@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  body { margin:0; background:#FAF8F9; font-family:Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#B0567E; text-decoration:none; }
+  a:hover { color:#8A3F61; }
+  input, textarea, button, select { font-family:inherit; }
+  input:focus, textarea:focus { outline:2px solid #F0D7E2; outline-offset:0; border-color:#B0567E !important; }
+  ::placeholder { color:#B6AEB3; }
+</style>
+</helmet>
+<div style="display:flex; min-height:100vh; color:#221D20; background:#FAF8F9;">
+
+  <aside style="width:236px; flex:0 0 236px; background:#FFFFFF; border-right:1px solid #EFE9EC; display:flex; flex-direction:column; padding:26px 16px 20px;">
+    <div style="display:flex; align-items:center; gap:9px; padding:0 10px 26px;">
+      <div style="width:26px; height:26px; border-radius:8px; background:#B0567E;"></div>
+      <div style="display:flex; flex-direction:column; gap:1px;">
+        <span style="font-size:15px; font-weight:700; letter-spacing:-0.3px;">{{ brandName }}</span>
+        <span style="font-size:10px; font-weight:600; color:#A79BA1; letter-spacing:0.4px;">ADMIN CONSOLE</span>
+      </div>
+    </div>
+
+    <nav style="display:flex; flex-direction:column; gap:2px;">
+      <button onClick="{{ goList }}" style="display:flex; align-items:center; gap:11px; padding:11px 12px; border:0; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; text-align:left; background:{{ navListBg }}; color:{{ navListColor }};" style-hover="background:#FAF2F5;">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="2.2" rx="1.1" fill="currentColor"/><rect x="2" y="7.9" width="14" height="2.2" rx="1.1" fill="currentColor"/><rect x="2" y="12.8" width="14" height="2.2" rx="1.1" fill="currentColor"/></svg>
+        예약 리스트
+        <span style="margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:#B0567E; color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ newCount }}</span>
+      </button>
+      <button onClick="{{ goCalendar }}" style="display:flex; align-items:center; gap:11px; padding:11px 12px; border:0; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; text-align:left; background:{{ navCalBg }}; color:{{ navCalColor }};" style-hover="background:#FAF2F5;">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><rect x="2.2" y="3.4" width="13.6" height="12.4" rx="3" stroke="currentColor" stroke-width="1.6"/><rect x="2.2" y="6.6" width="13.6" height="1.6" fill="currentColor"/><rect x="5" y="1.6" width="1.6" height="3.2" rx="0.8" fill="currentColor"/><rect x="11.4" y="1.6" width="1.6" height="3.2" rx="0.8" fill="currentColor"/></svg>
+        캘린더
+      </button>
+    </nav>
+
+    <div style="margin-top:auto; display:flex; flex-direction:column; gap:2px; padding-top:20px; border-top:1px solid #F3EEF0;">
+      <div style="display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:10px; font-size:13.5px; font-weight:500; color:#A79BA1;">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.6" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="9" r="6.4" stroke="currentColor" stroke-width="1.6"/></svg>
+        환경설정
+      </div>
+      <div style="display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:10px; font-size:13.5px; font-weight:500; color:#A79BA1;">
+        <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><rect x="2.6" y="4" width="12.8" height="10" rx="3" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/></svg>
+        고객지원
+      </div>
+    </div>
+  </aside>
+
+  <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+
+    <header style="height:66px; flex:0 0 66px; background:#FFFFFF; border-bottom:1px solid #EFE9EC; display:flex; align-items:center; gap:14px; padding:0 30px;">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="8" cy="8" r="5.6" stroke="#A79BA1" stroke-width="1.7"/><rect x="11.8" y="12.6" width="5" height="1.8" rx="0.9" transform="rotate(40 11.8 12.6)" fill="#A79BA1"/></svg>
+      <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="고객명 · 예식장 · 예약번호로 검색" style="flex:1; max-width:520px; border:0; font-size:14px; color:#221D20; background:transparent;" />
+      <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+        <span style="font-size:13px; color:#6E646A;">운영팀 김하늘</span>
+        <div style="width:32px; height:32px; border-radius:50%; background:#F3E2EA; color:#8A3F61; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center;">김</div>
+      </div>
+    </header>
+
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <main style="flex:1; padding:30px 30px 44px;">
+        <div style="display:flex; align-items:flex-end; gap:14px; margin-bottom:22px;">
+          <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.6px;">축의대 대행 예약</h1>
+          <span style="font-size:13px; color:#8C8188; padding-bottom:4px;">협의 내용을 확정하면 캘린더에 자동 등록됩니다</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:22px;">
+          <div style="background:#fff; border:1px solid #EFE9EC; border-radius:14px; padding:18px 20px;">
+            <div style="font-size:12.5px; color:#8C8188; font-weight:600;">신규 요청</div>
+            <div style="font-size:26px; font-weight:800; margin-top:6px; color:#B0567E;">{{ newCount }}</div>
+          </div>
+          <div style="background:#fff; border:1px solid #EFE9EC; border-radius:14px; padding:18px 20px;">
+            <div style="font-size:12.5px; color:#8C8188; font-weight:600;">협의 중</div>
+            <div style="font-size:26px; font-weight:800; margin-top:6px;">{{ talkingCount }}</div>
+          </div>
+          <div style="background:#fff; border:1px solid #EFE9EC; border-radius:14px; padding:18px 20px;">
+            <div style="font-size:12.5px; color:#8C8188; font-weight:600;">확정</div>
+            <div style="font-size:26px; font-weight:800; margin-top:6px;">{{ confirmedCount }}</div>
+          </div>
+          <div style="background:#fff; border:1px solid #EFE9EC; border-radius:14px; padding:18px 20px;">
+            <div style="font-size:12.5px; color:#8C8188; font-weight:600;">이번 달 확정 금액</div>
+            <div style="font-size:26px; font-weight:800; margin-top:6px;">{{ monthAmount }}</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:16px;">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+            <button onClick="{{ f.onClick }}" style="padding:8px 15px; border-radius:999px; border:1px solid {{ f.border }}; background:{{ f.bg }}; color:{{ f.color }}; font-size:13px; font-weight:600; cursor:pointer;">{{ f.label }}</button>
+          </sc-for>
+        </div>
+
+        <div style="background:#fff; border:1px solid #EFE9EC; border-radius:16px; overflow:hidden;">
+          <div style="overflow-x:auto;">
+          <div style="min-width:1000px; box-sizing:border-box; display:grid; grid-template-columns:120px minmax(0,1.1fr) minmax(0,1.5fr) 130px 90px 110px 108px; align-items:center; gap:12px; padding:14px 24px; border-bottom:1px solid #F1ECEE; font-size:12.5px; font-weight:700; color:#8C8188;">
+            <div>예약번호</div><div>고객</div><div>예식장 · 홀</div><div>예식일</div><div>인원</div><div>금액</div><div style="text-align:right;">상태</div>
+          </div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+            <div onClick="{{ r.onClick }}" style="min-width:1000px; box-sizing:border-box; display:grid; grid-template-columns:120px minmax(0,1.1fr) minmax(0,1.5fr) 130px 90px 110px 108px; align-items:center; gap:12px; padding:16px 24px; border-bottom:1px solid #F6F2F4; font-size:13.5px; cursor:pointer;" style-hover="background:#FCF7F9;">
+              <div style="color:#8C8188; font-variant-numeric:tabular-nums;">{{ r.id }}</div>
+              <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                <div style="width:30px; height:30px; flex:0 0 30px; border-radius:9px; background:#F6EBF0; color:#8A3F61; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ r.initial }}</div>
+                <span style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.customer }}</span>
+              </div>
+              <div style="color:#4A4247; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.venue }}</div>
+              <div style="font-variant-numeric:tabular-nums; color:#4A4247;">{{ r.date }}</div>
+              <div style="color:#4A4247;">{{ r.staff }}</div>
+              <div style="font-variant-numeric:tabular-nums; color:#4A4247;">{{ r.amount }}</div>
+              <div style="display:flex; justify-content:flex-end;">
+                <span style="padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; background:{{ r.badgeBg }}; color:{{ r.badgeColor }};">{{ r.status }}</span>
+              </div>
+            </div>
+          </sc-for>
+          </div>
+        </div>
+      </main>
+    </sc-if>
+
+    <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ true }}">
+      <main style="flex:1; padding:26px 30px 48px;">
+        <button onClick="{{ goList }}" style="border:0; background:transparent; color:#8C8188; font-size:13px; font-weight:600; cursor:pointer; padding:0; margin-bottom:14px;">← 예약 리스트</button>
+
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:22px;">
+          <h1 style="margin:0; font-size:25px; font-weight:800; letter-spacing:-0.6px;">{{ d.customer }} 님 · 축의대 대행</h1>
+          <span style="padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; background:{{ d.badgeBg }}; color:{{ d.badgeColor }};">{{ d.status }}</span>
+          <span style="font-size:13px; color:#8C8188; font-variant-numeric:tabular-nums;">{{ d.id }} · 접수 {{ d.createdAt }}</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:20px; align-items:start;">
+
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <section style="background:#fff; border:1px solid #EFE9EC; border-radius:16px; padding:22px 24px;">
+              <h2 style="margin:0 0 16px; font-size:15px; font-weight:700;">요청 정보</h2>
+              <div style="display:grid; grid-template-columns:96px minmax(0,1fr); gap:12px 16px; font-size:13.5px;">
+                <span style="color:#8C8188;">신랑 · 신부</span><span style="font-weight:600;">{{ d.couple }}</span>
+                <span style="color:#8C8188;">연락처</span><span>{{ d.phone }}</span>
+                <span style="color:#8C8188;">희망 일시</span><span>{{ d.wishDate }}</span>
+                <span style="color:#8C8188;">예식장</span><span>{{ d.venue }}</span>
+                <span style="color:#8C8188;">예상 하객</span><span>{{ d.guests }}</span>
+                <span style="color:#8C8188;">요청 사항</span><span style="line-height:1.6; text-wrap:pretty;">{{ d.memo }}</span>
+              </div>
+            </section>
+
+            <section style="background:#fff; border:1px solid #EFE9EC; border-radius:16px; padding:22px 24px;">
+              <h2 style="margin:0 0 16px; font-size:15px; font-weight:700;">협의 내용</h2>
+              <div style="display:flex; flex-direction:column; gap:16px;">
+                <sc-for list="{{ d.thread }}" as="t" hint-placeholder-count="3">
+                  <div style="display:flex; gap:12px;">
+                    <div style="width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#DCC4CF; margin-top:6px;"></div>
+                    <div style="min-width:0;">
+                      <div style="font-size:12px; color:#A79BA1; font-weight:600; margin-bottom:4px;">{{ t.who }} · {{ t.when }}</div>
+                      <div style="font-size:13.5px; line-height:1.65; color:#3B3438; text-wrap:pretty;">{{ t.text }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+
+          <section style="background:#fff; border:1px solid #EFE9EC; border-radius:16px; padding:22px 24px; position:sticky; top:20px;">
+            <h2 style="margin:0 0 4px; font-size:15px; font-weight:700;">확정 내용</h2>
+            <p style="margin:0 0 20px; font-size:12.5px; color:#8C8188;">협의된 내용을 최종 입력한 뒤 확정하세요.</p>
+
+            <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px;">
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">예식일
+                <input value="{{ f.date.value }}" onChange="{{ f.date.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">예식 시간
+                <input value="{{ f.time.value }}" onChange="{{ f.time.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A; grid-column:span 2;">예식장 · 홀
+                <input value="{{ f.venue.value }}" onChange="{{ f.venue.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">투입 인원
+                <input value="{{ f.staff.value }}" onChange="{{ f.staff.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">근무 시간
+                <input value="{{ f.hours.value }}" onChange="{{ f.hours.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">대행 금액 (원)
+                <input value="{{ f.amount.value }}" onChange="{{ f.amount.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">정산 방식
+                <input value="{{ f.pay.value }}" onChange="{{ f.pay.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A; grid-column:span 2;">특이사항
+                <textarea rows="3" value="{{ f.note.value }}" onChange="{{ f.note.onChange }}" style="border:1px solid #E6DEE2; border-radius:10px; padding:10px 12px; font-size:13.5px; color:#221D20; resize:vertical; line-height:1.6;"></textarea>
+              </label>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:22px;">
+              <button onClick="{{ onConfirm }}" style="flex:1; padding:13px; border:0; border-radius:11px; background:#B0567E; color:#fff; font-size:14px; font-weight:700; cursor:pointer;" style-hover="background:#993F68;">{{ confirmLabel }}</button>
+              <button onClick="{{ onHold }}" style="padding:13px 18px; border:1px solid #E6DEE2; border-radius:11px; background:#fff; color:#6E646A; font-size:14px; font-weight:600; cursor:pointer;" style-hover="background:#FAF6F8;">협의 중으로</button>
+            </div>
+            <sc-if value="{{ d.isConfirmed }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:14px; padding:12px 14px; border-radius:11px; background:#FAF2F5; color:#8A3F61; font-size:13px; font-weight:600; line-height:1.55;">확정 완료 · 캘린더 {{ f.date.value }} 일정에 등록되었습니다.</div>
+            </sc-if>
+          </section>
+        </div>
+      </main>
+    </sc-if>
+
+    <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+      <main style="flex:1; padding:30px 30px 48px;">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:22px;">
+          <h1 style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.6px;">{{ monthLabel }}</h1>
+          <div style="display:flex; gap:6px;">
+            <button onClick="{{ prevMonth }}" style="width:32px; height:32px; border:1px solid #E6DEE2; background:#fff; border-radius:9px; cursor:pointer; color:#6E646A; font-size:14px;">‹</button>
+            <button onClick="{{ nextMonth }}" style="width:32px; height:32px; border:1px solid #E6DEE2; background:#fff; border-radius:9px; cursor:pointer; color:#6E646A; font-size:14px;">›</button>
+          </div>
+          <span style="font-size:13px; color:#8C8188;">확정된 축의대 대행 일정 {{ monthEventCount }}건</span>
+        </div>
+
+        <div style="background:#fff; border:1px solid #EFE9EC; border-radius:16px; overflow:hidden;">
+          <div style="display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); border-bottom:1px solid #F1ECEE;">
+            <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7">
+              <div style="padding:12px 14px; font-size:12.5px; font-weight:700; color:{{ w.color }};">{{ w.label }}</div>
+            </sc-for>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(7, minmax(0,1fr));">
+          <sc-for list="{{ days }}" as="d" hint-placeholder-count="35">
+            <div style="min-height:112px; border-right:1px solid #F6F2F4; border-bottom:1px solid #F6F2F4; padding:10px 10px 12px; background:{{ d.bg }}; display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:12.5px; font-weight:700; color:{{ d.numColor }}; font-variant-numeric:tabular-nums;">{{ d.num }}</span>
+              <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="0">
+                <div onClick="{{ e.onClick }}" style="background:#F7EAF0; border-left:3px solid #B0567E; border-radius:6px; padding:6px 8px; cursor:pointer;" style-hover="background:#F1DCE6;">
+                  <div style="font-size:11.5px; font-weight:700; color:#8A3F61; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ e.time }} {{ e.customer }}</div>
+                  <div style="font-size:11px; color:#9A7A89; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ e.venue }} · {{ e.staff }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+          </div>
+        </div>
+      </main>
+    </sc-if>
+
+  </div>
+
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; left:50%; bottom:32px; transform:translateX(-50%); background:#2B2126; color:#fff; padding:13px 22px; border-radius:999px; font-size:13.5px; font-weight:600; box-shadow:0 12px 30px rgba(60,30,45,0.24);">{{ toast }}</div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;brandName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;웨딩버틀러&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const DATA = [
+  { id:"WB-20260901", customer:"이서연", couple:"박준호 · 이서연", phone:"010-2847-1103", createdAt:"09.01", wishDate:"2026년 9월 19일 (토) 12:00", venue:"더채플앳청담 · 그랜드홀", guests:"약 350명", memo:"양가 축의대 분리 운영 희망. 봉투 정리 및 명부 작성까지 부탁드립니다.", status:"신규요청",
+    thread:[{who:"고객", when:"09.01 14:22", text:"신랑측 2명, 신부측 2명으로 나눠서 진행 가능할까요?"},{who:"운영팀", when:"09.01 16:40", text:"4인 배치 가능합니다. 예식 1시간 전 도착 기준으로 안내드렸습니다."}],
+    confirm:{ date:"2026-09-19", time:"12:00", venue:"더채플앳청담 그랜드홀", staff:"4명", hours:"11:00 - 14:00", amount:"480,000", pay:"예식 당일 현장 결제", note:"양가 축의대 분리 · 명부 2부 작성" } },
+  { id:"WB-20260902", customer:"정하린", couple:"김도윤 · 정하린", phone:"010-5521-8890", createdAt:"09.02", wishDate:"2026년 9월 26일 (토) 14:30", venue:"소노펠리체 컨벤션 · 아모리스홀", guests:"약 220명", memo:"혼주 두 분 모두 지방에서 오셔서 축의대 전담이 필요합니다.", status:"협의중",
+    thread:[{who:"고객", when:"09.02 10:05", text:"2명이면 충분할까요? 예상 하객 220명입니다."},{who:"운영팀", when:"09.02 11:12", text:"200명 내외는 2인 권장드립니다. 금액은 24만원입니다."},{who:"고객", when:"09.03 09:30", text:"네 2명으로 진행할게요. 시간은 13:30 도착으로 부탁드립니다."}],
+    confirm:{ date:"2026-09-26", time:"14:30", venue:"소노펠리체 컨벤션 아모리스홀", staff:"2명", hours:"13:30 - 16:00", amount:"240,000", pay:"사전 계좌 이체", note:"" } },
+  { id:"WB-20260903", customer:"문지우", couple:"문지우 · 강예린", phone:"010-3320-4417", createdAt:"09.03", wishDate:"2026년 9월 12일 (토) 11:00", venue:"라온제나 웨딩홀 · 로즈홀", guests:"약 180명", memo:"축의금 즉시 입금 대행까지 가능한지 문의드립니다.", status:"확정",
+    thread:[{who:"운영팀", when:"09.03 15:00", text:"입금 대행은 혼주 동행 시에만 가능합니다."},{who:"고객", when:"09.04 09:10", text:"혼주 동행으로 진행하겠습니다. 확정 부탁드려요."}],
+    confirm:{ date:"2026-09-12", time:"11:00", venue:"라온제나 웨딩홀 로즈홀", staff:"2명", hours:"10:00 - 12:30", amount:"260,000", pay:"사전 계좌 이체", note:"혼주 동행 입금 대행 포함" } },
+  { id:"WB-20260904", customer:"한수아", couple:"오시현 · 한수아", phone:"010-7788-2044", createdAt:"09.04", wishDate:"2026년 9월 20일 (일) 13:00", venue:"그랜드하얏트 서울 · 그랜드볼룸", guests:"약 400명", memo:"VIP 하객 응대 경험 있는 인원으로 요청드립니다.", status:"확정",
+    thread:[{who:"고객", when:"09.04 18:20", text:"정장 착용 가능한 분들로 부탁드립니다."},{who:"운영팀", when:"09.05 10:02", text:"블랙 포멀 복장으로 5인 배치하겠습니다."}],
+    confirm:{ date:"2026-09-20", time:"13:00", venue:"그랜드하얏트 서울 그랜드볼룸", staff:"5명", hours:"11:30 - 15:00", amount:"650,000", pay:"세금계산서 발행", note:"블랙 포멀 복장 · VIP 동선 별도 안내" } },
+  { id:"WB-20260905", customer:"배유진", couple:"임태경 · 배유진", phone:"010-9911-3376", createdAt:"09.05", wishDate:"2026년 10월 3일 (토) 12:30", venue:"아펠가모 잠실 · 루체홀", guests:"약 250명", memo:"축의대 2곳 + 방명록 담당 1명 필요합니다.", status:"신규요청",
+    thread:[{who:"고객", when:"09.05 20:41", text:"방명록까지 포함해서 견적 부탁드립니다."}],
+    confirm:{ date:"2026-10-03", time:"12:30", venue:"아펠가모 잠실 루체홀", staff:"3명", hours:"11:30 - 14:30", amount:"360,000", pay:"", note:"" } },
+  { id:"WB-20260906", customer:"조민서", couple:"조민서 · 윤가영", phone:"010-4402-7781", createdAt:"09.06", wishDate:"2026년 9월 27일 (일) 16:00", venue:"웨딩시티 신도림 · 펄홀", guests:"약 150명", memo:"소규모라 2명이면 충분할 것 같습니다.", status:"협의중",
+    thread:[{who:"운영팀", when:"09.06 13:30", text:"150명 기준 2인 배치로 안내드립니다."}],
+    confirm:{ date:"2026-09-27", time:"16:00", venue:"웨딩시티 신도림 펄홀", staff:"2명", hours:"15:00 - 17:30", amount:"220,000", pay:"현장 카드 결제", note:"" } },
+  { id:"WB-20260907", customer:"신다은", couple:"류현우 · 신다은", phone:"010-6612-5509", createdAt:"09.07", wishDate:"2026년 9월 13일 (일) 14:00", venue:"더컨벤션 영등포 · 다이아몬드홀", guests:"약 300명", memo:"축의금 집계표 엑셀 파일로 전달 부탁드립니다.", status:"확정",
+    thread:[{who:"고객", when:"09.07 11:18", text:"집계표 양식 따로 있으신가요?"},{who:"운영팀", when:"09.07 12:00", text:"표준 양식으로 예식 후 2시간 내 전달드립니다."}],
+    confirm:{ date:"2026-09-13", time:"14:00", venue:"더컨벤션 영등포 다이아몬드홀", staff:"4명", hours:"13:00 - 16:00", amount:"460,000", pay:"사전 계좌 이체", note:"축의금 집계표 엑셀 전달" } },
+  { id:"WB-20260908", customer:"권나연", couple:"허준영 · 권나연", phone:"010-2233-6647", createdAt:"09.08", wishDate:"2026년 10월 10일 (토) 11:30", venue:"노블발렌티 대치 · 그랜드홀", guests:"약 280명", memo:"부모님 없이 진행되어 전 과정 대행이 필요합니다.", status:"신규요청",
+    thread:[{who:"고객", when:"09.08 22:05", text:"축의금 보관 및 전달까지 모두 대행 가능할까요?"}],
+    confirm:{ date:"2026-10-10", time:"11:30", venue:"노블발렌티 대치 그랜드홀", staff:"3명", hours:"10:30 - 13:30", amount:"420,000", pay:"", note:"" } }
+];
+
+const BADGE = {
+  "신규요청": { bg:"#F7EAF0", color:"#A8416C" },
+  "협의중":  { bg:"#F4F1EC", color:"#8A7A5E" },
+  "확정":    { bg:"#EDF1F6", color:"#3F5A7A" }
+};
+
+class Component extends DCLogic {
+  state = {
+    page: "list",
+    selectedId: null,
+    filter: "전체",
+    query: "",
+    toast: "",
+    month: 8, // 0-indexed: Sept 2026
+    year: 2026,
+    items: DATA.map(function(d){ return Object.assign({}, d, { confirm: Object.assign({}, d.confirm) }); })
+  };
+
+  showToast(msg) {
+    clearTimeout(this._t);
+    this.setState({ toast: msg });
+    this._t = setTimeout(() => this.setState({ toast: "" }), 2600);
+  }
+
+  setField(key, val) {
+    this.setState(s => ({
+      items: s.items.map(it => it.id === s.selectedId ? Object.assign({}, it, { confirm: Object.assign({}, it.confirm, { [key]: val }) }) : it)
+    }));
+  }
+
+  setStatus(status, msg) {
+    this.setState(s => ({ items: s.items.map(it => it.id === s.selectedId ? Object.assign({}, it, { status }) : it) }));
+    this.showToast(msg);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const q = s.query.trim();
+    const list = s.items.filter(it => {
+      const okFilter = s.filter === "전체" || it.status === s.filter;
+      const okQuery = !q || (it.customer + it.venue + it.id).indexOf(q) >= 0;
+      return okFilter && okQuery;
+    });
+
+    const rows = list.map(it => ({
+      id: it.id, customer: it.customer, initial: it.customer.slice(0,1),
+      venue: it.confirm.venue, date: it.confirm.date.replace(/-/g, ". "),
+      staff: it.confirm.staff, amount: it.confirm.amount ? it.confirm.amount + "원" : "미정",
+      status: it.status, badgeBg: BADGE[it.status].bg, badgeColor: BADGE[it.status].color,
+      onClick: () => this.setState({ page:"detail", selectedId: it.id })
+    }));
+
+    const mkFilter = (label) => ({
+      label,
+      bg: s.filter === label ? "#B0567E" : "#FFFFFF",
+      color: s.filter === label ? "#FFFFFF" : "#6E646A",
+      border: s.filter === label ? "#B0567E" : "#E6DEE2",
+      onClick: () => this.setState({ filter: label })
+    });
+
+    const cur = s.items.find(it => it.id === s.selectedId) || s.items[0];
+    const c = cur.confirm;
+    const field = (key) => ({ value: c[key], onChange: (e) => this.setField(key, e.target.value) });
+
+    const confirmedAll = s.items.filter(it => it.status === "확정");
+    const pad = (n) => String(n).padStart(2, "0");
+    const monthPrefix = s.year + "-" + pad(s.month + 1);
+    const monthEvents = confirmedAll.filter(it => it.confirm.date.indexOf(monthPrefix) === 0);
+
+    const first = new Date(s.year, s.month, 1);
+    const startPad = first.getDay();
+    const daysInMonth = new Date(s.year, s.month + 1, 0).getDate();
+    const prevDays = new Date(s.year, s.month, 0).getDate();
+    const cells = [];
+    for (let i = startPad - 1; i >= 0; i--) cells.push({ num: prevDays - i, dim: true, key: null });
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ num: d, dim: false, key: monthPrefix + "-" + pad(d) });
+    while (cells.length % 7 !== 0) cells.push({ num: cells.length % 7, dim: true, key: null });
+
+    const todayKey = "2026-09-11";
+    const days = cells.map(cell => {
+      const evs = cell.key ? monthEvents.filter(it => it.confirm.date === cell.key) : [];
+      return {
+        num: cell.num,
+        bg: cell.dim ? "#FCFAFB" : (cell.key === todayKey ? "#FDF7FA" : "#FFFFFF"),
+        numColor: cell.dim ? "#D2C9CE" : (cell.key === todayKey ? "#B0567E" : "#6E646A"),
+        events: evs.map(it => ({
+          time: it.confirm.time, customer: it.customer + " 님",
+          venue: it.confirm.venue, staff: it.confirm.staff,
+          onClick: () => this.setState({ page:"detail", selectedId: it.id })
+        }))
+      };
+    });
+
+    const sumMonth = monthEvents.reduce((a, it) => a + Number(String(it.confirm.amount).replace(/[^0-9]/g, "") || 0), 0);
+
+    return {
+      brandName: this.props.brandName ?? "웨딩버틀러",
+      isList: s.page === "list", isDetail: s.page === "detail", isCalendar: s.page === "calendar",
+      navListBg: s.page === "calendar" ? "transparent" : "#FAF2F5",
+      navListColor: s.page === "calendar" ? "#6E646A" : "#B0567E",
+      navCalBg: s.page === "calendar" ? "#FAF2F5" : "transparent",
+      navCalColor: s.page === "calendar" ? "#B0567E" : "#6E646A",
+      goList: () => this.setState({ page:"list" }),
+      goCalendar: () => this.setState({ page:"calendar" }),
+      query: s.query, onQuery: (e) => this.setState({ query: e.target.value }),
+      filters: ["전체","신규요청","협의중","확정"].map(mkFilter),
+      rows,
+      newCount: s.items.filter(it => it.status === "신규요청").length,
+      talkingCount: s.items.filter(it => it.status === "협의중").length,
+      confirmedCount: confirmedAll.length,
+      monthAmount: sumMonth.toLocaleString("ko-KR") + "원",
+      toast: s.toast,
+      d: {
+        id: cur.id, customer: cur.customer, couple: cur.couple, phone: cur.phone,
+        createdAt: cur.createdAt, wishDate: cur.wishDate, venue: cur.venue, guests: cur.guests,
+        memo: cur.memo, thread: cur.thread, status: cur.status,
+        badgeBg: BADGE[cur.status].bg, badgeColor: BADGE[cur.status].color,
+        isConfirmed: cur.status === "확정"
+      },
+      f: { date: field("date"), time: field("time"), venue: field("venue"), staff: field("staff"),
+           hours: field("hours"), amount: field("amount"), pay: field("pay"), note: field("note") },
+      confirmLabel: cur.status === "확정" ? "확정 내용 저장" : "확정하기",
+      onConfirm: () => this.setState({ selectedId: cur.id }, () => this.setStatus("확정", cur.status === "확정" ? "확정 내용이 저장되었습니다." : cur.customer + " 님 예약이 확정되어 캘린더에 등록되었습니다.")),
+      onHold: () => this.setState({ selectedId: cur.id }, () => this.setStatus("협의중", "협의 중 상태로 변경했습니다.")),
+      monthLabel: s.year + "년 " + (s.month + 1) + "월",
+      monthEventCount: monthEvents.length,
+      weekdays: ["일","월","화","수","목","금","토"].map((w, i) => ({ label: w, color: i === 0 ? "#C06B84" : "#8C8188" })),
+      days,
+      prevMonth: () => this.setState(st => st.month === 0 ? { month:11, year: st.year - 1 } : { month: st.month - 1 }),
+      nextMonth: () => this.setState(st => st.month === 11 ? { month:0, year: st.year + 1 } : { month: st.month + 1 })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

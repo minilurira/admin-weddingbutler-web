@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  body { margin:0; background:#FFFFFF; font-family:Pretendard, -apple-system, "Apple SD Gothic Neo", sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#B0567E; text-decoration:none; }
+  a:hover { color:#8A3F61; }
+  input, textarea, button { font-family:inherit; }
+  input:focus, textarea:focus { outline:none; }
+  ::placeholder { color:#AFA7AC; }
+</style>
+</helmet>
+<sc-if value="{{ loggedOut }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height:100vh; display:flex; background:linear-gradient(160deg, #FDF7FA 0%, #F7E9F0 42%, #EFDCE6 100%); color:#1E1A1C;">
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; padding:48px 32px;">
+      <div style="width:100%; max-width:372px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+        <img src="assets/wb-logo.png" alt="웨딩버틀러" style="width:64px; height:64px; border-radius:20px; display:block; margin-bottom:22px;">
+        <h1 style="margin:0 0 8px; font-size:27px; font-weight:800; letter-spacing:-0.7px;">웨딩버틀러 어드민</h1>
+        <p style="margin:0 0 34px; font-size:14px; color:#8C8188;">축의대 대행 예약을 확인하고 확정하세요.</p>
+
+        <label style="width:100%; box-sizing:border-box; text-align:left; display:flex; flex-direction:column; gap:8px; font-size:12.5px; font-weight:700; color:#6E646A; margin-bottom:14px;">아이디
+          <input value="{{ loginId }}" onChange="{{ onLoginId }}" onKeyDown="{{ onLoginKey }}" placeholder="admin" style="border:0; background:#FFFFFF; border-radius:14px; padding:15px 16px; font-size:14.5px; color:#1E1A1C;">
+        </label>
+        <label style="width:100%; box-sizing:border-box; text-align:left; display:flex; flex-direction:column; gap:8px; font-size:12.5px; font-weight:700; color:#6E646A;">비밀번호
+          <input type="password" value="{{ loginPw }}" onChange="{{ onLoginPw }}" onKeyDown="{{ onLoginKey }}" placeholder="비밀번호를 입력하세요" style="border:0; background:#FFFFFF; border-radius:14px; padding:15px 16px; font-size:14.5px; color:#1E1A1C;">
+        </label>
+
+        <div style="width:100%; display:flex; align-items:center; justify-content:space-between; margin:16px 0 22px;">
+          <button onClick="{{ toggleRemember }}" style="display:flex; align-items:center; gap:8px; border:0; background:transparent; cursor:pointer; padding:0; font-size:13px; color:#6E646A;">
+            <span style="width:18px; height:18px; border-radius:6px; border:1px solid {{ rememberBorder }}; background:{{ rememberBg }}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700;">{{ rememberMark }}</span>
+            로그인 상태 유지
+          </button>
+          <a href="#" style="font-size:13px;">비밀번호 찾기</a>
+        </div>
+
+        <sc-if value="{{ loginError }}" hint-placeholder-val="{{ false }}">
+          <div style="width:100%; box-sizing:border-box; margin-bottom:14px; padding:12px 14px; border-radius:12px; background:#FBEEF2; color:#A8416C; font-size:13px; font-weight:600;">{{ loginError }}</div>
+        </sc-if>
+
+        <button onClick="{{ doLogin }}" style="width:100%; height:54px; border:0; border-radius:14px; background:#B0567E; color:#fff; font-size:15.5px; font-weight:700; cursor:pointer;" style-hover="background:#98416A;">로그인</button>
+        <p style="margin:18px 0 0; font-size:12.5px; color:#A79BA1; line-height:1.6;">데모 계정 · 아이디 admin / 비밀번호 wb1234</p>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex; flex-direction:{{ shellDir }}; min-height:100vh; color:#1E1A1C; background:#FFFFFF;">
+
+  <sc-if value="{{ navOpen }}" hint-placeholder-val="{{ true }}">
+  <aside style="width:{{ sideW }}; flex:{{ sideFlex }}; box-sizing:border-box; border-right:1px solid #F0EDEF; display:flex; flex-direction:column; padding:18px 18px 0; position:{{ sidePos }}; top:0; left:0; height:{{ sideH }}; z-index:{{ sideZ }}; background:#FFFFFF; box-shadow:{{ sideShadow }};">
+    <div style="display:flex; align-items:center; gap:10px; padding:6px 8px 20px;">
+      <img src="assets/wb-logo.png" alt="웨딩버틀러" style="width:34px; height:34px; border-radius:11px; display:block;">
+      <span style="font-size:19px; font-weight:800; letter-spacing:-0.5px;">{{ brandName }}</span>
+    </div>
+
+    <nav style="display:flex; flex-direction:{{ navDir }}; flex-wrap:{{ navWrap }}; gap:4px;">
+      <button onClick="{{ goDash }}" style="display:flex; align-items:center; gap:12px; height:46px; padding:0 14px; border:0; border-radius:12px; cursor:pointer; font-size:14.5px; font-weight:600; text-align:left; background:{{ navDashBg }}; color:{{ navDashColor }};" style-hover="background:#FBF2F6;">
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none"><rect x="2.6" y="2.6" width="6.4" height="6.4" rx="2" fill="currentColor"></rect><rect x="11" y="2.6" width="6.4" height="6.4" rx="2" stroke="currentColor" stroke-width="1.7"></rect><rect x="2.6" y="11" width="6.4" height="6.4" rx="2" stroke="currentColor" stroke-width="1.7"></rect><rect x="11" y="11" width="6.4" height="6.4" rx="2" fill="currentColor"></rect></svg>
+        대시보드
+      </button>
+      <button onClick="{{ goList }}" style="display:flex; align-items:center; gap:12px; height:46px; padding:0 14px; border:0; border-radius:12px; cursor:pointer; font-size:14.5px; font-weight:600; text-align:left; background:{{ navListBg }}; color:{{ navListColor }};" style-hover="background:#FBF2F6;">
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="4" width="15" height="2.4" rx="1.2" fill="currentColor"></rect><rect x="2.5" y="8.8" width="15" height="2.4" rx="1.2" fill="currentColor"></rect><rect x="2.5" y="13.6" width="15" height="2.4" rx="1.2" fill="currentColor"></rect></svg>
+        예약 리스트
+        <span style="margin-left:auto; font-size:13px; font-weight:700; color:#B0567E;">{{ totalCount }}</span>
+      </button>
+
+
+      <button onClick="{{ goCalendar }}" style="display:flex; align-items:center; gap:12px; height:46px; padding:0 14px; border:0; border-radius:12px; cursor:pointer; font-size:14.5px; font-weight:600; text-align:left; background:{{ navCalBg }}; color:{{ navCalColor }};" style-hover="background:#FBF2F6;">
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none"><rect x="2.6" y="4" width="14.8" height="13.4" rx="3.4" stroke="currentColor" stroke-width="1.7"></rect><rect x="2.6" y="7.6" width="14.8" height="1.7" fill="currentColor"></rect><rect x="5.6" y="1.9" width="1.8" height="3.6" rx="0.9" fill="currentColor"></rect><rect x="12.6" y="1.9" width="1.8" height="3.6" rx="0.9" fill="currentColor"></rect></svg>
+        캘린더
+      </button>
+    </nav>
+
+    <div style="margin-top:auto; border-top:1px solid #F0EDEF; padding:16px 6px 18px; display:flex; flex-direction:{{ footerDir }}; flex-wrap:wrap; gap:10px 24px;">
+      <div style="display:flex; justify-content:space-between; font-size:13px; color:#8C8188;"><span>이번 달 확정</span><span style="color:#B0567E; font-weight:700;">{{ confirmedCount }}건</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; color:#8C8188;"><span>확정 금액</span><span style="color:#B0567E; font-weight:700;">{{ monthAmount }}</span></div>
+    </div>
+  </aside>
+  </sc-if>
+
+  <sc-if value="{{ showNavBackdrop }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ toggleNav }}" style="position:fixed; inset:0; z-index:45; background:rgba(40,26,33,0.32);"></div>
+  </sc-if>
+
+  <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+
+    <header style="min-height:{{ headerH }}; display:flex; flex-wrap:{{ headerWrap }}; align-items:center; gap:12px 16px; padding:{{ headerPadY }} {{ padX }};">
+      <button onClick="{{ toggleNav }}" title="메뉴" style="width:42px; height:42px; flex:0 0 42px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:0; border-radius:12px; background:#F6F3F5; cursor:pointer;" style-hover="background:#EFEAEC;">
+        <span style="width:16px; height:2px; border-radius:1px; background:#6E646A;"></span>
+        <span style="width:16px; height:2px; border-radius:1px; background:#6E646A;"></span>
+        <span style="width:16px; height:2px; border-radius:1px; background:#6E646A;"></span>
+      </button>
+      <div style="flex:1 1 220px; min-width:180px; max-width:660px; display:flex; align-items:center; gap:10px; height:48px; padding:0 18px; border-radius:14px; background:#F6F3F5;">
+        <svg width="19" height="19" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6.2" stroke="#9E9399" stroke-width="1.8"></circle><rect x="13.2" y="14" width="5.4" height="2" rx="1" transform="rotate(40 13.2 14)" fill="#9E9399"></rect></svg>
+        <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="예약 전체 검색" style="flex:1; border:0; background:transparent; font-size:14.5px; color:#1E1A1C;">
+      </div>
+      <div style="margin-left:auto; display:flex; align-items:center; gap:14px;">
+        <span style="font-size:13.5px; color:#6E646A;">운영팀 이강</span>
+        <div style="width:36px; height:36px; border-radius:50%; background:#F5E4EC; color:#8A3F61; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center;">이</div>
+        <button onClick="{{ doLogout }}" style="height:34px; padding:0 14px; border:0; border-radius:10px; background:#F6F3F5; color:#6E646A; font-size:13px; font-weight:600; cursor:pointer;" style-hover="background:#EFEAEC;">로그아웃</button>
+      </div>
+    </header>
+
+    <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+      <main style="flex:1; min-width:0; padding:4px {{ padX }} 48px;">
+        <h1 style="margin:0 0 22px; font-size:27px; font-weight:800; letter-spacing:-0.7px;">대시보드</h1>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(178px, 1fr)); gap:16px; margin-bottom:24px;">
+          <div onClick="{{ goNew }}" style="background:#F7EDF2; border-radius:18px; padding:22px 24px; min-height:112px; cursor:pointer;">
+            <div style="font-size:15px; font-weight:800; line-height:1.45; color:#7E3855;">신규 요청 {{ newCount }}건<br>확인이 필요해요</div>
+            <div style="font-size:12.5px; color:#9E7286; margin-top:8px;">협의 후 확정하면 캘린더에 등록됩니다</div>
+          </div>
+          <div onClick="{{ goTalking }}" style="background:#F2F1EE; border-radius:18px; padding:22px 24px; min-height:112px; cursor:pointer;">
+            <div style="font-size:15px; font-weight:800; line-height:1.45; color:#4E4A43;">협의 중 {{ talkingCount }}건<br>응답을 기다리고 있어요</div>
+            <div style="font-size:12.5px; color:#8A857C; margin-top:8px;">최근 응답 09.08 22:05</div>
+          </div>
+          <div onClick="{{ goConfirmed }}" style="background:#EDF0F4; border-radius:18px; padding:22px 24px; min-height:112px; cursor:pointer;">
+            <div style="font-size:15px; font-weight:800; line-height:1.45; color:#3E4C5C;">이번 달 확정 {{ confirmedCount }}건<br>{{ monthAmount }}</div>
+            <div style="font-size:12.5px; color:#7A8794; margin-top:8px;">투입 예정 버틀러 {{ staffTotal }}명</div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start;">
+          <div style="flex:1 1 300px; min-width:260px; border-radius:18px; background:#FFFFFF; border:1px solid #F0EDEF; padding:18px 18px 22px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+              <span style="font-size:19px; font-weight:800; letter-spacing:-0.4px;">{{ monthShort }}</span>
+              <div style="margin-left:auto; display:flex; gap:4px;">
+                <button onClick="{{ prevMonth }}" style="width:28px; height:28px; border:0; background:transparent; cursor:pointer; color:#8C8188; font-size:15px;">‹</button>
+                <button onClick="{{ nextMonth }}" style="width:28px; height:28px; border:0; background:transparent; cursor:pointer; color:#8C8188; font-size:15px;">›</button>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:2px 0;">
+              <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7">
+                <div style="height:28px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:{{ w.color }};">{{ w.label }}</div>
+              </sc-for>
+              <sc-for list="{{ mini }}" as="m" hint-placeholder-count="35">
+                <button onClick="{{ m.onClick }}" style="height:38px; border:0; background:transparent; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:10px;" style-hover="background:#F8F5F7;">
+                  <span style="width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:{{ m.weight }}; color:{{ m.color }}; background:{{ m.bg }}; font-variant-numeric:tabular-nums;">{{ m.num }}</span>
+                  <span style="width:4px; height:4px; border-radius:50%; background:{{ m.dot }};"></span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="flex:1 1 300px; min-width:260px; border-radius:18px; background:#F6F3F5; padding:20px;">
+            <div style="font-size:14px; font-weight:800; margin-bottom:14px;">다가오는 확정 일정</div>
+            <div style="display:flex; flex-direction:column; gap:14px;">
+              <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="3">
+                <div onClick="{{ u.onClick }}" style="display:flex; gap:12px; cursor:pointer;">
+                  <div style="width:3px; border-radius:2px; background:#B0567E; flex:0 0 3px;"></div>
+                  <div style="min-width:0;">
+                    <div style="font-size:13.5px; font-weight:700;">{{ u.dateLabel }} {{ u.time }}</div>
+                    <div style="font-size:12.5px; color:#8C8188; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ u.customer }} 님 · {{ u.venue }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </main>
+    </sc-if>
+
+    <div style="display:{{ paneDisplay }}; flex-wrap:wrap; align-items:stretch; flex:1; min-width:0;">
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+        <main style="flex:1 1 240px; min-width:0; max-width:{{ listMaxW }}; box-sizing:border-box; padding:6px {{ padX }} 48px;">
+          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:14px;">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+              <button onClick="{{ f.onClick }}" style="height:44px; padding:0 22px; border-radius:999px; border:1px solid {{ f.border }}; background:{{ f.bg }}; color:{{ f.color }}; font-size:14.5px; font-weight:700; cursor:pointer;">{{ f.label }}</button>
+            </sc-for>
+            <button onClick="{{ goList }}" style="margin-left:auto; height:44px; padding:0 20px; border:0; border-radius:14px; background:#B0567E; color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;" style-hover="background:#98416A;">새 예약 등록</button>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+              <div onClick="{{ r.onClick }}" style="display:flex; flex-direction:column; gap:8px; padding:16px 18px; border-radius:16px; cursor:pointer; background:{{ r.cardBg }}; box-shadow:inset 0 0 0 1px {{ r.cardRing }};" style-hover="background:#F3EFF1;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px;">
+                  <span style="width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:{{ r.badgeColor }};"></span>
+                  <span style="flex:1 1 auto; min-width:0; font-size:14.5px; font-weight:700; word-break:keep-all;">{{ r.customer }} 님</span>
+                  <span style="flex:0 0 auto; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; background:{{ r.badgeBg }}; color:{{ r.badgeColor }};">{{ r.status }}</span>
+                </div>
+                <div style="font-size:13px; color:#6E646A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.venue }}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:4px 10px; font-size:12.5px; color:#8C8188;">
+                  <span style="font-variant-numeric:tabular-nums;">{{ r.date }}</span>
+                  <span style="color:#B0567E; font-weight:600;">{{ r.id }}</span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:4px 10px; font-size:12.5px; color:#8C8188;">
+                  <span>{{ r.staff }}</span>
+                  <span style="margin-left:auto; font-weight:700; color:#413A3E; font-variant-numeric:tabular-nums;">{{ r.amount }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </main>
+
+    </sc-if>
+
+    <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ false }}">
+      <main style="flex:1.6 1 280px; min-width:0; box-sizing:border-box; padding:6px {{ padX }} 52px; border-left:{{ detailBorder }}; position:{{ detailPos }}; inset:{{ detailInset }}; z-index:{{ detailZ }}; background:#FFFFFF; overflow-y:{{ detailOverflow }};">
+        <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0 16px;">
+            <span style="font-size:13.5px; font-weight:700; color:#8C8188;">예약 상세</span>
+            <button onClick="{{ closeDetail }}" style="height:38px; padding:0 16px; border:0; border-radius:12px; background:#F6F3F5; color:#6E646A; font-size:13.5px; font-weight:700; cursor:pointer;">닫기</button>
+          </div>
+        </sc-if>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:22px;">
+          <h1 style="margin:0; font-size:22px; font-weight:800; letter-spacing:-0.6px; word-break:keep-all;">{{ d.customer }} 님 · 축의대 대행</h1>
+          <span style="padding:5px 12px; border-radius:999px; font-size:12px; font-weight:700; background:{{ d.badgeBg }}; color:{{ d.badgeColor }};">{{ d.status }}</span>
+          <span style="font-size:13px; color:#8C8188;">{{ d.id }} · 접수 {{ d.createdAt }}</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:20px; align-items:start;">
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <section style="background:#F8F6F7; border-radius:18px; padding:24px;">
+              <h2 style="margin:0 0 4px; font-size:15px; font-weight:800;">예약 내역</h2>
+              <p style="margin:0 0 16px; font-size:12.5px; color:#A79BA1;">고객이 홈페이지에서 신청한 내용입니다</p>
+
+              <div style="font-size:19px; font-weight:800; letter-spacing:-0.4px;">{{ req.plan }}</div>
+              <div style="font-size:12.5px; color:#8C8188; margin-top:5px;">{{ req.planDesc }}</div>
+              <div style="height:1px; background:#ECE7E9; margin:16px 0;"></div>
+
+              <div style="display:grid; grid-template-columns:96px minmax(0,1fr); gap:13px 16px; font-size:13.5px;">
+                <span style="color:#8C8188;">예식 일시</span><span style="font-weight:600;">{{ d.wishDate }}</span>
+                <span style="color:#8C8188;">예식장</span><span>{{ d.venue }}</span>
+                <span style="color:#8C8188;">배정 버틀러</span><span>{{ req.butlers }}</span>
+                <span style="color:#8C8188;">예상 하객</span><span>{{ d.guests }}</span>
+                <span style="color:#8C8188;">예약자</span><span>{{ d.couple }} · {{ d.phone }}</span>
+                <span style="color:#8C8188;">요청 사항</span><span style="line-height:1.6; text-wrap:pretty;">{{ d.memo }}</span>
+              </div>
+
+              <div style="height:1px; background:#ECE7E9; margin:16px 0;"></div>
+
+              <div style="display:flex; flex-direction:column; gap:10px; font-size:13px; color:#6E646A;">
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>기본 요금</span><span style="font-weight:600; color:#413A3E;">{{ req.base }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>추가 하객 {{ req.extraGuests }}명</span><span style="font-weight:600; color:#413A3E;">{{ req.guestFee }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>버틀러 추가</span><span style="font-weight:600; color:#413A3E;">{{ req.butlerFee }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px; padding-top:10px; border-top:1px solid #ECE7E9;"><span>총 금액 (부가세 포함)</span><span style="font-weight:700; color:#413A3E;">{{ req.total }}</span></div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:14px;">
+                <span style="font-size:13.5px; font-weight:700; color:#7E3855;">선결제 50%</span>
+                <span style="font-size:20px; font-weight:800; color:#7E3855;">{{ req.prepay }}</span>
+              </div>
+              <div style="font-size:12px; color:#9E7286; margin-top:6px; text-align:right;">예식 후 잔금 {{ req.balance }}</div>
+            </section>
+
+            <section style="padding:0 4px;">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
+                <h2 style="margin:0; font-size:15px; font-weight:800;">협의 내용</h2>
+                <span style="font-size:12.5px; color:#A79BA1;">유선으로 협의된 고객 요청 내용을 기록하세요</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:18px;">
+                <sc-for list="{{ d.thread }}" as="t" hint-placeholder-count="3">
+                  <div style="display:flex; gap:12px;">
+                    <div style="width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#DCC4CF; margin-top:7px;"></div>
+                    <div style="min-width:0;">
+                      <div style="font-size:12px; color:#A79BA1; font-weight:600; margin-bottom:5px;">{{ t.when }}</div>
+                      <div style="font-size:13.5px; line-height:1.65; color:#373135; text-wrap:pretty;">{{ t.text }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="margin-top:20px; background:#F8F6F7; border-radius:16px; padding:16px;">
+                <div style="font-size:12.5px; font-weight:700; color:#6E646A; margin-bottom:10px;">고객 요청 기록</div>
+                <textarea rows="3" value="{{ noteDraft }}" onChange="{{ onNoteDraft }}" placeholder="고객 요청 내용을 입력하세요 (예: 인원 4명 → 3명으로 조정 요청, 금액 36만원 합의)" style="width:100%; box-sizing:border-box; border:0; background:#FFFFFF; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C; line-height:1.6; resize:vertical;"></textarea>
+                <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+                  <button onClick="{{ addNote }}" style="height:40px; padding:0 18px; border:0; border-radius:12px; background:#B0567E; color:#fff; font-size:13.5px; font-weight:700; cursor:pointer;" style-hover="background:#98416A;">협의 기록 추가</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section style="background:#FFFFFF; border:1px solid #EFEBED; border-radius:18px; padding:24px;">
+            <h2 style="margin:0 0 4px; font-size:15px; font-weight:800;">확정 내용</h2>
+            <p style="margin:0 0 20px; font-size:12.5px; color:#8C8188;">협의된 내용을 최종 입력한 뒤 확정하세요.</p>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(148px, 1fr)); gap:14px;">
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">예식일
+                <input value="{{ f.date.value }}" onChange="{{ f.date.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;">
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">예식 시간
+                <input value="{{ f.time.value }}" onChange="{{ f.time.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;">
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A; grid-column:1 / -1;">예식장 · 홀
+                <input value="{{ f.venue.value }}" onChange="{{ f.venue.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;">
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">배정 버틀러 (명)
+                <input value="{{ f.butlers.value }}" onChange="{{ f.butlers.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">추가 하객 (명)
+                <input value="{{ f.extraGuests.value }}" onChange="{{ f.extraGuests.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">할인 금액 (원)
+                <input value="{{ f.discount.value }}" onChange="{{ f.discount.onChange }}" placeholder="0" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A;">근무 시간
+                <input value="{{ f.hours.value }}" onChange="{{ f.hours.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; font-weight:600; color:#6E646A; grid-column:1 / -1;">특이사항
+                <textarea rows="3" value="{{ f.note.value }}" onChange="{{ f.note.onChange }}" style="border:0; background:#F6F3F5; border-radius:12px; padding:12px 14px; font-size:13.5px; color:#1E1A1C; resize:vertical; line-height:1.6;"></textarea>
+              </label>
+            </div>
+
+            <div style="margin-top:22px; background:#F7EDF2; border-radius:16px; padding:18px;">
+              <div style="font-size:15px; font-weight:800; color:#7E3855;">{{ money.planLabel }}</div>
+              <div style="font-size:12.5px; color:#9E7286; margin-top:4px;">{{ money.planDesc }}</div>
+              <div style="height:1px; background:#EBD5DF; margin:14px 0;"></div>
+              <div style="display:flex; flex-direction:column; gap:9px; font-size:13px; color:#6E5A62;">
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>기본 요금</span><span style="font-weight:600; color:#413A3E;">{{ money.base }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>{{ money.guestLabel }}</span><span style="font-weight:600; color:#413A3E;">{{ money.guestFee }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>{{ money.butlerLabel }}</span><span style="font-weight:600; color:#413A3E;">{{ money.butlerFee }}</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span>할인 금액</span><span style="font-weight:600; color:#A8416C;">{{ money.discount }}</span></div>
+              </div>
+              <div style="height:1px; background:#EBD5DF; margin:14px 0;"></div>
+              <div style="display:flex; justify-content:space-between; gap:12px; font-size:13.5px;"><span style="color:#6E5A62;">총 금액 (부가세 포함)</span><span style="font-weight:700;">{{ money.total }}</span></div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-top:12px;">
+                <span style="font-size:13.5px; font-weight:700; color:#7E3855;">선결제 50%</span>
+                <span style="font-size:22px; font-weight:800; color:#7E3855;">{{ money.prepay }}</span>
+              </div>
+              <div style="font-size:12px; color:#9E7286; margin-top:6px; text-align:right;">예식 후 잔금 {{ money.balance }}</div>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:20px;">
+              <button onClick="{{ onConfirm }}" style="flex:1; height:52px; border:0; border-radius:14px; background:#B0567E; color:#fff; font-size:15px; font-weight:700; cursor:pointer;" style-hover="background:#98416A;">{{ confirmLabel }}</button>
+              <button onClick="{{ onHold }}" style="height:52px; padding:0 20px; border:0; border-radius:14px; background:#F6F3F5; color:#6E646A; font-size:14.5px; font-weight:600; cursor:pointer;" style-hover="background:#EFEAEC;">협의 중</button>
+            </div>
+            <sc-if value="{{ d.isConfirmed }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:14px; padding:15px; border-radius:12px; background:#F9EFF4; display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+                <div style="flex:1 1 180px; min-width:0; color:#8A3F61; font-size:13px; font-weight:600; line-height:1.55;">확정 완료 · 캘린더 {{ f.date.value }} 일정에 등록되었습니다.<br /><span style="color:#A87D91; font-weight:500;">알림톡 발송 {{ d.alimtalkLog }}</span></div>
+                <button onClick="{{ sendAlimtalk }}" style="flex:0 0 auto; height:40px; padding:0 16px; border:1px solid #D9A3BC; border-radius:12px; background:#FFFFFF; color:#8A3F61; font-size:13px; font-weight:700; cursor:pointer;" style-hover="background:#FBF0F5;">확정 알림톡 재발송</button>
+              </div>
+            </sc-if>
+          </section>
+        </div>
+      </main>
+    </sc-if>
+    </div>
+
+    <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+      <main style="flex:1; min-width:0; padding:4px {{ padX }} 48px;">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:22px;">
+          <h1 style="margin:0; font-size:27px; font-weight:800; letter-spacing:-0.7px;">{{ monthLabel }}</h1>
+          <div style="display:flex; gap:6px;">
+            <button onClick="{{ prevMonth }}" style="width:36px; height:36px; border:0; background:#F6F3F5; border-radius:12px; cursor:pointer; color:#6E646A; font-size:15px;">‹</button>
+            <button onClick="{{ nextMonth }}" style="width:36px; height:36px; border:0; background:#F6F3F5; border-radius:12px; cursor:pointer; color:#6E646A; font-size:15px;">›</button>
+          </div>
+          <span style="font-size:13.5px; color:#8C8188;">확정된 축의대 대행 일정 {{ monthEventCount }}건</span>
+        </div>
+
+        <div style="border-radius:18px; border:1px solid #F0EDEF; overflow:hidden;">
+          <div style="display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); background:#FAF8F9;">
+            <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7">
+              <div style="padding:13px 16px; font-size:12.5px; font-weight:700; color:{{ w.color }};">{{ w.label }}</div>
+            </sc-for>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(7, minmax(0,1fr));">
+            <sc-for list="{{ days }}" as="d" hint-placeholder-count="35">
+              <div style="min-height:{{ calMinH }}; border-top:1px solid #F4F1F2; border-right:1px solid #F4F1F2; padding:10px; background:{{ d.bg }}; display:flex; flex-direction:column; gap:6px;">
+                <span style="width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color:{{ d.numColor }}; background:{{ d.numBg }}; font-variant-numeric:tabular-nums;">{{ d.num }}</span>
+                <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="0">
+                  <div onClick="{{ e.onClick }}" style="background:#F9EFF4; border-radius:9px; padding:7px 9px; cursor:pointer;" style-hover="background:#F2E1EA;">
+                    <div style="font-size:11.5px; font-weight:700; color:#8A3F61; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ e.time }} {{ e.customer }}</div>
+                    <div style="font-size:11px; color:#9C7C8B; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">{{ e.venue }} · {{ e.staff }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </main>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; left:50%; bottom:32px; transform:translateX(-50%); background:#2B2126; color:#fff; padding:14px 24px; border-radius:999px; font-size:13.5px; font-weight:600; box-shadow:0 14px 34px rgba(60,30,45,0.22);">{{ toast }}</div>
+  </sc-if>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const DATA = [
+  { id:"WB-20260901", customer:"이서연", couple:"박준호 · 이서연", phone:"010-2847-1103", createdAt:"09.01", wishDate:"2026년 9월 19일 (토) 12:00", venue:"더채플앳청담 · 그랜드홀", guests:"약 350명", memo:"양가 축의대 분리 운영 희망. 봉투 정리 및 명부 작성까지 부탁드립니다.", status:"신규요청",
+    thread:[{who:"고객", when:"09.01 14:22", text:"신랑측 2명, 신부측 2명으로 나눠서 진행 가능할까요?"},{who:"운영팀", when:"09.01 16:40", text:"4인 배치 가능합니다. 예식 1시간 전 도착 기준으로 안내드렸습니다."}],
+    confirm:{ date:"2026-09-19", time:"12:00", venue:"더채플앳청담 그랜드홀", staff:"4명", hours:"11:00 - 14:00", amount:"480,000", pay:"예식 당일 현장 결제", note:"양가 축의대 분리 · 명부 2부 작성" } },
+  { id:"WB-20260902", customer:"정하린", couple:"김도윤 · 정하린", phone:"010-5521-8890", createdAt:"09.02", wishDate:"2026년 9월 26일 (토) 14:30", venue:"소노펠리체 컨벤션 · 아모리스홀", guests:"약 220명", memo:"혼주 두 분 모두 지방에서 오셔서 축의대 전담이 필요합니다.", status:"협의중",
+    thread:[{who:"고객", when:"09.02 10:05", text:"2명이면 충분할까요? 예상 하객 220명입니다."},{who:"운영팀", when:"09.02 11:12", text:"200명 내외는 2인 권장드립니다. 금액은 24만원입니다."},{who:"고객", when:"09.03 09:30", text:"네 2명으로 진행할게요. 시간은 13:30 도착으로 부탁드립니다."}],
+    confirm:{ date:"2026-09-26", time:"14:30", venue:"소노펠리체 컨벤션 아모리스홀", staff:"2명", hours:"13:30 - 16:00", amount:"240,000", pay:"사전 계좌 이체", note:"" } },
+  { id:"WB-20260903", customer:"문지우", couple:"문지우 · 강예린", phone:"010-3320-4417", createdAt:"09.03", wishDate:"2026년 9월 12일 (토) 11:00", venue:"라온제나 웨딩홀 · 로즈홀", guests:"약 180명", memo:"축의금 즉시 입금 대행까지 가능한지 문의드립니다.", status:"확정",
+    thread:[{who:"운영팀", when:"09.03 15:00", text:"입금 대행은 혼주 동행 시에만 가능합니다."},{who:"고객", when:"09.04 09:10", text:"혼주 동행으로 진행하겠습니다. 확정 부탁드려요."}],
+    confirm:{ date:"2026-09-12", time:"11:00", venue:"라온제나 웨딩홀 로즈홀", staff:"2명", hours:"10:00 - 12:30", amount:"260,000", pay:"사전 계좌 이체", note:"혼주 동행 입금 대행 포함" } },
+  { id:"WB-20260904", customer:"한수아", couple:"오시현 · 한수아", phone:"010-7788-2044", createdAt:"09.04", wishDate:"2026년 9월 20일 (일) 13:00", venue:"그랜드하얏트 서울 · 그랜드볼룸", guests:"약 400명", memo:"VIP 하객 응대 경험 있는 인원으로 요청드립니다.", status:"확정",
+    thread:[{who:"고객", when:"09.04 18:20", text:"정장 착용 가능한 분들로 부탁드립니다."},{who:"운영팀", when:"09.05 10:02", text:"블랙 포멀 복장으로 5인 배치하겠습니다."}],
+    confirm:{ date:"2026-09-20", time:"13:00", venue:"그랜드하얏트 서울 그랜드볼룸", staff:"5명", hours:"11:30 - 15:00", amount:"650,000", pay:"세금계산서 발행", note:"블랙 포멀 복장 · VIP 동선 별도 안내" } },
+  { id:"WB-20260905", customer:"배유진", couple:"임태경 · 배유진", phone:"010-9911-3376", createdAt:"09.05", wishDate:"2026년 10월 3일 (토) 12:30", venue:"아펠가모 잠실 · 루체홀", guests:"약 250명", memo:"축의대 2곳 + 방명록 담당 1명 필요합니다.", status:"신규요청",
+    thread:[{who:"고객", when:"09.05 20:41", text:"방명록까지 포함해서 견적 부탁드립니다."}],
+    confirm:{ date:"2026-10-03", time:"12:30", venue:"아펠가모 잠실 루체홀", staff:"3명", hours:"11:30 - 14:30", amount:"360,000", pay:"", note:"" } },
+  { id:"WB-20260906", customer:"조민서", couple:"조민서 · 윤가영", phone:"010-4402-7781", createdAt:"09.06", wishDate:"2026년 9월 27일 (일) 16:00", venue:"웨딩시티 신도림 · 펄홀", guests:"약 150명", memo:"소규모라 2명이면 충분할 것 같습니다.", status:"협의중",
+    thread:[{who:"운영팀", when:"09.06 13:30", text:"150명 기준 2인 배치로 안내드립니다."}],
+    confirm:{ date:"2026-09-27", time:"16:00", venue:"웨딩시티 신도림 펄홀", staff:"2명", hours:"15:00 - 17:30", amount:"220,000", pay:"현장 카드 결제", note:"" } },
+  { id:"WB-20260907", customer:"신다은", couple:"류현우 · 신다은", phone:"010-6612-5509", createdAt:"09.07", wishDate:"2026년 9월 13일 (일) 14:00", venue:"더컨벤션 영등포 · 다이아몬드홀", guests:"약 300명", memo:"축의금 집계표 엑셀 파일로 전달 부탁드립니다.", status:"확정",
+    thread:[{who:"고객", when:"09.07 11:18", text:"집계표 양식 따로 있으신가요?"},{who:"운영팀", when:"09.07 12:00", text:"표준 양식으로 예식 후 2시간 내 전달드립니다."}],
+    confirm:{ date:"2026-09-13", time:"14:00", venue:"더컨벤션 영등포 다이아몬드홀", staff:"4명", hours:"13:00 - 16:00", amount:"460,000", pay:"사전 계좌 이체", note:"축의금 집계표 엑셀 전달" } },
+  { id:"WB-20260908", customer:"권나연", couple:"허준영 · 권나연", phone:"010-2233-6647", createdAt:"09.08", wishDate:"2026년 10월 10일 (토) 11:30", venue:"노블발렌티 대치 · 그랜드홀", guests:"약 280명", memo:"부모님 없이 진행되어 전 과정 대행이 필요합니다.", status:"신규요청",
+    thread:[{who:"고객", when:"09.08 22:05", text:"축의금 보관 및 전달까지 모두 대행 가능할까요?"}],
+    confirm:{ date:"2026-10-10", time:"11:30", venue:"노블발렌티 대치 그랜드홀", staff:"3명", hours:"10:30 - 13:30", amount:"420,000", pay:"", note:"" } }
+];
+
+const BADGE = {
+  "신규요청": { bg:"#F7EAF0", color:"#A8416C", dot:"#D18AA8" },
+  "협의중":  { bg:"#F2F1EC", color:"#7D6F55", dot:"#C7BD9E" },
+  "확정":    { bg:"#EDF1F6", color:"#3F5A7A", dot:"#9BB2C9" }
+};
+const TODAY = "2026-09-11";
+const PLANS = [
+  { key:"스몰케어", desc:"하객 150명 이하 · 웨딩버틀러 1명", butlers:1, base:300000 },
+  { key:"스탠다드", desc:"하객 300명 이하 · 웨딩버틀러 2명", butlers:2, base:450000 },
+  { key:"프리미엄", desc:"하객 300명 초과 · 웨딩버틀러 3명", butlers:3, base:600000 }
+];
+const PLAN_BY_ID = {
+  "WB-20260901": { req:"프리미엄", conf:"프리미엄" },
+  "WB-20260902": { req:"프리미엄", conf:"스탠다드" },
+  "WB-20260903": { req:"스몰케어", conf:"스몰케어" },
+  "WB-20260904": { req:"프리미엄", conf:"프리미엄" },
+  "WB-20260905": { req:"스탠다드", conf:"스탠다드" },
+  "WB-20260906": { req:"스몰케어", conf:"스몰케어" },
+  "WB-20260907": { req:"프리미엄", conf:"프리미엄" },
+  "WB-20260908": { req:"스탠다드", conf:"스탠다드" }
+};
+const EXTRA_BUTLER_FEE = 150000;
+const EXTRA_GUEST_FEE = 1000;
+const num = (v) => Number(String(v).replace(/[^0-9]/g, "")) || 0;
+const won = (v) => v.toLocaleString("ko-KR") + "원";
+const planMeta = (key) => PLANS.find(p => p.key === key) || PLANS[1];
+
+class Component extends DCLogic {
+  state = { auth:false, loginId:"", loginPw:"", remember:true, loginError:"",
+    page:"dash", selectedId:DATA[0].id, filter:"전체", query:"", toast:"", month:8, year:2026, noteDraft:"", noteWho:"운영팀",
+    vw: 1200, navOpen: true, navTouched: false, detailOpen: false,
+    items: DATA.map(d => {
+      const conf = PLAN_BY_ID[d.id].conf;
+      const extra = Math.max(0, num(d.guests) - (conf === "스몰케어" ? 150 : conf === "스탠다드" ? 300 : 400));
+      return Object.assign({}, d, { plan: PLAN_BY_ID[d.id].req, confirm: {
+        plan: conf, date: d.confirm.date, time: d.confirm.time, venue: d.confirm.venue,
+        butlers: String(num(d.confirm.staff)), extraGuests: String(extra), discount: "0",
+        hours: d.confirm.hours, note: d.confirm.note } });
+    }) };
+
+  componentDidMount() {
+    this._onResize = () => this.setState(s => ({ vw: window.innerWidth, navOpen: s.navTouched ? s.navOpen : window.innerWidth >= 900 }));
+    this._onResize();
+    window.addEventListener("resize", this._onResize);
+  }
+  componentWillUnmount() { window.removeEventListener("resize", this._onResize); }
+
+  calc(it) {
+    const meta = planMeta(it.confirm.plan);
+    const butlers = num(it.confirm.butlers);
+    const extraButlers = Math.max(0, butlers - meta.butlers);
+    const guestFee = num(it.confirm.extraGuests) * EXTRA_GUEST_FEE;
+    const butlerFee = extraButlers * EXTRA_BUTLER_FEE;
+    const discount = num(it.confirm.discount);
+    const total = Math.max(0, meta.base + guestFee + butlerFee - discount);
+    return { meta, butlers, extraButlers, guestFee, butlerFee, discount, total, prepay: Math.round(total / 2), balance: total - Math.round(total / 2) };
+  }
+
+  showToast(msg) { clearTimeout(this._t); this.setState({ toast: msg }); this._t = setTimeout(() => this.setState({ toast:"" }), 2600); }
+
+  setField(key, val) {
+    this.setState(s => ({ items: s.items.map(it => it.id === s.selectedId ? Object.assign({}, it, { confirm: Object.assign({}, it.confirm, { [key]: val }) }) : it) }));
+  }
+
+  setStatus(status, msg) {
+    const at = this.stamp();
+    this.setState(s => ({ items: s.items.map(it => it.id === s.selectedId
+      ? Object.assign({}, it, { status, alimtalkAt: status === "확정" ? at : it.alimtalkAt }) : it) }));
+    this.showToast(msg);
+  }
+
+  login() {
+    const { loginId, loginPw } = this.state;
+    if (!loginId.trim() || !loginPw.trim()) { this.setState({ loginError:"아이디와 비밀번호를 모두 입력해 주세요." }); return; }
+    if (loginId.trim() !== "admin" || loginPw !== "wb1234") { this.setState({ loginError:"아이디 또는 비밀번호가 올바르지 않습니다." }); return; }
+    this.setState({ auth:true, loginError:"", loginPw:"" });
+    this.showToast("환영합니다, 이강 님");
+  }
+
+  stamp() {
+    const n = new Date();
+    const p = (v) => String(v).padStart(2,"0");
+    return p(n.getMonth()+1) + "." + p(n.getDate()) + " " + p(n.getHours()) + ":" + p(n.getMinutes());
+  }
+
+  sendAlimtalk() {
+    const at = this.stamp();
+    this.setState(s => ({ items: s.items.map(it => it.id === (s.selectedId || s.items[0].id) ? Object.assign({}, it, { alimtalkAt: at }) : it) }));
+    this.showToast("확정 알림톡을 재발송했습니다.");
+  }
+
+  open(id) { this.setState({ page:"list", selectedId:id, noteDraft:"", detailOpen:true }); }
+
+  addNote() {
+    const text = this.state.noteDraft.trim();
+    if (!text) { this.showToast("협의 내용을 입력해 주세요."); return; }
+    const now = new Date();
+    const stamp = String(now.getMonth() + 1).padStart(2,"0") + "." + String(now.getDate()).padStart(2,"0") + " " +
+      String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+    this.setState(s => ({
+      noteDraft: "",
+      items: s.items.map(it => it.id === (s.selectedId || s.items[0].id)
+        ? Object.assign({}, it, { thread: it.thread.concat([{ who:"고객 요청", when: stamp, text }]), status: it.status === "신규요청" ? "협의중" : it.status })
+        : it)
+    }));
+    this.showToast("고객 요청 기록이 추가되었습니다.");
+  }
+
+  renderVals() {
+    const s = this.state;
+    const q = s.query.trim();
+    const list = s.items.filter(it => (s.filter === "전체" || it.status === s.filter) && (!q || (it.customer + it.venue + it.id).indexOf(q) >= 0));
+
+    const rows = list.map(it => ({
+      id: it.id, customer: it.customer, initial: it.customer.slice(0,1),
+      venue: it.confirm.plan + " · " + it.confirm.venue, staff: "버틀러 " + it.confirm.butlers + "명",
+      date: it.confirm.date.replace(/-/g, ". "),
+      amount: won(this.calc(it).total),
+      status: it.status, badgeBg: BADGE[it.status].bg, badgeColor: BADGE[it.status].color,
+      cardBg: it.id === s.selectedId ? "#F9EFF4" : "#F8F6F7",
+      cardRing: it.id === s.selectedId ? "#E3BCCE" : "transparent",
+      onClick: () => this.open(it.id)
+    }));
+
+    const count = (st) => s.items.filter(it => it.status === st).length;
+    const mkFilter = (label) => ({ label,
+      bg: s.filter === label ? "#B0567E" : "#FFFFFF",
+      color: s.filter === label ? "#FFFFFF" : "#7A6F75",
+      border: s.filter === label ? "#B0567E" : "#E8E2E5",
+      onClick: () => this.setState({ filter: label }) });
+
+    const sideFilters = ["신규요청","협의중","확정"].map(label => ({
+      label, count: count(label), dot: BADGE[label].dot,
+      color: s.filter === label && s.page !== "calendar" ? "#B0567E" : "#6E646A",
+      weight: s.filter === label && s.page !== "calendar" ? "700" : "500",
+      onClick: () => this.setState({ page:"list", filter: label })
+    }));
+
+    const cur = s.items.find(it => it.id === s.selectedId) || s.items[0];
+    const c = cur.confirm;
+    const field = (key) => ({ value: c[key], onChange: (e) => this.setField(key, e.target.value) });
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const monthPrefix = s.year + "-" + pad(s.month + 1);
+    const confirmedAll = s.items.filter(it => it.status === "확정");
+    const monthEvents = confirmedAll.filter(it => it.confirm.date.indexOf(monthPrefix) === 0);
+
+    const startPad = new Date(s.year, s.month, 1).getDay();
+    const daysInMonth = new Date(s.year, s.month + 1, 0).getDate();
+    const prevDays = new Date(s.year, s.month, 0).getDate();
+    const cells = [];
+    for (let i = startPad - 1; i >= 0; i--) cells.push({ num: prevDays - i, dim:true, key:null, dow:(startPad - 1 - i) % 7 });
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ num: d, dim:false, key: monthPrefix + "-" + pad(d), dow: cells.length % 7 });
+    let tail = 1;
+    while (cells.length % 7 !== 0) cells.push({ num: tail++, dim:true, key:null, dow: cells.length % 7 });
+
+    const evsFor = (key) => key ? monthEvents.filter(it => it.confirm.date === key) : [];
+
+    const days = cells.map(cell => ({
+      num: cell.num,
+      bg: cell.dim ? "#FCFBFB" : "#FFFFFF",
+      numColor: cell.key === TODAY ? "#FFFFFF" : (cell.dim ? "#CFC8CC" : (cell.dow === 0 ? "#C4566E" : "#5C5358")),
+      numBg: cell.key === TODAY ? "#B0567E" : "transparent",
+      events: evsFor(cell.key).map(it => ({ time: it.confirm.time, customer: it.customer + " 님", venue: it.confirm.venue, staff: "버틀러 " + it.confirm.butlers + "명", onClick: () => this.open(it.id) }))
+    }));
+
+    const mini = cells.map(cell => {
+      const evs = evsFor(cell.key);
+      return {
+        num: cell.num,
+        color: cell.key === TODAY ? "#FFFFFF" : (cell.dim ? "#CFC8CC" : (cell.dow === 0 ? "#C4566E" : "#413A3E")),
+        bg: cell.key === TODAY ? "#B0567E" : "transparent",
+        weight: evs.length ? "700" : "500",
+        dot: evs.length ? "#B0567E" : "transparent",
+        onClick: () => evs.length ? this.open(evs[0].id) : this.setState({ page:"calendar" })
+      };
+    });
+
+    const sumMonth = monthEvents.reduce((a, it) => a + this.calc(it).total, 0);
+    const staffTotal = monthEvents.reduce((a, it) => a + num(it.confirm.butlers), 0);
+    const money = this.calc(cur);
+    const mobile = s.vw < 900;
+
+    const upcoming = confirmedAll.slice().sort((a,b) => a.confirm.date < b.confirm.date ? -1 : 1).slice(0,4).map(it => ({
+      dateLabel: it.confirm.date.slice(5).replace("-", "."), time: it.confirm.time,
+      customer: it.customer, venue: it.confirm.venue, onClick: () => this.open(it.id)
+    }));
+
+    return {
+      brandName: "웨딩버틀러",
+      loggedIn: s.auth, loggedOut: !s.auth,
+      loginId: s.loginId, loginPw: s.loginPw, loginError: s.loginError,
+      onLoginId: (e) => this.setState({ loginId: e.target.value, loginError:"" }),
+      onLoginPw: (e) => this.setState({ loginPw: e.target.value, loginError:"" }),
+      onLoginKey: (e) => { if (e.key === "Enter") this.login(); },
+      doLogin: () => this.login(),
+      doLogout: () => this.setState({ auth:false, loginPw:"", page:"list" }),
+      toggleRemember: () => this.setState(st => ({ remember: !st.remember })),
+      rememberBg: s.remember ? "#B0567E" : "#FFFFFF",
+      rememberBorder: s.remember ? "#B0567E" : "#DDD5D9",
+      rememberMark: s.remember ? "✓" : "",
+      noteDraft: s.noteDraft,
+      onNoteDraft: (e) => this.setState({ noteDraft: e.target.value }),
+      addNote: () => this.addNote(),
+      sendAlimtalk: () => this.sendAlimtalk(),
+      planOptions: PLANS.map(p => ({ label: p.key, desc: p.desc, price: won(p.base),
+        bg: c.plan === p.key ? "#B0567E" : "#F6F3F5",
+        color: c.plan === p.key ? "#FFFFFF" : "#413A3E",
+        subColor: c.plan === p.key ? "#F0CFDE" : "#948A90",
+        onClick: () => this.setField("plan", p.key) })),
+      money: {
+        planLabel: money.meta.key, planDesc: money.meta.desc,
+        base: won(money.meta.base),
+        guestFee: money.guestFee ? won(money.guestFee) : "-",
+        guestLabel: "추가 하객 " + num(c.extraGuests) + "명",
+        butlerFee: money.butlerFee ? won(money.butlerFee) : "-",
+        butlerLabel: "버틀러 추가 " + money.extraButlers + "명",
+        discount: money.discount ? "-" + won(money.discount) : "-",
+        total: won(money.total), prepay: won(money.prepay), balance: won(money.balance)
+      },
+      req: (() => {
+        const meta = planMeta(cur.plan);
+        const limit = meta.key === "스몰케어" ? 150 : meta.key === "스탠다드" ? 300 : 400;
+        const extraGuests = Math.max(0, num(cur.guests) - limit);
+        const guestFee = extraGuests * EXTRA_GUEST_FEE;
+        const total = meta.base + guestFee;
+        const prepay = Math.round(total / 2);
+        return { plan: meta.key, planDesc: meta.desc, butlers: meta.butlers + "명",
+          base: won(meta.base), extraGuests: String(extraGuests),
+          guestFee: guestFee ? won(guestFee) : "-", butlerFee: "-",
+          total: won(total), prepay: won(prepay), balance: won(total - prepay) };
+      })(),
+      isMobile: mobile,
+      navOpen: s.navOpen,
+      toggleNav: () => this.setState(st => ({ navOpen: !st.navOpen, navTouched: true })),
+      shellDir: "row",
+      sideW: mobile ? "272px" : "268px",
+      sideFlex: mobile ? "0 0 272px" : "0 0 268px",
+      sidePos: mobile ? "fixed" : "static",
+      sideH: mobile ? "100%" : "auto",
+      sideZ: mobile ? "50" : "auto",
+      sideShadow: mobile ? "0 18px 46px rgba(60,30,45,0.22)" : "none",
+      showNavBackdrop: mobile && s.navOpen,
+      navDir: "column",
+      navWrap: "nowrap",
+      subFilterPad: mobile ? "4px 0" : "4px 0 4px 14px",
+      padX: mobile ? "16px" : "28px",
+      headerH: mobile ? "auto" : "78px",
+      headerWrap: mobile ? "wrap" : "nowrap",
+      headerPadY: mobile ? "12px" : "0",
+      footerDir: "column",
+      calMinH: mobile ? "78px" : "118px",
+      isDash: s.page === "dash", isList: s.page === "list", isCalendar: s.page === "calendar",
+      showDetail: s.page === "list" && !!s.selectedId && (!mobile || s.detailOpen),
+      paneDisplay: s.page === "list" ? "flex" : "none",
+      closeDetail: () => this.setState({ detailOpen: false }),
+      detailPos: mobile ? "fixed" : "static",
+      detailInset: mobile ? "0" : "auto",
+      detailZ: mobile ? "40" : "auto",
+      detailOverflow: mobile ? "auto" : "visible",
+      listMaxW: s.page === "list" && s.selectedId && !mobile ? "340px" : "none",
+      detailBorder: mobile ? "0" : "1px solid #F0EDEF",
+      navDashBg: s.page === "dash" ? "#F9EFF4" : "transparent",
+      navDashColor: s.page === "dash" ? "#B0567E" : "#6E646A",
+      navListBg: s.page === "list" ? "#F9EFF4" : "transparent",
+      navListColor: s.page === "list" ? "#B0567E" : "#6E646A",
+      navCalBg: s.page === "calendar" ? "#F9EFF4" : "transparent",
+      navCalColor: s.page === "calendar" ? "#B0567E" : "#6E646A",
+      goDash: () => this.setState({ page:"dash", navOpen: mobile ? false : s.navOpen }),
+      goList: () => this.setState({ page:"list", navOpen: mobile ? false : s.navOpen }),
+      goCalendar: () => this.setState({ page:"calendar", navOpen: mobile ? false : s.navOpen }),
+      goNew: () => this.setState({ page:"list", filter:"신규요청" }),
+      goTalking: () => this.setState({ page:"list", filter:"협의중" }),
+      goConfirmed: () => this.setState({ page:"list", filter:"확정" }),
+      query: s.query, onQuery: (e) => this.setState({ query: e.target.value }),
+      filters: ["전체","신규요청","협의중","확정"].map(mkFilter),
+      sideFilters, rows,
+      totalCount: s.items.length,
+      newCount: count("신규요청"), talkingCount: count("협의중"), confirmedCount: monthEvents.length,
+      monthAmount: sumMonth.toLocaleString("ko-KR") + "원",
+      staffTotal,
+      toast: s.toast,
+      d: { id: cur.id, customer: cur.customer, couple: cur.couple, phone: cur.phone, createdAt: cur.createdAt,
+           wishDate: cur.wishDate, venue: cur.venue, guests: cur.guests, memo: cur.memo, status: cur.status, plan: cur.plan,
+           badgeBg: BADGE[cur.status].bg, badgeColor: BADGE[cur.status].color, isConfirmed: cur.status === "확정",
+           alimtalkLog: cur.alimtalkAt ? cur.alimtalkAt : "이력 없음",
+           thread: cur.thread.map(t => ({ who: t.who, when: t.when, text: t.text, tag: t.who === "운영팀" ? "운영" : "고객",
+             avatarBg: t.who === "운영팀" ? "#F1EFEE" : "#F7EAF0", avatarColor: t.who === "운영팀" ? "#6E646A" : "#A8416C" })) },
+      f: { date: field("date"), time: field("time"), venue: field("venue"), butlers: field("butlers"),
+           extraGuests: field("extraGuests"), discount: field("discount"), hours: field("hours"), note: field("note") },
+      confirmLabel: cur.status === "확정" ? "확정 내용 저장" : "확정하기",
+      onConfirm: () => this.setState({ selectedId: cur.id }, () => this.setStatus("확정", cur.status === "확정" ? "확정 내용이 저장되었습니다." : cur.customer + " 님 예약이 확정되어 캘린더에 등록되었습니다.")),
+      onHold: () => this.setState({ selectedId: cur.id }, () => this.setStatus("협의중", "협의 중 상태로 변경했습니다.")),
+      monthLabel: s.year + "년 " + (s.month + 1) + "월",
+      monthShort: s.year + "." + (s.month + 1),
+      monthEventCount: monthEvents.length,
+      weekdays: ["일","월","화","수","목","금","토"].map((w,i) => ({ label:w, color: i === 0 ? "#C4566E" : "#8C8188" })),
+      days, mini, upcoming,
+      prevMonth: () => this.setState(st => st.month === 0 ? { month:11, year: st.year - 1 } : { month: st.month - 1 }),
+      nextMonth: () => this.setState(st => st.month === 11 ? { month:0, year: st.year + 1 } : { month: st.month + 1 })
+    };
+  }
+}
+
+</script>
+</body>
+</html>
