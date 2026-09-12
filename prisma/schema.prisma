@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+// Status values: "신규요청" | "협의중" | "확정"
+// Plan keys: "스몰케어" | "스탠다드" | "프리미엄"
+model Reservation {
+  id             String   @id
+  customer       String
+  couple         String
+  phone          String
+  requestedAt    DateTime
+  wishDateLabel  String
+  venueLabel     String
+  guestsLabel    String
+  memo           String
+  status         String
+  requestedPlan  String
+
+  confirmDate        String
+  confirmTime         String
+  confirmVenue        String
+  confirmPlan         String
+  confirmButlers      Int
+  confirmExtraGuests  Int
+  confirmDiscount     Int      @default(0)
+  confirmHours        String
+  confirmNote         String   @default("")
+
+  alimtalkAt     DateTime?
+
+  notes          Note[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Note {
+  id            String      @id @default(cuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  text          String
+  createdAt     DateTime    @default(now())
+}

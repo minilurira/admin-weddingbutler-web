@@ -1,25 +1,36 @@
-# CODING AGENTS: READ THIS FIRST
+# 웨딩버틀러 어드민
 
-This is a **handoff bundle** from Claude Design (claude.ai/design).
+축의대 대행 예약을 접수 → 협의 → 확정까지 관리하는 내부 어드민. Next.js (App Router) + Prisma/SQLite로 구현한 실제 동작하는 앱입니다.
 
-A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
+`project/`와 `chats/`에는 이 앱의 기반이 된 Claude Design 프로토타입과 디자인 논의 기록이 원본 그대로 남아 있습니다 (참고용).
 
-## What you should do — IMPORTANT
+## 실행 방법
 
-**Read the chat transcripts first.** There are 1 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+```bash
+npm install
+cp .env.example .env   # 필요시 값 수정
+npm run db:push        # SQLite 스키마 생성 (prisma/dev.db)
+npm run db:seed        # 샘플 예약 8건 + 관리자 계정(admin/wb1234) 생성
+npm run dev
+```
 
-**Read `project/웨딩버틀러 어드민 v2.dc.html` in full.** The user had this file open when they triggered the handoff, so it's almost certainly the primary design they want built. Read it top to bottom — don't skim. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+`http://localhost:3000/login` 에서 `admin` / `wb1234` 로 로그인합니다.
 
-**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
+## 스택
 
-## About the design files
+- **Next.js 14 (App Router) + TypeScript** — 화면, 라우팅, Server Actions
+- **Prisma + SQLite** — 예약/협의기록/관리자 계정 저장 (`prisma/schema.prisma`)
+- **NextAuth (Credentials)** — 다중 관리자 계정 로그인, 세션 쿠키
+- **n8n 웹훅** — 확정 알림톡(카카오) 발송을 위임. 이 앱은 실제 카카오 API 키를 갖고 있지 않고, `N8N_ALIMTALK_WEBHOOK_URL` 로 설정한 n8n 워크플로우에 발송 요청만 보냅니다. n8n 쪽에서 Solapi/NHN Cloud 등 실제 알림톡 제공사 자격증명을 관리하세요. 웹훅 URL이 비어 있으면 발송을 건너뛰고 콘솔에 경고 로그만 남깁니다 (개발 중에도 안전하게 동작).
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+## 새 관리자 계정 추가
 
-**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
+현재는 시드 스크립트로만 계정을 만듭니다. 추가 계정이 필요하면 `prisma/seed.ts`를 참고해 `prisma.adminUser.create(...)` 형태로 스크립트를 만들어 실행하세요 (비밀번호는 `bcryptjs`로 해시).
 
-## Bundle contents
+## 폴더 구조
 
-- `README.md` — this file
-- `chats/` — conversation transcripts (read these!)
-- `project/` — the `웨딩버틀러 어드민 설계` project files (HTML prototypes, assets, components)
+- `src/app/(admin)` — 로그인 이후 화면 (대시보드/예약 리스트/캘린더) 공통 레이아웃
+- `src/app/login` — 로그인 화면
+- `src/lib/actions.ts` — 예약 확정/협의중 전환/메모 추가/알림톡 재발송/신규 등록 Server Actions
+- `src/lib/pricing.ts` — 요금제·추가 하객/버틀러·할인 계산 로직
+- `src/components/` — 사이드바, 헤더, 예약 상세, 캘린더 등 클라이언트 컴포넌트
