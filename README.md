@@ -16,7 +16,16 @@ npm run db:seed             # 샘플 예약 8건 + 관리자 계정(admin/wb1234
 npm run dev
 ```
 
-배포 환경(Vercel 등)에서는 `npm run build`가 `prisma migrate deploy`를 먼저 실행해 마이그레이션을 자동 적용합니다. `DATABASE_URL`, `NEXTAUTH_URL`(배포된 실제 URL), `NEXTAUTH_SECRET`을 배포 플랫폼의 환경 변수로 반드시 설정하세요 — 특히 `NEXTAUTH_URL`이 빌드 시점에 없으면 정적 페이지 생성 중 빌드가 실패합니다.
+배포 환경(Vercel 등)에서는 `DATABASE_URL`, `NEXTAUTH_URL`(배포된 실제 URL), `NEXTAUTH_SECRET`을 반드시 환경 변수로 설정하세요. 이 세 값이 **Production** 환경에도 적용되어 있는지 확인하세요 — Vercel은 Production/Preview/Development 환경별로 변수를 따로 관리하므로, Preview에만 추가하면 `main`에 푸시해서 만들어지는 Production 배포에서는 빈 값으로 취급됩니다.
+
+빌드 단계(`npm run build`)는 `prisma generate && next build`만 실행하고 마이그레이션은 적용하지 않습니다 (DATABASE_URL이 빌드 시점에 없어도 빌드가 깨지지 않도록 분리). 배포 후 실제 DB에 스키마를 적용하려면 한 번은 별도로 실행해야 합니다:
+
+```bash
+DATABASE_URL="<프로덕션 연결 문자열>" npm run db:deploy   # prisma migrate deploy
+DATABASE_URL="<프로덕션 연결 문자열>" npm run db:seed     # 샘플 데이터 + admin 계정
+```
+
+로컬 머신이나 Vercel CLI(`vercel env pull`로 값을 받아와서) 어디서든 실행 가능합니다.
 
 `http://localhost:3000/login` 에서 `admin` / `wb1234` 로 로그인합니다.
 
