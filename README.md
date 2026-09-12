@@ -36,6 +36,34 @@ DATABASE_URL="<프로덕션 연결 문자열>" npm run db:seed     # 샘플 데�
 - **NextAuth (Credentials)** — 다중 관리자 계정 로그인, 세션 쿠키
 - **n8n 웹훅** — 확정 알림톡(카카오) 발송을 위임. 이 앱은 실제 카카오 API 키를 갖고 있지 않고, `N8N_ALIMTALK_WEBHOOK_URL` 로 설정한 n8n 워크플로우에 발송 요청만 보냅니다. n8n 쪽에서 Solapi/NHN Cloud 등 실제 알림톡 제공사 자격증명을 관리하세요. 웹훅 URL이 비어 있으면 발송을 건너뛰고 콘솔에 경고 로그만 남깁니다 (개발 중에도 안전하게 동작).
 
+## 홈페이지 예약 접수 API
+
+홈페이지에서 예약이 완료되면 아래 엔드포인트로 POST 요청을 보내면 이 어드민의 "신규요청" 목록에 바로 들어갑니다.
+
+```
+POST https://<배포 도메인>/api/public/reservations
+Authorization: Bearer <RESERVATION_API_KEY>
+Content-Type: application/json
+
+{
+  "externalId": "홈페이지 자체 예약번호 (선택, 있으면 재전송해도 중복 생성 안 됨)",
+  "customer": "이서연",
+  "couple": "박준호 · 이서연",
+  "phone": "010-2847-1103",
+  "weddingDate": "2026-09-19",
+  "weddingTime": "12:00",
+  "venue": "더채플앳청담 · 그랜드홀",
+  "guestCount": 350,
+  "plan": "프리미엄",
+  "memo": "양가 축의대 분리 운영 희망"
+}
+```
+
+- `plan`은 반드시 `스몰케어` / `스탠다드` / `프리미엄` 중 하나여야 합니다 (`src/lib/pricing.ts`의 `PLANS`).
+- `RESERVATION_API_KEY` 환경 변수를 배포 환경에 설정해야 하며, 헤더의 값이 정확히 일치하지 않으면 401을 반환합니다. 이 값이 아예 설정되지 않은 배포에서는 500을 반환하고 요청을 거부합니다 (인증 없이 데이터가 들어가는 걸 막기 위함).
+- 성공 시 `201`과 함께 생성된 예약의 `id`를 반환합니다. 같은 `externalId`로 재전송하면 새로 만들지 않고 기존 레코드를 `200`으로 반환합니다 (재시도에 안전).
+- 필수 필드가 비어있거나 형식이 틀리면 `400`과 함께 어떤 필드가 문제인지 메시지로 알려줍니다.
+
 ## 새 관리자 계정 추가
 
 현재는 시드 스크립트로만 계정을 만듭니다. 추가 계정이 필요하면 `prisma/seed.ts`를 참고해 `prisma.adminUser.create(...)` 형태로 스크립트를 만들어 실행하세요 (비밀번호는 `bcryptjs`로 해시).
