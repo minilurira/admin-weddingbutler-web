@@ -56,11 +56,18 @@ button {
   cursor: pointer;
 }
 
+.wb-list-pane-capped {
+  max-width: 340px;
+}
+
 @media (max-width: 899px) {
   .wb-list-pane-hidden {
     display: none;
   }
   .wb-detail-pane-closed {
     display: none;
+  }
+  .wb-list-pane-capped {
+    max-width: none;
   }
 }
