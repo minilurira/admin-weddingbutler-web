@@ -176,7 +176,7 @@
             <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
               <button onClick="{{ f.onClick }}" style="height:44px; padding:0 22px; border-radius:999px; border:1px solid {{ f.border }}; background:{{ f.bg }}; color:{{ f.color }}; font-size:14.5px; font-weight:700; cursor:pointer;">{{ f.label }}</button>
             </sc-for>
-            <button onClick="{{ goList }}" style="margin-left:auto; height:44px; padding:0 20px; border:0; border-radius:14px; background:#B0567E; color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;" style-hover="background:#98416A;">새 예약 등록</button>
+            <button onClick="{{ goList }}" style="margin-left:{{ newBtnMargin }}; height:44px; padding:0 20px; border:0; border-radius:14px; background:#B0567E; color:#fff; font-size:14.5px; font-weight:700; cursor:pointer;" style-hover="background:#98416A;">새 예약 등록</button>
           </div>
 
           <div style="display:flex; flex-direction:column; gap:10px;">
@@ -456,11 +456,25 @@ class Component extends DCLogic {
     }) };
 
   componentDidMount() {
-    this._onResize = () => this.setState(s => ({ vw: window.innerWidth, navOpen: s.navTouched ? s.navOpen : window.innerWidth >= 900 }));
+    const measure = () => {
+      const el = document.documentElement, b = document.body;
+      const cands = [window.innerWidth, el && el.clientWidth, b && b.clientWidth].filter(n => typeof n === "number" && n > 0);
+      return cands.length ? Math.min.apply(null, cands) : 1200;
+    };
+    this._onResize = () => { const w = measure(); this.setState(s => ({ vw: w, navOpen: s.navTouched ? s.navOpen : w >= 900 })); };
     this._onResize();
     window.addEventListener("resize", this._onResize);
+    window.addEventListener("orientationchange", this._onResize);
+    if (window.ResizeObserver && document.body) {
+      this._ro = new ResizeObserver(() => this._onResize());
+      this._ro.observe(document.body);
+    }
   }
-  componentWillUnmount() { window.removeEventListener("resize", this._onResize); }
+  componentWillUnmount() {
+    window.removeEventListener("resize", this._onResize);
+    window.removeEventListener("orientationchange", this._onResize);
+    if (this._ro) this._ro.disconnect();
+  }
 
   calc(it) {
     const meta = planMeta(it.confirm.plan);
@@ -662,6 +676,7 @@ class Component extends DCLogic {
       navWrap: "nowrap",
       subFilterPad: mobile ? "4px 0" : "4px 0 4px 14px",
       padX: mobile ? "16px" : "28px",
+      newBtnMargin: mobile ? "0" : "auto",
       headerH: mobile ? "auto" : "78px",
       headerWrap: mobile ? "wrap" : "nowrap",
       headerPadY: mobile ? "12px" : "0",

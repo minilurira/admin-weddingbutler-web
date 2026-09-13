@@ -6,10 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PLANS } from "@/lib/pricing";
 import { createReservation } from "@/lib/actions";
 import { useToast } from "./ToastContext";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 const FILTERS = ["전체", "신규요청", "협의중", "확정"];
 
 export default function ReservationListControls({ currentFilter }: { currentFilter: string }) {
+  const mobile = useIsMobile();
   const router = useRouter();
   const searchParams = useSearchParams();
   const showToast = useToast();
@@ -66,7 +68,7 @@ export default function ReservationListControls({ currentFilter }: { currentFilt
             </Link>
           );
         })}
-        <button onClick={() => setOpen(true)} style={{ marginLeft: "auto", height: 44, padding: "0 20px", border: 0, borderRadius: 14, background: "#B0567E", color: "#fff", fontSize: 14.5, fontWeight: 700 }}>
+        <button onClick={() => setOpen(true)} style={{ marginLeft: mobile ? 0 : "auto", height: 44, padding: "0 20px", border: 0, borderRadius: 14, background: "#B0567E", color: "#fff", fontSize: 14.5, fontWeight: 700 }}>
           새 예약 등록
         </button>
       </div>
