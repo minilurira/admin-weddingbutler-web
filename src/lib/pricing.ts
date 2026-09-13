@@ -9,13 +9,14 @@ export interface PlanMeta {
 }
 
 export const PLANS: PlanMeta[] = [
-  { key: "스몰케어", desc: "하객 150명 이하 · 웨딩버틀러 1명", butlers: 1, base: 300000, guestLimit: 150 },
+  { key: "스몰케어", desc: "하객 200명 이하 · 웨딩버틀러 2명", butlers: 2, base: 390000, guestLimit: 200 },
   { key: "스탠다드", desc: "하객 300명 이하 · 웨딩버틀러 2명", butlers: 2, base: 450000, guestLimit: 300 },
-  { key: "프리미엄", desc: "하객 300명 초과 · 웨딩버틀러 3명", butlers: 3, base: 600000, guestLimit: 400 },
+  { key: "프리미엄", desc: "양가 각 200명 기준 · 웨딩버틀러 4명", butlers: 4, base: 800000, guestLimit: 400 },
 ];
 
-export const EXTRA_BUTLER_FEE = 150000;
-export const EXTRA_GUEST_FEE = 1000;
+// Matches src/lib/plans.ts in the weddingbutler homepage repo — keep in sync.
+export const EXTRA_BUTLER_FEE = 100000;
+export const EXTRA_GUEST_FEE = 2000;
 
 export function planMeta(key: string): PlanMeta {
   return PLANS.find((p) => p.key === key) ?? PLANS[1];
