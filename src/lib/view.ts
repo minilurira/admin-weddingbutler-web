@@ -1,5 +1,5 @@
 import type { Reservation } from "@prisma/client";
-import { calcConfirm, won } from "@/lib/pricing";
+import { calcConfirm, planMeta, won } from "@/lib/pricing";
 import { BADGE } from "@/lib/badge";
 import type { GridEvent } from "@/lib/calendarGrid";
 
@@ -16,6 +16,8 @@ export function toRow(r: Reservation) {
     staffLine: `버틀러 ${r.confirmButlers}명`,
     dateLine: r.confirmDate.replace(/-/g, ". "),
     amountLine: won(reservationTotal(r)),
+    planAmountLine: won(planMeta(r.confirmPlan).base),
+    paidAmountLine: won(r.paidAmount),
     status: r.status,
     badgeBg: badge.bg,
     badgeColor: badge.color,

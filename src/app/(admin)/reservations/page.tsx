@@ -20,6 +20,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     memo: r.memo,
     status: r.status,
     requestedPlan: r.requestedPlan,
+    paidAmount: r.paidAmount,
     alimtalkLabel: r.alimtalkAt ? formatStamp(r.alimtalkAt) : "이력 없음",
     notes: r.notes.map((n) => ({ id: n.id, when: formatStamp(n.createdAt), text: n.text })),
     confirm: {
@@ -105,6 +106,10 @@ export default async function ReservationsPage({
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 12.5, color: "#8C8188" }}>
                   <span>{row.staffLine}</span>
                   <span style={{ marginLeft: "auto", fontWeight: 700, color: "#413A3E", fontVariantNumeric: "tabular-nums" }}>{row.amountLine}</span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 12, color: "#A79BA1" }}>
+                  <span>플랜 {row.planAmountLine}</span>
+                  <span style={{ marginLeft: "auto" }}>결제 {row.paidAmountLine}</span>
                 </div>
               </Link>
             );

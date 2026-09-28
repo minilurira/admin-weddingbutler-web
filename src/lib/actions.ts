@@ -4,7 +4,8 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcConfirm } from "@/lib/pricing";
+import { calcConfirm, planMeta } from "@/lib/pricing";
+import { formatWishDateLabel } from "@/lib/format";
 import { sendConfirmAlimtalk } from "@/lib/alimtalk";
 
 async function requireSession() {
@@ -28,6 +29,7 @@ export interface ConfirmFieldsInput {
   discount: number;
   hours: string;
   note: string;
+  paidAmount: number;
 }
 
 export async function saveConfirmFields(id: string, fields: ConfirmFieldsInput) {
@@ -43,6 +45,7 @@ export async function saveConfirmFields(id: string, fields: ConfirmFieldsInput) 
       confirmDiscount: fields.discount,
       confirmHours: fields.hours,
       confirmNote: fields.note,
+      paidAmount: fields.paidAmount,
     },
   });
   revalidateAll();
@@ -65,6 +68,7 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
       confirmDiscount: fields.discount,
       confirmHours: fields.hours,
       confirmNote: fields.note,
+      paidAmount: fields.paidAmount,
     },
   });
 
@@ -72,11 +76,16 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
   const result = await sendConfirmAlimtalk({
     reservationId: updated.id,
     customer: updated.customer,
+    couple: updated.couple,
     phone: updated.phone,
-    venue: updated.confirmVenue,
-    date: updated.confirmDate,
-    time: updated.confirmTime,
-    amount: price.total,
+    wishDateLabel: formatWishDateLabel(updated.confirmDate, updated.confirmTime),
+    venueLabel: updated.confirmVenue,
+    guestsLabel: updated.guestsLabel,
+    requestedPlan: updated.confirmPlan,
+    planAmount: planMeta(updated.confirmPlan).base,
+    paidAmount: updated.paidAmount,
+    confirmAmount: price.total,
+    balanceAmount: Math.max(0, price.total - updated.paidAmount),
   });
   await prisma.reservation.update({ where: { id }, data: { alimtalkAt: new Date() } });
 
@@ -119,6 +128,7 @@ export interface NewReservationInput {
   guestsLabel: string;
   memo: string;
   requestedPlan: string;
+  paidAmount?: number;
 }
 
 function generateId() {
@@ -154,6 +164,7 @@ export async function createReservation(input: NewReservationInput) {
       confirmDiscount: 0,
       confirmHours: "",
       confirmNote: "",
+      paidAmount: input.paidAmount ?? 0,
     },
   });
   revalidateAll();
@@ -165,8 +176,18 @@ export async function resendAlimtalk(id: string) {
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
   const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount });
   const result = await sendConfirmAlimtalk({
-    reservationId: r.id, customer: r.customer, phone: r.phone,
-    venue: r.confirmVenue, date: r.confirmDate, time: r.confirmTime, amount: price.total,
+    reservationId: r.id,
+    customer: r.customer,
+    couple: r.couple,
+    phone: r.phone,
+    wishDateLabel: formatWishDateLabel(r.confirmDate, r.confirmTime),
+    venueLabel: r.confirmVenue,
+    guestsLabel: r.guestsLabel,
+    requestedPlan: r.confirmPlan,
+    planAmount: planMeta(r.confirmPlan).base,
+    paidAmount: r.paidAmount,
+    confirmAmount: price.total,
+    balanceAmount: Math.max(0, price.total - r.paidAmount),
   });
   await prisma.reservation.update({ where: { id }, data: { alimtalkAt: new Date() } });
   revalidateAll();

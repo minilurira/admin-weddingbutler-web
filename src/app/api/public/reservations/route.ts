@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { PLANS, planMeta, requestedTotal } from "@/lib/pricing";
+import { PLANS, planMeta } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 
@@ -17,6 +17,7 @@ interface IncomingBody {
   guestCount?: number;
   plan?: string;
   memo?: string;
+  paidAmount?: number;
 }
 
 function unauthorized() {
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     return badRequest("invalid JSON body");
   }
 
-  const { externalId, customer, couple, phone, weddingDate, weddingTime, venue, guestCount, plan, memo } = body;
+  const { externalId, customer, couple, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, paidAmount } = body;
 
   if (!customer?.trim()) return badRequest("customer is required");
   if (!couple?.trim()) return badRequest("couple is required");
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
 
   const meta = planMeta(plan);
   const extraGuests = Math.max(0, guestCount - meta.guestLimit);
+  const resolvedPaidAmount = typeof paidAmount === "number" && paidAmount >= 0 ? paidAmount : 0;
 
   const created = await prisma.reservation.create({
     data: {
@@ -98,18 +100,23 @@ export async function POST(req: NextRequest) {
       confirmDiscount: 0,
       confirmHours: "",
       confirmNote: "",
+      paidAmount: resolvedPaidAmount,
     },
   });
 
-  const { prepay } = requestedTotal(plan, `${guestCount}명`);
   void sendNewReservationAlimtalk({
     reservationId: created.id,
     customer: created.customer,
+    couple: created.couple,
     phone: created.phone,
-    venue: created.venueLabel,
-    date: weddingDate,
-    time: weddingTime,
-    amount: prepay,
+    wishDateLabel: created.wishDateLabel,
+    venueLabel: created.venueLabel,
+    guestsLabel: created.guestsLabel,
+    requestedPlan: created.requestedPlan,
+    planAmount: meta.base,
+    paidAmount: created.paidAmount,
+    confirmAmount: meta.base,
+    balanceAmount: Math.max(0, meta.base - created.paidAmount),
   });
 
   return NextResponse.json({ id: created.id, status: created.status }, { status: 201 });

@@ -27,6 +27,7 @@ export interface DetailReservation {
   memo: string;
   status: string;
   requestedPlan: string;
+  paidAmount: number;
   alimtalkLabel: string;
   notes: DetailNote[];
   confirm: {
@@ -64,6 +65,7 @@ export default function ReservationDetail({
     discount: String(reservation.confirm.discount),
     hours: reservation.confirm.hours,
     note: reservation.confirm.note,
+    paidAmount: String(reservation.paidAmount),
   });
 
   const parsedFields = useMemo(
@@ -76,6 +78,7 @@ export default function ReservationDetail({
       discount: toNum(fields.discount),
       hours: fields.hours,
       note: fields.note,
+      paidAmount: toNum(fields.paidAmount),
     }),
     [fields]
   );
@@ -239,6 +242,7 @@ export default function ReservationDetail({
             <label style={labelStyle}>배정 버틀러 (명)<input {...field("butlers")} style={inputStyle} /></label>
             <label style={labelStyle}>추가 하객 (명)<input {...field("extraGuests")} style={inputStyle} /></label>
             <label style={labelStyle}>할인 금액 (원)<input {...field("discount")} placeholder="0" style={inputStyle} /></label>
+            <label style={labelStyle}>결제한 금액 (원)<input {...field("paidAmount")} placeholder="0" style={inputStyle} /></label>
             <label style={labelStyle}>근무 시간<input {...field("hours")} style={inputStyle} /></label>
             <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>특이사항<textarea rows={3} {...field("note")} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} /></label>
           </div>
@@ -260,6 +264,9 @@ export default function ReservationDetail({
               <span style={{ fontSize: 22, fontWeight: 800, color: "#7E3855" }}>{won(money.prepay)}</span>
             </div>
             <div style={{ fontSize: 12, color: "#9E7286", marginTop: 6, textAlign: "right" }}>예식 후 잔금 {won(money.balance)}</div>
+            <div style={{ height: 1, background: "#EBD5DF", margin: "14px 0" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13.5 }}><span style={{ color: "#6E5A62" }}>실 결제 금액</span><span style={{ fontWeight: 700 }}>{won(parsedFields.paidAmount)}</span></div>
+            <div style={{ fontSize: 12, color: "#9E7286", marginTop: 6, textAlign: "right" }}>현장결제(잔금) {won(Math.max(0, money.total - parsedFields.paidAmount))}</div>
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 20 }}>

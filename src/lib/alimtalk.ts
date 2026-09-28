@@ -11,17 +11,38 @@ function digitsOnly(phone: string) {
   return phone.replace(/[^0-9]/g, "");
 }
 
-export interface AlimtalkPayload {
+export interface AlimtalkFields {
   reservationId: string;
   customer: string;
+  couple: string;
   phone: string;
-  venue: string;
-  date: string;
-  time: string;
-  amount: number;
+  wishDateLabel: string;
+  venueLabel: string;
+  guestsLabel: string;
+  requestedPlan: string;
+  planAmount: number;
+  paidAmount: number;
+  confirmAmount: number;
+  balanceAmount: number;
 }
 
-export async function sendConfirmAlimtalk(payload: AlimtalkPayload): Promise<{ sent: boolean; detail: string }> {
+function buildVariables(f: AlimtalkFields): Record<string, string> {
+  return {
+    "#{customer}": f.customer,
+    "#{couple}": f.couple,
+    "#{phone}": f.phone,
+    "#{wishDateLabel}": f.wishDateLabel,
+    "#{venueLabel}": f.venueLabel,
+    "#{guestLabel}": f.guestsLabel,
+    "#{requestedPlan}": f.requestedPlan,
+    "#{planAmount}": f.planAmount.toLocaleString("ko-KR"),
+    "#{paidAmount}": f.paidAmount.toLocaleString("ko-KR"),
+    "#{confirmAmount}": f.confirmAmount.toLocaleString("ko-KR"),
+    "#{balanceAmount}": f.balanceAmount.toLocaleString("ko-KR"),
+  };
+}
+
+export async function sendConfirmAlimtalk(payload: AlimtalkFields): Promise<{ sent: boolean; detail: string }> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const templateId = process.env.SOLAPI_TEMPLATE_CONFIRMED;
@@ -36,13 +57,7 @@ export async function sendConfirmAlimtalk(payload: AlimtalkPayload): Promise<{ s
       kakaoOptions: {
         pfId: process.env.SOLAPI_PF_ID!,
         templateId,
-        variables: {
-          "#{고객명}": payload.customer,
-          "#{예식장}": payload.venue,
-          "#{예식일자}": payload.date,
-          "#{예식시간}": payload.time,
-          "#{금액}": payload.amount.toLocaleString("ko-KR"),
-        },
+        variables: buildVariables(payload),
       },
     });
     return { sent: true, detail: "전송 완료" };
@@ -52,17 +67,7 @@ export async function sendConfirmAlimtalk(payload: AlimtalkPayload): Promise<{ s
   }
 }
 
-export interface NewReservationAlimtalkPayload {
-  reservationId: string;
-  customer: string;
-  phone: string;
-  venue: string;
-  date: string;
-  time: string;
-  amount: number;
-}
-
-export async function sendNewReservationAlimtalk(payload: NewReservationAlimtalkPayload): Promise<void> {
+export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promise<void> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
@@ -78,13 +83,7 @@ export async function sendNewReservationAlimtalk(payload: NewReservationAlimtalk
     return;
   }
 
-  const variables = {
-    "#{고객명}": payload.customer,
-    "#{예식장}": payload.venue,
-    "#{예식일자}": payload.date,
-    "#{예식시간}": payload.time,
-    "#{금액}": payload.amount.toLocaleString("ko-KR"),
-  };
+  const variables = buildVariables(payload);
 
   const messages = [
     {

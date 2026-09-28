@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PLANS } from "@/lib/pricing";
 import { createReservation } from "@/lib/actions";
+import { toNum } from "@/lib/format";
 import { useToast } from "./ToastContext";
 import { useIsMobile } from "@/lib/useIsMobile";
 
@@ -18,9 +19,9 @@ export default function ReservationListControls({ currentFilter }: { currentFilt
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<{
-    customer: string; couple: string; phone: string; wishDateLabel: string; venueLabel: string; guestsLabel: string; memo: string; requestedPlan: string;
+    customer: string; couple: string; phone: string; wishDateLabel: string; venueLabel: string; guestsLabel: string; memo: string; requestedPlan: string; paidAmount: string;
   }>({
-    customer: "", couple: "", phone: "", wishDateLabel: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: PLANS[1].key,
+    customer: "", couple: "", phone: "", wishDateLabel: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: PLANS[1].key, paidAmount: "0",
   });
 
   function filterHref(label: string) {
@@ -37,10 +38,10 @@ export default function ReservationListControls({ currentFilter }: { currentFilt
       return;
     }
     setSaving(true);
-    const res = await createReservation(form);
+    const res = await createReservation({ ...form, paidAmount: toNum(form.paidAmount) });
     setSaving(false);
     setOpen(false);
-    setForm({ customer: "", couple: "", phone: "", wishDateLabel: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: PLANS[1].key });
+    setForm({ customer: "", couple: "", phone: "", wishDateLabel: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: PLANS[1].key, paidAmount: "0" });
     showToast("새 예약이 등록되었습니다.");
     router.push(`/reservations?id=${res.id}`);
   }
@@ -101,6 +102,9 @@ export default function ReservationListControls({ currentFilter }: { currentFilt
                 <select style={inputStyle} value={form.requestedPlan} onChange={(e) => setForm((f) => ({ ...f, requestedPlan: e.target.value }))}>
                   {PLANS.map((p) => <option key={p.key} value={p.key}>{p.key} ({p.desc})</option>)}
                 </select>
+              </label>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
+                결제한 금액 <input style={inputStyle} value={form.paidAmount} onChange={(e) => setForm((f) => ({ ...f, paidAmount: e.target.value }))} placeholder="0" />
               </label>
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
                 요청 사항 <textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} />

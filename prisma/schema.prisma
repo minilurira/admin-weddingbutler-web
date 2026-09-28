@@ -40,6 +40,8 @@ model Reservation {
   confirmHours        String
   confirmNote         String   @default("")
 
+  paidAmount     Int      @default(0)
+
   alimtalkAt     DateTime?
 
   notes          Note[]
