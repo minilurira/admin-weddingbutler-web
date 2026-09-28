@@ -78,7 +78,7 @@ export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promi
     .map((p) => p.trim())
     .filter(Boolean);
 
-  if (!svc || !from || !pfId || !customerTemplateId || !staffTemplateId) {
+  if (!svc || !from || !pfId || !customerTemplateId) {
     console.warn(`[alimtalk] Solapi env vars not fully set — skipping new-reservation send for ${payload.reservationId}.`);
     return;
   }
@@ -95,16 +95,23 @@ export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promi
         variables,
       },
     },
-    ...staffPhones.map((phone) => ({
-      to: digitsOnly(phone),
-      from,
-      kakaoOptions: {
-        pfId,
-        templateId: staffTemplateId,
-        variables,
-      },
-    })),
   ];
+
+  if (staffTemplateId && staffPhones.length > 0) {
+    messages.push(
+      ...staffPhones.map((phone) => ({
+        to: digitsOnly(phone),
+        from,
+        kakaoOptions: {
+          pfId,
+          templateId: staffTemplateId,
+          variables,
+        },
+      }))
+    );
+  } else {
+    console.warn(`[alimtalk] SOLAPI_TEMPLATE_NEW_STAFF/SOLAPI_STAFF_PHONES not set — staff Kakao notice skipped for ${payload.reservationId} (Slack 연동 예정).`);
+  }
 
   try {
     await svc.send(messages);
