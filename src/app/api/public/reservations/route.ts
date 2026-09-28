@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { PLANS, planMeta } from "@/lib/pricing";
+import { PLANS, planMeta, requestedTotal } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
+import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,17 @@ export async function POST(req: NextRequest) {
       confirmHours: "",
       confirmNote: "",
     },
+  });
+
+  const { prepay } = requestedTotal(plan, `${guestCount}명`);
+  void sendNewReservationAlimtalk({
+    reservationId: created.id,
+    customer: created.customer,
+    phone: created.phone,
+    venue: created.venueLabel,
+    date: weddingDate,
+    time: weddingTime,
+    amount: prepay,
   });
 
   return NextResponse.json({ id: created.id, status: created.status }, { status: 201 });
