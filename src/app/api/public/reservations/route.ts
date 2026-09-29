@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { PLANS, planMeta } from "@/lib/pricing";
+import { PLANS, planMeta, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
+import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,15 @@ export async function POST(req: NextRequest) {
     confirmAmount: meta.base,
     balanceAmount: Math.max(0, meta.base - created.paidAmount),
   });
+
+  void sendNewReservationKakaoWorkNotice(
+    [
+      `신규 예약 신청 (${created.id})`,
+      `고객: ${created.customer} (${created.couple}) · ${created.phone}`,
+      `예식: ${created.wishDateLabel} · ${created.venueLabel}`,
+      `플랜: ${created.requestedPlan} · 결제 ${won(created.paidAmount)}`,
+    ].join("\n")
+  );
 
   return NextResponse.json({ id: created.id, status: created.status }, { status: 201 });
 }
