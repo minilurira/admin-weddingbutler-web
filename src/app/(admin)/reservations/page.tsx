@@ -13,7 +13,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     customer: r.customer,
     couple: r.couple,
     phone: r.phone,
-    createdAtLabel: `${String(r.requestedAt.getMonth() + 1).padStart(2, "0")}.${String(r.requestedAt.getDate()).padStart(2, "0")}`,
+    createdAtLabel: formatStamp(r.requestedAt),
     wishDateLabel: r.wishDateLabel,
     venueLabel: r.venueLabel,
     guestsLabel: r.guestsLabel,
