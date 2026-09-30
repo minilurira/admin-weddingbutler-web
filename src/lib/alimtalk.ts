@@ -1,5 +1,13 @@
 import { SolapiMessageService } from "solapi";
 
+function logSendResult(reservationId: string, result: { failedMessageList: readonly unknown[]; groupInfo: { count: Record<string, number> } }) {
+  if (result.failedMessageList.length > 0) {
+    console.error(`[alimtalk] Solapi rejected send for ${reservationId}:`, JSON.stringify(result.failedMessageList));
+  } else {
+    console.log(`[alimtalk] Solapi accepted send for ${reservationId}:`, JSON.stringify(result.groupInfo.count));
+  }
+}
+
 function client(): SolapiMessageService | null {
   const key = process.env.SOLAPI_API_KEY;
   const secret = process.env.SOLAPI_API_SECRET;
@@ -51,7 +59,7 @@ export async function sendConfirmAlimtalk(payload: AlimtalkFields): Promise<{ se
     return { sent: false, detail: "미설정 (로컬 기록만 저장됨)" };
   }
   try {
-    await svc.send({
+    const result = await svc.send({
       to: digitsOnly(payload.phone),
       from,
       kakaoOptions: {
@@ -60,6 +68,10 @@ export async function sendConfirmAlimtalk(payload: AlimtalkFields): Promise<{ se
         variables: buildVariables(payload),
       },
     });
+    logSendResult(payload.reservationId, result);
+    if (result.failedMessageList.length > 0) {
+      return { sent: false, detail: "전송 실패" };
+    }
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
     console.error(`[alimtalk] Solapi confirm send failed for ${payload.reservationId}`, err);
@@ -114,7 +126,8 @@ export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promi
   }
 
   try {
-    await svc.send(messages);
+    const result = await svc.send(messages);
+    logSendResult(payload.reservationId, result);
   } catch (err) {
     console.error(`[alimtalk] Solapi new-reservation send failed for ${payload.reservationId}`, err);
   }
