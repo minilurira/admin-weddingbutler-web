@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
 import { PLANS, planMeta, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
@@ -105,28 +106,35 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  void sendNewReservationAlimtalk({
-    reservationId: created.id,
-    customer: created.customer,
-    couple: created.couple,
-    phone: created.phone,
-    wishDateLabel: created.wishDateLabel,
-    venueLabel: created.venueLabel,
-    guestsLabel: created.guestsLabel,
-    requestedPlan: created.requestedPlan,
-    planAmount: meta.base,
-    paidAmount: created.paidAmount,
-    confirmAmount: meta.base,
-    balanceAmount: Math.max(0, meta.base - created.paidAmount),
-  });
+  // waitUntil keeps the serverless function alive for these until they settle,
+  // since the platform can freeze execution right after the response below is
+  // sent — a bare fire-and-forget call here can get cut off mid-flight.
+  waitUntil(
+    sendNewReservationAlimtalk({
+      reservationId: created.id,
+      customer: created.customer,
+      couple: created.couple,
+      phone: created.phone,
+      wishDateLabel: created.wishDateLabel,
+      venueLabel: created.venueLabel,
+      guestsLabel: created.guestsLabel,
+      requestedPlan: created.requestedPlan,
+      planAmount: meta.base,
+      paidAmount: created.paidAmount,
+      confirmAmount: meta.base,
+      balanceAmount: Math.max(0, meta.base - created.paidAmount),
+    })
+  );
 
-  void sendNewReservationKakaoWorkNotice(
-    [
-      `신규 예약 신청 (${created.id})`,
-      `고객: ${created.customer} (${created.couple}) · ${created.phone}`,
-      `예식: ${created.wishDateLabel} · ${created.venueLabel}`,
-      `플랜: ${created.requestedPlan} · 결제 ${won(created.paidAmount)}`,
-    ].join("\n")
+  waitUntil(
+    sendNewReservationKakaoWorkNotice(
+      [
+        `신규 예약 신청 (${created.id})`,
+        `고객: ${created.customer} (${created.couple}) · ${created.phone}`,
+        `예식: ${created.wishDateLabel} · ${created.venueLabel}`,
+        `플랜: ${created.requestedPlan} · 결제 ${won(created.paidAmount)}`,
+      ].join("\n")
+    )
   );
 
   return NextResponse.json({ id: created.id, status: created.status }, { status: 201 });
