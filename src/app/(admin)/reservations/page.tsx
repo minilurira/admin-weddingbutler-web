@@ -24,6 +24,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     requestedExtraButlers: r.requestedExtraButlers,
     paidAmount: r.paidAmount,
     alimtalkLabel: r.alimtalkAt ? formatStamp(r.alimtalkAt) : "이력 없음",
+    recordStatus: recordStatusOf(r.recordLink?.status),
     notes: r.notes.map((n) => ({ id: n.id, when: formatStamp(n.createdAt), text: n.text })),
     confirm: {
       plan: r.confirmPlan,
@@ -39,8 +40,15 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
   };
 }
 
+function recordStatusOf(status: string | undefined): DetailReservation["recordStatus"] {
+  return status === "draft" || status === "published" || status === "revoked" ? status : "none";
+}
+
 async function loadReservation(id: string) {
-  return prisma.reservation.findUnique({ where: { id }, include: { notes: { orderBy: { createdAt: "asc" } } } });
+  return prisma.reservation.findUnique({
+    where: { id },
+    include: { notes: { orderBy: { createdAt: "asc" } }, recordLink: { select: { status: true } } },
+  });
 }
 
 export default async function ReservationsPage({

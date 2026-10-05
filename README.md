@@ -64,6 +64,18 @@ Content-Type: application/json
 - 성공 시 `201`과 함께 생성된 예약의 `id`를 반환합니다. 같은 `externalId`로 재전송하면 새로 만들지 않고 기존 레코드를 `200`으로 반환합니다 (재시도에 안전).
 - 필수 필드가 비어있거나 형식이 틀리면 `400`과 함께 어떤 필드가 문제인지 메시지로 알려줍니다.
 
+## 고객 축의 기록
+
+예약 상세(확정 건)의 "기록 만들기"에서 하객 명단을 엑셀(.xlsx)·CSV로 불러오거나 직접 입력하고 게시하면, 고객용 주소 `https://weddingbutler.co.kr/r/<토큰>`이 만들어집니다. 고객은 예약 전화번호로 받은 문자 인증번호를 입력해야 열람할 수 있고, 게시일로부터 90일 뒤에는 열리지 않습니다. 관리자는 "고객 화면으로 보기"로 인증 없이 같은 화면을 봅니다.
+
+- 데이터: `RecordLink`(예약당 1개) · `RecordEntry`(봉투 1장당 1행) · `RecordAccess`(인증번호 발송·열람 기록). 마이그레이션 `20261005120000_add_guest_records`를 `npm run db:deploy`로 적용해야 합니다.
+- 홈페이지 서버용 API (`Authorization: Bearer <RECORD_API_KEY 또는 RESERVATION_API_KEY>`):
+  - `GET /api/public/records/:token` — 상태(게시·만료), 상품, 마스킹된 전화번호
+  - `POST /api/public/records/:token/otp` — 인증번호 문자 발송 (1시간 5회)
+  - `POST /api/public/records/:token/verify` — `{ "code": "123456" }` 확인 (5회 실패 시 잠금)
+  - `GET /api/public/records/:token/entries` — 명단 포함 전체 기록. 밀봉이면 `amount` 키가 없습니다.
+  - 관리자 열람은 `?viewer=admin`을 붙이며, 홈페이지가 어드민이 서명한 링크를 검증한 뒤에만 붙입니다.
+
 ## 새 관리자 계정 추가
 
 현재는 시드 스크립트로만 계정을 만듭니다. 추가 계정이 필요하면 `prisma/seed.ts`를 참고해 `prisma.adminUser.create(...)` 형태로 스크립트를 만들어 실행하세요 (비밀번호는 `bcryptjs`로 해시).

@@ -47,6 +47,7 @@ model Reservation {
   alimtalkAt     DateTime?
 
   notes          Note[]
+  recordLink     RecordLink?
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -58,4 +59,60 @@ model Note {
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   text          String
   createdAt     DateTime    @default(now())
+}
+
+// 고객용 축의 기록 (홈페이지 /r/[token]). 예약 1건당 링크 1개.
+// status: "draft" | "published" | "revoked", recordMode: "opened" | "sealed"
+model RecordLink {
+  id                    String         @id @default(cuid())
+  reservationId         String         @unique
+  reservation           Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  token                 String         @unique
+  status                String         @default("draft")
+  recordMode            String         @default("opened")
+  handoverAt            DateTime?
+  handoverEnvelopeCount Int            @default(0)
+  receiverLabel         String         @default("")
+  staffCount            Int            @default(0)
+  videoUrl              String         @default("")
+  version               Int            @default(0)
+  publishedAt           DateTime?
+  expiresAt             DateTime?
+  entries               RecordEntry[]
+  accesses              RecordAccess[]
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+}
+
+// side: "신랑측" | "신부측". 밀봉 모드면 amount는 null.
+model RecordEntry {
+  id           String     @id @default(cuid())
+  recordLinkId String
+  recordLink   RecordLink @relation(fields: [recordLinkId], references: [id], onDelete: Cascade)
+  envelopeNo   Int
+  side         String
+  name         String
+  relation     String     @default("")
+  amount       Int?
+  tickets      Int        @default(0)
+  memo         String     @default("")
+
+  @@unique([recordLinkId, envelopeNo])
+}
+
+// kind: "otp" (문자 인증번호 발송) | "view" (열람). viewer: "customer" | "admin"
+model RecordAccess {
+  id           String     @id @default(cuid())
+  recordLinkId String
+  recordLink   RecordLink @relation(fields: [recordLinkId], references: [id], onDelete: Cascade)
+  kind         String
+  viewer       String     @default("customer")
+  codeHash     String?
+  expiresAt    DateTime?
+  attempts     Int        @default(0)
+  verifiedAt   DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([recordLinkId, kind, createdAt])
 }

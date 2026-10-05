@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { calcConfirm, requestedTotal, won } from "@/lib/pricing";
@@ -31,6 +32,7 @@ export interface DetailReservation {
   requestedExtraButlers: number;
   paidAmount: number;
   alimtalkLabel: string;
+  recordStatus: "none" | "draft" | "published" | "revoked";
   notes: DetailNote[];
   confirm: {
     plan: string;
@@ -44,6 +46,13 @@ export interface DetailReservation {
     note: string;
   };
 }
+
+const RECORD_STATUS_TEXT: Record<DetailReservation["recordStatus"], string> = {
+  none: "예식이 끝나면 명단을 올려 고객용 링크를 만드세요.",
+  draft: "작성 중 · 아직 고객에게 게시하지 않았어요.",
+  published: "게시됨 · 고객이 링크로 볼 수 있어요.",
+  revoked: "회수됨 · 고객 링크가 막혀 있어요.",
+};
 
 export default function ReservationDetail({
   reservation, backHref, className,
@@ -278,6 +287,18 @@ export default function ReservationDetail({
             </button>
             <button disabled={isPending} onClick={onHoldClick} style={{ height: 52, padding: "0 20px", border: 0, borderRadius: 14, background: "#F6F3F5", color: "#6E646A", fontSize: 14.5, fontWeight: 600 }}>협의 중</button>
           </div>
+
+          {isConfirmed && (
+            <div style={{ marginTop: 14, padding: 15, borderRadius: 12, border: "1px solid #EFEBED", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: "1 1 180px", minWidth: 0, fontSize: 13, lineHeight: 1.55 }}>
+                <div style={{ fontWeight: 700, color: "#413A3E" }}>축의 기록</div>
+                <span style={{ color: "#8C8188" }}>{RECORD_STATUS_TEXT[reservation.recordStatus]}</span>
+              </div>
+              <Link href={`/reservations/${reservation.id}/record`} style={{ flex: "0 0 auto", height: 40, padding: "0 16px", display: "inline-flex", alignItems: "center", border: "1px solid #D9A3BC", borderRadius: 12, background: "#FFFFFF", color: "#8A3F61", fontSize: 13, fontWeight: 700 }}>
+                {reservation.recordStatus === "none" ? "기록 만들기" : "기록 관리"}
+              </Link>
+            </div>
+          )}
 
           {isConfirmed && (
             <div style={{ marginTop: 14, padding: 15, borderRadius: 12, background: "#F9EFF4", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
