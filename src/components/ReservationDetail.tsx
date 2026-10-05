@@ -20,6 +20,7 @@ export interface DetailReservation {
   customer: string;
   couple: string;
   phone: string;
+  email: string;
   createdAtLabel: string;
   wishDateLabel: string;
   venueLabel: string;
@@ -27,6 +28,7 @@ export interface DetailReservation {
   memo: string;
   status: string;
   requestedPlan: string;
+  requestedExtraButlers: number;
   paidAmount: number;
   alimtalkLabel: string;
   notes: DetailNote[];
@@ -84,7 +86,7 @@ export default function ReservationDetail({
   );
 
   const money = useMemo(() => calcConfirm({ plan: reservation.confirm.plan, butlers: parsedFields.butlers, extraGuests: parsedFields.extraGuests, discount: parsedFields.discount }), [reservation.confirm.plan, parsedFields]);
-  const req = useMemo(() => requestedTotal(reservation.requestedPlan, reservation.guestsLabel), [reservation.requestedPlan, reservation.guestsLabel]);
+  const req = useMemo(() => requestedTotal(reservation.requestedPlan, reservation.guestsLabel, reservation.requestedExtraButlers), [reservation.requestedPlan, reservation.guestsLabel, reservation.requestedExtraButlers]);
 
   const badge = BADGE[reservation.status] ?? BADGE["신규요청"];
   const isConfirmed = reservation.status === "확정";
@@ -173,9 +175,10 @@ export default function ReservationDetail({
             <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", gap: "13px 16px", fontSize: 13.5 }}>
               <span style={{ color: "#8C8188" }}>예식 일시</span><span style={{ fontWeight: 600 }}>{reservation.wishDateLabel}</span>
               <span style={{ color: "#8C8188" }}>예식장</span><span>{reservation.venueLabel}</span>
-              <span style={{ color: "#8C8188" }}>배정 버틀러</span><span>{req.meta.butlers}명</span>
+              <span style={{ color: "#8C8188" }}>배정 버틀러</span><span>{req.meta.butlers + req.extraButlers}명{req.extraButlers ? ` (추가 ${req.extraButlers}명 포함)` : ""}</span>
               <span style={{ color: "#8C8188" }}>예상 하객</span><span>{reservation.guestsLabel}</span>
               <span style={{ color: "#8C8188" }}>예약자</span><span>{reservation.couple} · {reservation.phone}</span>
+              <span style={{ color: "#8C8188" }}>이메일</span><span style={{ wordBreak: "break-all" }}>{reservation.email || "-"}</span>
               <span style={{ color: "#8C8188" }}>요청 사항</span><span style={{ lineHeight: 1.6 }}>{reservation.memo}</span>
             </div>
 
@@ -184,7 +187,7 @@ export default function ReservationDetail({
             <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13, color: "#6E646A" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><span>기본 요금</span><span style={{ fontWeight: 600, color: "#413A3E" }}>{won(req.meta.base)}</span></div>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><span>추가 하객 {req.extraGuests}명</span><span style={{ fontWeight: 600, color: "#413A3E" }}>{req.guestFee ? won(req.guestFee) : "-"}</span></div>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><span>버틀러 추가</span><span style={{ fontWeight: 600, color: "#413A3E" }}>-</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><span>버틀러 추가 {req.extraButlers}명</span><span style={{ fontWeight: 600, color: "#413A3E" }}>{req.butlerFee ? won(req.butlerFee) : "-"}</span></div>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, paddingTop: 10, borderTop: "1px solid #ECE7E9" }}><span>총 금액 (부가세 포함)</span><span style={{ fontWeight: 700, color: "#413A3E" }}>{won(req.total)}</span></div>
             </div>
 

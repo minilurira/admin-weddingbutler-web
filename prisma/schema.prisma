@@ -22,6 +22,7 @@ model Reservation {
   customer       String
   couple         String
   phone          String
+  email          String   @default("")
   requestedAt    DateTime
   wishDateLabel  String
   venueLabel     String
@@ -29,6 +30,7 @@ model Reservation {
   memo           String
   status         String
   requestedPlan  String
+  requestedExtraButlers Int @default(0)
 
   confirmDate        String
   confirmTime         String
