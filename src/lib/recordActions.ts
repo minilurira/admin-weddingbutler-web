@@ -42,15 +42,17 @@ function int(v: unknown) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function validateEntries(entries: RecordEntryInput[], sealed: boolean) {
+type Validated = { error: string; rows?: undefined } | { error?: undefined; rows: RecordEntryInput[] };
+
+function validateEntries(entries: RecordEntryInput[], sealed: boolean): Validated {
   const seen = new Set<number>();
   const rows: RecordEntryInput[] = [];
   for (const e of entries) {
     const name = String(e.name ?? "").trim();
     if (!name) continue; // 빈 줄은 저장하지 않는다
     const envelopeNo = int(e.envelopeNo);
-    if (!envelopeNo) return { error: `${name} 님의 봉투번호가 비어 있어요.` } as const;
-    if (seen.has(envelopeNo)) return { error: `봉투번호 ${envelopeNo}번이 두 번 들어 있어요.` } as const;
+    if (!envelopeNo) return { error: `${name} 님의 봉투번호가 비어 있어요.` };
+    if (seen.has(envelopeNo)) return { error: `봉투번호 ${envelopeNo}번이 두 번 들어 있어요.` };
     seen.add(envelopeNo);
     rows.push({
       envelopeNo,
@@ -62,14 +64,15 @@ function validateEntries(entries: RecordEntryInput[], sealed: boolean) {
       memo: String(e.memo ?? "").trim(),
     });
   }
-  return { rows } as const;
+  return { rows };
 }
 
-export async function saveRecord(reservationId: string, input: RecordSaveInput) {
+export async function saveRecord(reservationId: string, input: RecordSaveInput): Promise<{ ok: boolean; message: string }> {
   await requireSession();
   const sealed = input.recordMode === "sealed";
   const checked = validateEntries(input.entries, sealed);
-  if ("error" in checked) return { ok: false, message: checked.error };
+  if (checked.error !== undefined) return { ok: false, message: checked.error };
+  const rows = checked.rows;
 
   const handoverAt = input.handoverAt ? fromKstInput(input.handoverAt) : null;
   if (input.handoverAt && !handoverAt) return { ok: false, message: "인계 시각 형식을 확인해 주세요." };
@@ -93,8 +96,8 @@ export async function saveRecord(reservationId: string, input: RecordSaveInput) 
         })
       : await tx.recordLink.create({ data: { ...data, reservationId, token: newToken() } });
     await tx.recordEntry.deleteMany({ where: { recordLinkId: link.id } });
-    if (checked.rows.length > 0) {
-      await tx.recordEntry.createMany({ data: checked.rows.map((r) => ({ ...r, recordLinkId: link.id })) });
+    if (rows.length > 0) {
+      await tx.recordEntry.createMany({ data: rows.map((r) => ({ ...r, recordLinkId: link.id })) });
     }
   });
 
@@ -105,7 +108,7 @@ export async function saveRecord(reservationId: string, input: RecordSaveInput) 
   };
 }
 
-export async function publishRecord(reservationId: string) {
+export async function publishRecord(reservationId: string): Promise<{ ok: boolean; message: string }> {
   await requireSession();
   const link = await prisma.recordLink.findUnique({ where: { reservationId }, include: { _count: { select: { entries: true } } } });
   if (!link) return { ok: false, message: "먼저 명단을 저장해 주세요." };
@@ -126,7 +129,7 @@ export async function publishRecord(reservationId: string) {
   return { ok: true, message: "게시했어요. 고객에게 링크를 보내 주세요." };
 }
 
-export async function revokeRecord(reservationId: string) {
+export async function revokeRecord(reservationId: string): Promise<{ ok: boolean; message: string }> {
   await requireSession();
   const link = await prisma.recordLink.findUnique({ where: { reservationId } });
   if (!link) return { ok: false, message: "게시된 기록이 없어요." };
