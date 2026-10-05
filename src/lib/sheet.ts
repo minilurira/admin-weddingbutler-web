@@ -102,7 +102,7 @@ async function readXlsx(buf: Uint8Array): Promise<string[][]> {
   const sheetName = files.has("xl/worksheets/sheet1.xml")
     ? "xl/worksheets/sheet1.xml"
     : Array.from(files.keys()).filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
-  const sheet = xml(files.get(sheetName));
+  const sheet = sheetName ? xml(files.get(sheetName)) : null;
   if (!sheet) throw new Error("엑셀 파일에서 시트를 찾지 못했어요.");
 
   return all(sheet, "row").map((rowEl) => {

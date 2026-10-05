@@ -52,7 +52,7 @@ export default async function RecordPage({ params }: { params: { id: string } })
         }
       : null,
     initial: {
-      recordMode: link?.recordMode === "sealed" ? "sealed" : "opened",
+      recordMode: link?.recordMode === "sealed" ? ("sealed" as const) : ("opened" as const),
       handoverAt: toKstInput(link?.handoverAt ?? null),
       handoverEnvelopeCount: link?.handoverEnvelopeCount ?? 0,
       receiverLabel: link?.receiverLabel ?? "",
@@ -60,7 +60,7 @@ export default async function RecordPage({ params }: { params: { id: string } })
       videoUrl: link?.videoUrl ?? "",
       entries: (link?.entries ?? []).map((e) => ({
         envelopeNo: e.envelopeNo,
-        side: e.side === "신부측" ? "신부측" : "신랑측",
+        side: e.side === "신부측" ? ("신부측" as const) : ("신랑측" as const),
         name: e.name,
         relation: e.relation,
         amount: e.amount,
