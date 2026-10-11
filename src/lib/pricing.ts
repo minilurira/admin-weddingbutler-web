@@ -56,12 +56,13 @@ export function calcConfirm(input: ConfirmInput): PriceBreakdown {
   return { meta, butlers: input.butlers, extraButlers, guestFee, butlerFee, discount, total, prepay, balance: total - prepay };
 }
 
-export function requestedTotal(planKey: string, guestsLabel: string) {
+export function requestedTotal(planKey: string, guestsLabel: string, extraButlers = 0) {
   const meta = planMeta(planKey);
   const guestCount = Number(String(guestsLabel).replace(/[^0-9]/g, "")) || 0;
   const extraGuests = Math.max(0, guestCount - meta.guestLimit);
   const guestFee = extraGuests * EXTRA_GUEST_FEE;
-  const total = meta.base + guestFee;
+  const butlerFee = extraButlers * EXTRA_BUTLER_FEE;
+  const total = meta.base + guestFee + butlerFee;
   const prepay = Math.round(total / 2);
-  return { meta, extraGuests, guestFee, total, prepay, balance: total - prepay };
+  return { meta, extraGuests, guestFee, extraButlers, butlerFee, total, prepay, balance: total - prepay };
 }

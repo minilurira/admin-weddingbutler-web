@@ -13,10 +13,12 @@ interface IncomingBody {
   customer?: string;
   couple?: string;
   phone?: string;
+  email?: string;
   weddingDate?: string; // "YYYY-MM-DD"
   weddingTime?: string; // "HH:MM"
   venue?: string;
   guestCount?: number;
+  extraButlers?: number;
   plan?: string;
   memo?: string;
   paidAmount?: number;
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
     return badRequest("invalid JSON body");
   }
 
-  const { externalId, customer, couple, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, paidAmount } = body;
+  const { externalId, customer, couple, phone, email, weddingDate, weddingTime, venue, guestCount, extraButlers, plan, memo, paidAmount } = body;
 
   if (!customer?.trim()) return badRequest("customer is required");
   if (!couple?.trim()) return badRequest("couple is required");
@@ -64,6 +66,9 @@ export async function POST(req: NextRequest) {
   if (!weddingTime || !/^\d{2}:\d{2}$/.test(weddingTime)) return badRequest("weddingTime must be HH:MM");
   if (!venue?.trim()) return badRequest("venue is required");
   if (typeof guestCount !== "number" || guestCount < 0) return badRequest("guestCount must be a non-negative number");
+  if (extraButlers !== undefined && (!Number.isInteger(extraButlers) || extraButlers < 0)) {
+    return badRequest("extraButlers must be a non-negative integer");
+  }
   if (!plan || !PLANS.some((p) => p.key === plan)) {
     return badRequest(`plan must be one of: ${PLANS.map((p) => p.key).join(", ")}`);
   }
@@ -78,6 +83,7 @@ export async function POST(req: NextRequest) {
 
   const meta = planMeta(plan);
   const extraGuests = Math.max(0, guestCount - meta.guestLimit);
+  const requestedExtraButlers = extraButlers ?? 0;
   const resolvedPaidAmount = typeof paidAmount === "number" && paidAmount >= 0 ? paidAmount : 0;
 
   const created = await prisma.reservation.create({
@@ -86,6 +92,7 @@ export async function POST(req: NextRequest) {
       customer: customer.trim(),
       couple: couple.trim(),
       phone: phone.trim(),
+      email: email?.trim() ?? "",
       requestedAt: new Date(),
       wishDateLabel: formatWishDateLabel(weddingDate, weddingTime),
       venueLabel: venue.trim(),
@@ -93,11 +100,12 @@ export async function POST(req: NextRequest) {
       memo: memo?.trim() ?? "",
       status: "신규요청",
       requestedPlan: plan,
+      requestedExtraButlers,
       confirmPlan: plan,
       confirmDate: weddingDate,
       confirmTime: weddingTime,
       confirmVenue: venue.trim(),
-      confirmButlers: meta.butlers,
+      confirmButlers: meta.butlers + requestedExtraButlers,
       confirmExtraGuests: extraGuests,
       confirmDiscount: 0,
       confirmHours: "",
