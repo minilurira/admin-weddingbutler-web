@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveInquiryMemo, setInquiryHandled } from "@/lib/inquiryActions";
+import { saveInquiryMemo, setInquiriesHandled } from "@/lib/inquiryActions";
 import { useToast } from "./ToastContext";
 
 export default function InquiryControls({ id, handled, memo }: { id: string; handled: boolean; memo: string }) {
@@ -13,7 +13,7 @@ export default function InquiryControls({ id, handled, memo }: { id: string; han
   const toggleHandled = () =>
     startTransition(async () => {
       try {
-        await setInquiryHandled(id, !handled);
+        await setInquiriesHandled([id], !handled);
         showToast(handled ? "미처리로 되돌렸습니다." : "처리완료로 표시했습니다.");
       } catch {
         showToast("저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");

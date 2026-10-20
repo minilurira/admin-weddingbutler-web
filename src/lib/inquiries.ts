@@ -49,8 +49,10 @@ export async function listInquiries(): Promise<Inquiry[]> {
   return res.json();
 }
 
-export async function updateInquiry(id: string, fields: { handled_at?: string | null; admin_memo?: string }) {
-  await supabaseFetch(`contact_messages?id=eq.${encodeURIComponent(id)}`, {
+export async function updateInquiries(ids: string[], fields: { handled_at?: string | null; admin_memo?: string }) {
+  if (ids.length === 0) return;
+  const list = ids.map((id) => encodeURIComponent(id)).join(",");
+  await supabaseFetch(`contact_messages?id=in.(${list})`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
     body: JSON.stringify(fields),
