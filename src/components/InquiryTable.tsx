@@ -113,7 +113,7 @@ function MemoEditor({ id, memo }: { id: string; memo: string }) {
         onClick={save}
         disabled={isPending || !dirty}
         style={{
-          alignSelf: "flex-end", height: 32, padding: "0 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, border: "none",
+          alignSelf: "flex-end", height: 36, padding: "0 16px", borderRadius: 10, fontSize: 13, fontFamily: "inherit", fontWeight: 700, border: "none",
           background: dirty ? "#B0567E" : "#F4F3F3", color: dirty ? "#FFFFFF" : "#A79BA1", cursor: isPending || !dirty ? "default" : "pointer",
         }}
       >
@@ -174,10 +174,6 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
     background: active ? "#B0567E" : "#FFFFFF", color: active ? "#FFFFFF" : "#6E646A",
     boxShadow: active ? "none" : "inset 0 0 0 1px #E8E2E5",
   });
-  const textBtn: React.CSSProperties = {
-    display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 2px", border: "none", background: "transparent",
-    fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer",
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 760 }}>
@@ -221,12 +217,15 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
           const handled = Boolean(it.handled_at);
           const open = openId === it.id;
           const toggleOpen = () => setOpenId(open ? null : it.id);
+          const stop = (e: React.SyntheticEvent) => e.stopPropagation();
           return (
             <article
               key={it.id}
+              onClick={toggleOpen}
+              aria-expanded={open}
               style={{
-                display: "flex", flexDirection: "column", gap: 10, padding: "16px 18px", borderRadius: 14, background: "#FFFFFF",
-                boxShadow: `0 1px 2px rgba(60,30,45,0.05), inset 0 0 0 1px ${open ? "#C98AA6" : "#EEE8EB"}`,
+                display: "flex", flexDirection: "column", gap: 10, padding: "16px 18px", borderRadius: 14, background: "#FFFFFF", cursor: "pointer",
+                boxShadow: `0 1px 2px rgba(60,30,45,0.05), inset 0 0 0 ${open ? 1.5 : 1}px ${open ? "#C98AA6" : "#EEE8EB"}`,
               }}
             >
               {/* 제목 줄 */}
@@ -235,32 +234,38 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
                   type="checkbox"
                   checked={selected.has(it.id)}
                   onChange={() => toggle(it.id)}
+                  onClick={stop}
                   aria-label={`${it.name} 선택`}
                   style={{ width: 16, height: 16, margin: 0, flex: "0 0 auto", accentColor: "#B0567E", cursor: "pointer" }}
                 />
-                <button type="button" onClick={toggleOpen} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8, border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}>
+                <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontSize: 15, fontWeight: 800, color: "#2B2126", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name} 님</span>
                   <span style={{ flex: "0 0 auto", fontSize: 12.5, fontWeight: 600, color: "#8C8188" }}>{it.topic}</span>
-                </button>
+                  {it.admin_memo && !open && (
+                    <span style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11.5, fontWeight: 700, color: "#A9647E" }}>
+                      <MemoIcon />메모
+                    </span>
+                  )}
+                </span>
                 <StatusBadge handled={handled} />
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true" style={{ flex: "0 0 auto", transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}>
+                  <path d="m5 8 5 5 5-5" stroke="#A79BA1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </div>
 
               {/* 내용 미리보기 / 전문 */}
-              <button
-                type="button"
-                onClick={toggleOpen}
+              <p
                 style={{
-                  border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit",
-                  fontSize: 13.5, color: "#5E555A", lineHeight: 1.6, wordBreak: "break-word", whiteSpace: open ? "pre-wrap" : "normal",
+                  margin: 0, fontSize: 13.5, color: "#5E555A", lineHeight: 1.6, wordBreak: "break-word", whiteSpace: open ? "pre-wrap" : "normal",
                   ...(open ? {} : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
                 }}
               >
                 {it.message}
-              </button>
+              </p>
 
               {/* 정보 줄 */}
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 14px", fontSize: 12.5, color: "#8C8188" }}>
-                <a href={`tel:${it.phone.replace(/[^0-9+]/g, "")}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#B0567E", fontWeight: 600 }}>
+                <a href={`tel:${it.phone.replace(/[^0-9+]/g, "")}`} onClick={stop} style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#B0567E", fontWeight: 600 }}>
                   <PhoneIcon />{it.phone}
                 </a>
                 {it.ceremony_date && <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><CalendarIcon />예식일 {it.ceremony_date}</span>}
@@ -268,30 +273,32 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><ClockIcon />접수 {formatStamp(new Date(it.created_at))}</span>
               </div>
 
+              {/* 펼쳤을 때: 메모 · 처리완료 (안쪽 클릭은 카드를 접지 않는다) */}
               {open && (
-                <div style={{ paddingTop: 10, borderTop: "1px solid #F3EEF1" }}>
+                <div onClick={stop} style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 12, borderTop: "1px solid #F3EEF1", cursor: "default" }}>
                   <MemoEditor key={it.admin_memo ?? ""} id={it.id} memo={it.admin_memo ?? ""} />
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                    {it.handled_at && (
+                      <span style={{ fontSize: 12, color: "#A79BA1" }}>처리 {formatStamp(new Date(it.handled_at))}</span>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => markHandled([it.id], !handled)}
+                      style={{
+                        marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, height: 40, padding: "0 18px", borderRadius: 10,
+                        fontSize: 13.5, fontWeight: 700, fontFamily: "inherit", cursor: isPending ? "default" : "pointer", opacity: isPending ? 0.6 : 1,
+                        border: "none",
+                        background: handled ? "#FFFFFF" : "#4F9A72", color: handled ? "#6E646A" : "#FFFFFF",
+                        boxShadow: handled ? "inset 0 0 0 1px #E0D9DD" : "0 2px 6px rgba(79,154,114,0.28)",
+                      }}
+                    >
+                      {handled ? <UndoIcon /> : <CheckIcon />}
+                      {handled ? "미처리로 되돌리기" : "처리완료"}
+                    </button>
+                  </div>
                 </div>
               )}
-
-              {/* 동작 줄 */}
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 18px", paddingTop: 2 }}>
-                <button type="button" onClick={toggleOpen} style={{ ...textBtn, color: "#413A3E" }}>
-                  <MemoIcon />{open ? "접기" : it.admin_memo ? "메모 보기" : "메모"}
-                </button>
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => markHandled([it.id], !handled)}
-                  style={{ ...textBtn, color: handled ? "#8A8487" : "#4F9A72" }}
-                >
-                  {handled ? <UndoIcon /> : <CheckIcon />}
-                  {handled ? "되돌리기" : "처리완료"}
-                </button>
-                {it.handled_at && (
-                  <span style={{ marginLeft: "auto", fontSize: 12, color: "#A79BA1" }}>처리 {formatStamp(new Date(it.handled_at))}</span>
-                )}
-              </div>
             </article>
           );
         })}
