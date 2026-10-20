@@ -20,6 +20,7 @@ interface IncomingBody {
   guestCount?: number;
   plan?: string;
   memo?: string;
+  customerMemo?: string; // 고객이 직접 남긴 메모(선택)
   paidAmount?: number;
   paymentType?: string; // "deposit" | "full"
   extraButlers?: number;
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     return badRequest("invalid JSON body");
   }
 
-  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
+  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
 
   if (!customer?.trim()) return badRequest("customer is required");
   if (!couple?.trim()) return badRequest("couple is required");
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
     useHomepageAmounts && typeof sentOnsite === "number" && sentOnsite >= 0
       ? sentOnsite
       : onsiteAmount(total, resolvedPaidAmount);
+  const resolvedCustomerMemo = typeof customerMemo === "string" ? customerMemo.trim().slice(0, 500) : "";
   const memoParts = [memo?.trim() ?? "", resolvedExtraButlers ? `버틀러 추가 ${resolvedExtraButlers}명` : ""].filter(Boolean);
 
   const created = await prisma.reservation.create({
@@ -112,6 +114,7 @@ export async function POST(req: NextRequest) {
       venueLabel: venue.trim(),
       guestsLabel: `약 ${guestCount}명`,
       memo: memoParts.join(" · "),
+      customerMemo: resolvedCustomerMemo,
       status: "신규요청",
       requestedPlan: plan,
       confirmPlan: plan,
@@ -158,6 +161,7 @@ export async function POST(req: NextRequest) {
         `예식: ${created.wishDateLabel} · ${created.venueLabel}`,
         `플랜: ${created.requestedPlan}${resolvedExtraButlers ? ` (버틀러 추가 ${resolvedExtraButlers}명)` : ""}`,
         `결제: ${resolvedPaymentType ? PAYMENT_TYPES[resolvedPaymentType].name : "유형 미지정"} · 결제 ${won(created.paidAmount)} · 현장(현금) ${won(onsite)}`,
+        ...(created.customerMemo ? [`메모: ${created.customerMemo}`] : []),
       ].join("\n")
     )
   );

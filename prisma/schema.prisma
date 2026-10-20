@@ -29,6 +29,8 @@ model Reservation {
   venueLabel     String
   guestsLabel    String
   memo           String
+  // 고객이 홈페이지 예약 때 직접 남긴 메모(선택). 없으면 ""
+  customerMemo   String   @default("")
   status         String
   requestedPlan  String
 

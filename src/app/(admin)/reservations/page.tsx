@@ -20,6 +20,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     venueLabel: r.venueLabel,
     guestsLabel: r.guestsLabel,
     memo: r.memo,
+    customerMemo: r.customerMemo,
     status: r.status,
     requestedPlan: r.requestedPlan,
     paidAmount: r.paidAmount,
@@ -118,6 +119,9 @@ export default async function ReservationsPage({
                   <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: 14.5, fontWeight: 700, wordBreak: "keep-all" }}>{row.customer} 님</span>
                   {row.side && (
                     <span style={{ flex: "0 0 auto", padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "#FFFFFF", color: "#7A6F75", boxShadow: "inset 0 0 0 1px #E8E2E5" }}>{row.side}</span>
+                  )}
+                  {row.hasCustomerMemo && (
+                    <span style={{ flex: "0 0 auto", padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "#FFFFFF", color: "#A9647E", boxShadow: "inset 0 0 0 1px #E7C9D5" }}>메모</span>
                   )}
                   <span style={{ flex: "0 0 auto", padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800, background: row.badgeBg, color: row.badgeColor }}>{row.status === "신규요청" ? "신규요청 · 확정 필요" : row.status}</span>
                 </div>

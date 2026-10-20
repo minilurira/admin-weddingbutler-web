@@ -15,6 +15,7 @@ export function toRow(r: Reservation) {
     id: r.id,
     customer: r.customer,
     side: r.side,
+    hasCustomerMemo: r.customerMemo !== "",
     venueLine: `${r.confirmPlan} · ${r.confirmVenue}`,
     staffLine: `버틀러 ${r.confirmButlers}명`,
     dateLine: r.confirmDate.replace(/-/g, ". "),
