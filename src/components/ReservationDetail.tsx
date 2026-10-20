@@ -451,7 +451,7 @@ export default function ReservationDetail({
         {/* 예약 취소 */}
         {!isCancelled && (
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button disabled={isPending} onClick={openCancel} style={{ height: 36, padding: "0 4px", border: 0, background: "transparent", color: "#B04A4A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            <button disabled={isPending} onClick={openCancel} style={{ ...outlineBtn, borderColor: "#E3B4B4", color: "#B04A4A" }}>
               예약 취소
             </button>
           </div>

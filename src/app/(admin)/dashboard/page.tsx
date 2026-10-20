@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { won } from "@/lib/pricing";
-import { reservationTotal, toCalendarEvent } from "@/lib/view";
+import { toCalendarEvent } from "@/lib/view";
+import { monthPaidConfirmed } from "@/lib/monthStats";
 import MiniCalendar from "@/components/MiniCalendar";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const items = await prisma.reservation.findMany({ orderBy: { requestedAt: "desc" } });
+  const [items, monthPaid] = await Promise.all([prisma.reservation.findMany({ orderBy: { requestedAt: "desc" } }), monthPaidConfirmed()]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -19,7 +20,6 @@ export default async function DashboardPage() {
   const talkingCount = items.filter((it) => it.status === "협의중").length;
   const confirmedAll = items.filter((it) => it.status === "확정");
   const monthConfirmed = confirmedAll.filter((it) => it.confirmDate.startsWith(monthPrefix));
-  const monthAmount = monthConfirmed.reduce((sum, it) => sum + reservationTotal(it), 0);
   const staffTotal = monthConfirmed.reduce((sum, it) => sum + it.confirmButlers, 0);
 
   const eventsByDate: Record<string, ReturnType<typeof toCalendarEvent>[]> = {};
@@ -47,8 +47,8 @@ export default async function DashboardPage() {
           <div style={{ fontSize: 12.5, color: "#8A857C", marginTop: 8 }}>대시보드에서 바로 확인하세요</div>
         </Link>
         <Link href="/reservations?filter=확정" style={{ background: "#EDF0F4", borderRadius: 18, padding: "22px 24px", minHeight: 112, display: "block" }}>
-          <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.45, color: "#3E4C5C" }}>이번 달 확정 {monthConfirmed.length}건<br />{won(monthAmount)}</div>
-          <div style={{ fontSize: 12.5, color: "#7A8794", marginTop: 8 }}>투입 예정 버틀러 {staffTotal}명</div>
+          <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.45, color: "#3E4C5C" }}>이번 달 결제 확정 {monthPaid.count}건<br />{won(monthPaid.amount)}</div>
+          <div style={{ fontSize: 12.5, color: "#7A8794", marginTop: 8 }}>이번 달 예식 투입 버틀러 {staffTotal}명</div>
         </Link>
       </div>
 
