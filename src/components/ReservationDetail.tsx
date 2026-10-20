@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { calcConfirm, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentTypeName, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
+import { calcConfirm, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
 import { BADGE } from "@/lib/badge";
 import { formatWishDateLabel, toNum } from "@/lib/format";
 import { refundQuote } from "@/lib/refundPolicy";
@@ -76,7 +76,7 @@ export default function ReservationDetail({
   const [customReason, setCustomReason] = useState("");
   const [noPaymentMessage, setNoPaymentMessage] = useState<string | null>(null);
   const [refundDraft, setRefundDraft] = useState("");
-  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<typeof fields | null>(null);
 
   const [fields, setFields] = useState({
     date: reservation.confirm.date,
@@ -132,13 +132,56 @@ export default function ReservationDetail({
   const quote = refundQuote(reservation.confirm.date, reservation.paidAmount);
   const refundAmount = toNum(refundDraft);
 
-  function field(key: keyof typeof fields) {
+  function draftField(key: keyof typeof fields) {
     return {
-      value: fields[key],
-      readOnly: locked,
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setFields((f) => ({ ...f, [key]: e.target.value })),
-      onBlur: () => { if (!locked) startTransition(() => { saveConfirmFields(reservation.id, parsedFields); }); },
+      value: draft ? draft[key] : "",
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+        setDraft((d) => (d ? { ...d, [key]: e.target.value } : d)),
     };
+  }
+
+  function openEdit() {
+    setDraft({ ...fields });
+  }
+
+  // 처음 예약이 들어왔을 때 값(홈페이지 신청 기준). 결제 금액·방식은 따로 남지 않아 지금 값을 유지한다.
+  function initialFields(): typeof fields {
+    const m = reservation.wishDateLabel.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일.*?(\d{1,2}:\d{2})/);
+    const date = m ? `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}` : fields.date;
+    const time = m ? m[4] : fields.time;
+    const butlers = planMeta(reservation.requestedPlan).butlers + reservation.requestedExtraButlers;
+    const fromHomepage = reservation.requestedTotal > 0;
+    const extraGuests = fromHomepage ? 0 : requestedTotal(reservation.requestedPlan, reservation.guestsLabel).extraGuests;
+    const discount = fromHomepage
+      ? Math.max(0, calcConfirm({ plan: reservation.confirm.plan, butlers, extraGuests: 0, discount: 0 }).total - reservation.requestedTotal)
+      : 0;
+    return {
+      ...(draft ?? fields),
+      date, time, venue: reservation.venueLabel,
+      butlers: String(butlers), extraGuests: String(extraGuests), discount: String(discount),
+      hours: "", note: "",
+    };
+  }
+
+  function onResetDraft() {
+    if (!window.confirm("처음 예약 들어온 내용으로 되돌릴까요? 저장을 눌러야 반영됩니다.")) return;
+    setDraft(initialFields());
+  }
+
+  function onSaveDraft() {
+    if (!draft) return;
+    const next = draft;
+    const parsed = {
+      date: next.date, time: next.time, venue: next.venue,
+      butlers: toNum(next.butlers), extraGuests: toNum(next.extraGuests), discount: toNum(next.discount),
+      hours: next.hours, note: next.note, paidAmount: toNum(next.paidAmount), paymentType: next.paymentType,
+    };
+    startTransition(async () => {
+      await saveConfirmFields(reservation.id, parsed);
+      setFields(next);
+      setDraft(null);
+      showToast("예약 내역을 저장했습니다.");
+    });
   }
 
   function closeDetail() {
@@ -208,6 +251,7 @@ export default function ReservationDetail({
   }
 
   const inputStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 12, padding: "12px 14px", fontSize: 13.5, color: locked ? "#6E646A" : "#1E1A1C", width: "100%", boxSizing: "border-box" };
+  const editInput: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 12, padding: "12px 14px", fontSize: 13.5, color: "#1E1A1C", width: "100%", boxSizing: "border-box", fontFamily: "inherit" };
   const card: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #EFEBED", borderRadius: 18, padding: 24, boxSizing: "border-box" };
   const divider: React.CSSProperties = { height: 1, background: "#ECE7E9", margin: "16px 0" };
   const dt: React.CSSProperties = { color: "#8C8188" };
@@ -295,13 +339,11 @@ export default function ReservationDetail({
             <div>
               <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>예약 내역</h2>
               <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>
-                {editing ? "입력칸을 벗어나면 바로 저장됩니다" : locked ? "확정된 내용입니다. 고치려면 재협의를 눌러 주세요." : "협의 후 확정할 내용입니다"}
+                {locked ? "확정된 내용입니다. 고치려면 재협의를 눌러 주세요." : "협의 후 확정할 내용입니다"}
               </p>
             </div>
             {!locked && !isCancelled && (
-              <button onClick={() => setEditing((v) => !v)} style={editing ? { ...primaryBtn, height: 38, padding: "0 16px", fontSize: 13 } : { ...outlineBtn, height: 38 }}>
-                {editing ? "수정 완료" : "예약 내역 수정"}
-              </button>
+              <button onClick={openEdit} style={{ ...outlineBtn, height: 38 }}>예약 내역 수정</button>
             )}
           </div>
 
@@ -309,33 +351,6 @@ export default function ReservationDetail({
           <div style={{ fontSize: 12.5, color: "#8C8188", marginTop: 5 }}>{money.meta.desc}</div>
           <div style={divider} />
 
-          {editing ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-              <label style={labelStyle}>예식일<input {...field("date")} placeholder="2026-09-19" style={inputStyle} /></label>
-              <label style={labelStyle}>예식 시간<input {...field("time")} placeholder="12:00" style={inputStyle} /></label>
-              <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>예식장 · 홀<input {...field("venue")} style={inputStyle} /></label>
-              <label style={labelStyle}>배정 버틀러 (명)<input {...field("butlers")} style={inputStyle} /></label>
-              <label style={labelStyle}>추가 하객 (명)<input {...field("extraGuests")} style={inputStyle} /></label>
-              <label style={labelStyle}>할인 금액 (원)<input {...field("discount")} placeholder="0" style={inputStyle} /></label>
-              <label style={labelStyle}>결제 방식
-                <select
-                  value={fields.paymentType}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setFields((f) => ({ ...f, paymentType: v }));
-                    startTransition(() => { saveConfirmFields(reservation.id, { ...parsedFields, paymentType: v }); });
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">미지정</option>
-                  {(Object.keys(PAYMENT_TYPES) as PaymentType[]).map((t) => <option key={t} value={t}>{PAYMENT_TYPES[t].name}</option>)}
-                </select>
-              </label>
-              <label style={labelStyle}>결제한 금액 (원)<input {...field("paidAmount")} placeholder="0" style={inputStyle} /></label>
-              <label style={labelStyle}>근무 시간<input {...field("hours")} style={inputStyle} /></label>
-              <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>특이사항<textarea rows={3} {...field("note")} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} /></label>
-            </div>
-          ) : (
             <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", gap: "13px 16px", fontSize: 13.5 }}>
               <span style={dt}>예식 일시</span><span style={{ fontWeight: 600 }}>{dateLabel}</span>
               <span style={dt}>예식장</span><span>{fields.venue || reservation.venueLabel || "-"}</span>
@@ -347,7 +362,6 @@ export default function ReservationDetail({
               {fields.hours && (<><span style={dt}>근무 시간</span><span>{fields.hours}</span></>)}
               {fields.note && (<><span style={dt}>특이사항</span><span style={{ lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{fields.note}</span></>)}
             </div>
-          )}
 
           <div style={divider} />
 
@@ -369,9 +383,9 @@ export default function ReservationDetail({
             <span style={{ fontWeight: 700, color: "#413A3E" }}>{won(onsiteAmount(money.total, parsedFields.paidAmount))}</span>
           </div>
 
-          <details style={{ marginTop: 18, padding: "12px 14px", borderRadius: 12, background: "#F8F6F7", fontSize: 13, color: "#6E646A" }}>
-            <summary style={{ cursor: "pointer", fontWeight: 700 }}>고객 신청 원본 (홈페이지에서 신청한 내용)</summary>
-            <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", gap: "9px 16px", marginTop: 12 }}>
+          <details style={{ marginTop: 18, padding: "14px 16px", borderRadius: 12, background: "#F8F6F7", fontSize: 13, lineHeight: 1.5, color: "#5E555A" }}>
+            <summary style={{ cursor: "pointer", fontWeight: 700, color: "#6E646A" }}>고객 신청 원본 <span style={{ fontWeight: 500, color: "#A79BA1" }}>홈페이지에서 신청한 내용</span></summary>
+            <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", alignItems: "baseline", rowGap: 10, columnGap: 16, marginTop: 14, paddingTop: 14, borderTop: "1px solid #ECE7E9" }}>
               <span style={dt}>플랜</span><span>{req.meta.key}</span>
               <span style={dt}>예식 일시</span><span>{reservation.wishDateLabel || "-"}</span>
               <span style={dt}>예식장</span><span>{reservation.venueLabel || "-"}</span>
@@ -443,6 +457,45 @@ export default function ReservationDetail({
           </div>
         )}
       </div>
+
+      {draft && (
+        <div onClick={() => !isPending && setDraft(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(30,26,28,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: 20, padding: 26, boxSizing: "border-box", boxShadow: "0 18px 46px rgba(60,30,45,0.22)" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
+              <div>
+                <h2 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 800 }}>예약 내역 수정</h2>
+                <p style={{ margin: 0, fontSize: 12.5, color: "#8C8188" }}>{reservation.customer} 님 · {reservation.id} · 저장하면 예약 내역에 반영됩니다.</p>
+              </div>
+              <button aria-label="닫기" disabled={isPending} onClick={() => setDraft(null)} style={{ width: 36, height: 36, flex: "0 0 36px", border: 0, borderRadius: 10, background: "#F6F3F5", color: "#6E646A", fontSize: 16, cursor: "pointer" }}>×</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+              <label style={labelStyle}>예식일<input {...draftField("date")} placeholder="2026-09-19" style={editInput} /></label>
+              <label style={labelStyle}>예식 시간<input {...draftField("time")} placeholder="12:00" style={editInput} /></label>
+              <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>예식장 · 홀<input {...draftField("venue")} style={editInput} /></label>
+              <label style={labelStyle}>배정 버틀러 (명)<input {...draftField("butlers")} inputMode="numeric" style={editInput} /></label>
+              <label style={labelStyle}>추가 하객 (명)<input {...draftField("extraGuests")} inputMode="numeric" style={editInput} /></label>
+              <label style={labelStyle}>할인 금액 (원)<input {...draftField("discount")} inputMode="numeric" placeholder="0" style={editInput} /></label>
+              <label style={labelStyle}>결제 방식
+                <select {...draftField("paymentType")} style={editInput}>
+                  <option value="">미지정</option>
+                  {(Object.keys(PAYMENT_TYPES) as PaymentType[]).map((t) => <option key={t} value={t}>{PAYMENT_TYPES[t].name}</option>)}
+                </select>
+              </label>
+              <label style={labelStyle}>결제한 금액 (원)<input {...draftField("paidAmount")} inputMode="numeric" placeholder="0" style={editInput} /></label>
+              <label style={labelStyle}>근무 시간<input {...draftField("hours")} placeholder="예: 10:00 - 12:30" style={editInput} /></label>
+              <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>특이사항<textarea rows={3} {...draftField("note")} style={{ ...editInput, resize: "vertical", lineHeight: 1.6 }} /></label>
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 22 }}>
+              <button disabled={isPending} onClick={onResetDraft} style={{ ...outlineBtn, height: 46 }}>초기화</button>
+              <span style={{ fontSize: 12, color: "#A79BA1", marginRight: "auto" }}>처음 예약 들어온 내용으로 되돌립니다</span>
+              <button disabled={isPending} onClick={() => setDraft(null)} style={{ height: 46, padding: "0 18px", border: 0, borderRadius: 12, background: "#F6F3F5", color: "#6E646A", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>취소</button>
+              <button disabled={isPending} onClick={onSaveDraft} style={{ ...primaryBtn, height: 46, opacity: isPending ? 0.7 : 1 }}>저장</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cancelOpen && (
         <div onClick={() => !isPending && setCancelOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(30,26,28,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
