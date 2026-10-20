@@ -91,7 +91,13 @@ export default async function ReservationsPage({
         className={[explicitlyOpened ? "wb-list-pane-hidden" : "", selected ? "wb-list-pane-capped" : ""].filter(Boolean).join(" ") || undefined}
         style={{ flex: "1 1 240px", minWidth: 0, boxSizing: "border-box", padding: "6px 28px 48px" }}
       >
-        <ReservationListControls currentFilter={filter} />
+        <ReservationListControls
+          currentFilter={filter}
+          counts={{
+            전체: all.length,
+            ...Object.fromEntries(["신규요청", "협의중", "확정", "취소"].map((st) => [st, all.filter((r) => r.status === st).length])),
+          }}
+        />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.length === 0 && <div style={{ fontSize: 13.5, color: "#8C8188", padding: "24px 4px" }}>조건에 맞는 예약이 없습니다.</div>}

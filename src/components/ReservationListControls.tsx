@@ -11,7 +11,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 
 const FILTERS = ["전체", "신규요청", "협의중", "확정", "취소"];
 
-export default function ReservationListControls({ currentFilter }: { currentFilter: string }) {
+export default function ReservationListControls({ currentFilter, counts }: { currentFilter: string; counts: Record<string, number> }) {
   const mobile = useIsMobile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,7 +50,19 @@ export default function ReservationListControls({ currentFilter }: { currentFilt
 
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
+      {/* 제목 줄: 예약 N건 · 새 예약 */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "6px 0 14px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.4px" }}>예약</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#B0567E" }}>{counts["전체"] ?? 0}건</span>
+        </div>
+        <button onClick={() => setOpen(true)} style={{ height: 40, padding: "0 16px", border: 0, borderRadius: 12, background: "#B0567E", color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 6px rgba(176,86,126,0.25)" }}>
+          + 새 예약
+        </button>
+      </div>
+
+      {/* 상태 필터: 회색 바 안의 탭 */}
+      <div style={{ display: "flex", gap: 4, padding: 4, marginBottom: 14, borderRadius: 14, background: "#F4F1F3", overflowX: "auto" }}>
         {FILTERS.map((label) => {
           const active = currentFilter === label;
           return (
@@ -58,20 +70,19 @@ export default function ReservationListControls({ currentFilter }: { currentFilt
               key={label}
               href={filterHref(label)}
               style={{
-                height: 44, padding: "0 22px", borderRadius: 999, display: "flex", alignItems: "center",
-                border: `1px solid ${active ? "#B0567E" : "#E8E2E5"}`,
-                background: active ? "#B0567E" : "#FFFFFF",
-                color: active ? "#FFFFFF" : "#7A6F75",
-                fontSize: 14.5, fontWeight: 700,
+                flex: mobile ? "0 0 auto" : "1 1 0", minWidth: 0, height: 38, padding: "0 12px", borderRadius: 10,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap",
+                background: active ? "#FFFFFF" : "transparent",
+                boxShadow: active ? "0 1px 3px rgba(60,30,45,0.12)" : "none",
+                color: active ? "#B0567E" : "#7A6F75",
+                fontSize: 13.5, fontWeight: active ? 800 : 600,
               }}
             >
-              {label}
+              {label === "신규요청" ? "신규" : label}
+              <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#B0567E" : "#A79BA1" }}>{counts[label] ?? 0}</span>
             </Link>
           );
         })}
-        <button onClick={() => setOpen(true)} style={{ marginLeft: mobile ? 0 : "auto", height: 44, padding: "0 20px", border: 0, borderRadius: 14, background: "#B0567E", color: "#fff", fontSize: 14.5, fontWeight: 700 }}>
-          새 예약 등록
-        </button>
       </div>
 
       {open && (
