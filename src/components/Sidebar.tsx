@@ -29,6 +29,17 @@ const navItems = [
     ),
   },
   {
+    href: "/inquiries",
+    label: "문의 목록",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <path d="M3.4 4.6a2 2 0 0 1 2-2h9.2a2 2 0 0 1 2 2v7.2a2 2 0 0 1-2 2H9l-3.6 3v-3h0a2 2 0 0 1-2-2V4.6Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <rect x="6.4" y="6.4" width="7.2" height="1.7" rx="0.85" fill="currentColor" />
+        <rect x="6.4" y="9.6" width="4.6" height="1.7" rx="0.85" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
     href: "/calendar",
     label: "캘린더",
     icon: (
