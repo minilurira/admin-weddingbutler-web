@@ -60,6 +60,14 @@ button {
   max-width: 340px;
 }
 
+/* 메뉴를 접으면 비는 사이드바 폭(268px)만큼 리스트가 넓어지고 상세 폭은 그대로 */
+@media (min-width: 900px) {
+  .wb-nav-closed .wb-list-pane-capped {
+    flex: 0 0 608px !important;
+    max-width: 608px;
+  }
+}
+
 @media (max-width: 899px) {
   .wb-list-pane-hidden {
     display: none;

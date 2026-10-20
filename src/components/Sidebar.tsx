@@ -119,7 +119,7 @@ export default function Sidebar({
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#8C8188" }}>
-          <span>이번 달 확정</span>
+          <span>이번 달 결제 확정</span>
           <span style={{ color: "#B0567E", fontWeight: 700 }}>{confirmedCount}건</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#8C8188" }}>
