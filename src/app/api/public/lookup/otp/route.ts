@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRecordApiKey } from "@/lib/publicApi";
 import { sendSms } from "@/lib/sms";
+import { sendLookupOtpAlimtalk } from "@/lib/alimtalk";
 import { LOOKUP_OTP_MAX_SENDS_PER_HOUR, LOOKUP_OTP_TTL_MS, findReservationsByPhone, hashLookupOtp, normalizePhone } from "@/lib/lookup";
 
 export const dynamic = "force-dynamic";
 
-// 홈페이지 예약 조회: 예약이 있는 번호로 6자리 인증번호 문자 발송. 번호당 1시간에 5회까지.
+// 홈페이지 예약 조회: 예약이 있는 번호로 6자리 인증번호 알림톡(실패 시 문자) 발송. 번호당 1시간에 5회까지.
 export async function POST(req: NextRequest) {
   const denied = requireRecordApiKey(req);
   if (denied) return denied;
@@ -31,7 +32,10 @@ export async function POST(req: NextRequest) {
     data: { phone, codeHash: hashLookupOtp(phone, code), expiresAt: new Date(Date.now() + LOOKUP_OTP_TTL_MS) },
   });
 
-  const sent = await sendSms(phone, `[웨딩버틀러] 예약 조회 인증번호는 ${code} 입니다. 5분 안에 입력해 주세요.`, `lookup ${phone.slice(-4)}`);
+  // 알림톡으로 먼저 보내고, 템플릿이 없거나 실패하면 문자로 보낸다.
+  const sent =
+    (await sendLookupOtpAlimtalk(phone, code)) ||
+    (await sendSms(phone, `[웨딩버틀러] 예약 조회 인증번호는 ${code} 입니다. 5분 안에 입력해 주세요.`, `lookup ${phone.slice(-4)}`));
   if (!sent) return NextResponse.json({ error: "sms_failed" }, { status: 502 });
   return NextResponse.json({ ok: true });
 }

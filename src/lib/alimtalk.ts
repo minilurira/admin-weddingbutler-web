@@ -232,3 +232,25 @@ export async function sendCancelAlimtalk(
     return { sent: false, detail: "전송 실패" };
   }
 }
+
+/** 예약 조회 인증번호 알림톡(#{authCode}). 템플릿 ID가 없거나 실패하면 false — 호출부가 문자로 대신 보낸다. */
+export async function sendLookupOtpAlimtalk(phone: string, code: string): Promise<boolean> {
+  const svc = client();
+  const from = process.env.SOLAPI_SENDER_PHONE;
+  const pfId = process.env.SOLAPI_PF_ID;
+  const templateId = process.env.SOLAPI_TEMPLATE_LOOKUP_OTP;
+  const tag = `lookup ${phone.slice(-4)}`;
+  if (!svc || !from || !pfId || !templateId) return false;
+  try {
+    const result = await svc.send({
+      to: digitsOnly(phone),
+      from,
+      kakaoOptions: { pfId, templateId, disableSms: true, variables: { "#{authCode}": code } },
+    });
+    logSendResult(tag, result);
+    return result.failedMessageList.length === 0;
+  } catch (err) {
+    console.error(`[alimtalk] Solapi lookup OTP send failed for ${tag}`, err);
+    return false;
+  }
+}
