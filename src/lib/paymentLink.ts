@@ -5,6 +5,7 @@ import { sendNewReservationAlimtalk, sendPaymentLinkAlimtalk } from "@/lib/alimt
 import { sendSms } from "@/lib/sms";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { formatStamp } from "@/lib/format";
+import { recordMessage } from "@/lib/messageLog";
 import { cancelPayment, createPaymentLink, deactivatePaymentLink, getPayment, PortOneV1Error } from "@/lib/portoneV1";
 import { expireLabel, expiryAfterDays, paymentLinkText, paymentLinkVariables, type PaymentLinkFields } from "@/lib/paymentLinkText";
 
@@ -68,6 +69,19 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   let sentVia = "";
   if (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag)) sentVia = "alimtalk";
   else if (await sendSms(r.phone, paymentLinkText(fields), tag)) sentVia = "sms";
+
+  // 예약 상세의 발송 내역에 남긴다 (알림톡이면 변수, 문자면 보낸 본문)
+  await recordMessage({
+    reservationId: r.id,
+    kind: "결제 링크",
+    channel: sentVia === "sms" ? "문자" : "알림톡",
+    recipient: r.phone,
+    templateId: sentVia === "alimtalk" ? process.env.SOLAPI_TEMPLATE_PAYMENT_LINK : undefined,
+    variables: sentVia === "alimtalk" ? paymentLinkVariables(fields) : undefined,
+    content: sentVia === "sms" ? paymentLinkText(fields) : "",
+    status: sentVia ? "sent" : "failed",
+    detail: sentVia ? "" : "알림톡과 문자 모두 보내지 못했습니다.",
+  });
 
   await prisma.paymentLink.create({
     data: {

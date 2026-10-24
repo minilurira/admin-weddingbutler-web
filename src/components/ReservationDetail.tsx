@@ -1,6 +1,7 @@
 "use client";
 
 import ButlerAssign from "./ButlerAssign";
+import MessageHistory from "./MessageHistory";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -456,6 +457,9 @@ export default function ReservationDetail({
 
         {/* 버틀러 배정: 필요한 인원만큼 실제 버틀러를 정한다 */}
         <ButlerAssign reservationId={reservation.id} required={parsedFields.butlers} cancelled={isCancelled} card={card} />
+
+        {/* 알림톡 발송 내역과 내용 */}
+        <MessageHistory reservationId={reservation.id} card={card} legacyLabel={reservation.alimtalkLabel} />
 
         {/* 결제 링크 (포트원 링크페이) */}
         {(!isCancelled || reservation.paymentLinks.length > 0) && (

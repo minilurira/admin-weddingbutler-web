@@ -1,4 +1,5 @@
 import { SolapiMessageService } from "solapi";
+import { maskPhone, recordMessage, type MessageKind } from "@/lib/messageLog";
 
 function logSendResult(reservationId: string, result: { failedMessageList: readonly unknown[]; groupInfo: { count: Record<string, number> } }) {
   if (result.failedMessageList.length > 0) {
@@ -6,6 +7,17 @@ function logSendResult(reservationId: string, result: { failedMessageList: reado
   } else {
     console.log(`[alimtalk] Solapi accepted send for ${reservationId}:`, JSON.stringify(result.groupInfo.count));
   }
+}
+
+/** 솔라피 결과에서 이 번호로 간 메시지가 거절됐는지 (거절됐으면 사유) */
+function failureFor(result: { failedMessageList: readonly { to?: string; statusMessage?: string; statusCode?: string }[] }, phone: string): string | null {
+  const f = result.failedMessageList.find((x) => x.to === digitsOnly(phone)) ?? (result.failedMessageList.length === 1 ? result.failedMessageList[0] : undefined);
+  return f ? (f.statusMessage || f.statusCode || "전송 실패") : null;
+}
+
+/** 예약 상세의 발송 내역용 기록. 저장에 실패해도 발송에는 영향이 없다. */
+async function logKakao(reservationId: string, kind: MessageKind, phone: string, templateId: string | undefined, variables: Record<string, string>, outcome: { status: "sent" | "failed" | "skipped"; detail?: string }, staff = false) {
+  await recordMessage({ reservationId, kind, channel: "알림톡", recipient: staff ? maskPhone(phone) : phone, templateId, variables, status: outcome.status, detail: outcome.detail });
 }
 
 function client(): SolapiMessageService | null {
@@ -72,29 +84,30 @@ export async function sendConfirmAlimtalk(payload: AlimtalkFields): Promise<{ se
   const templateId = process.env.SOLAPI_TEMPLATE_CONFIRMED;
   if (!svc || !from || !templateId) {
     console.warn(`[alimtalk] Solapi env vars not fully set — skipping confirm send for ${payload.reservationId}.`);
+    await logKakao(payload.reservationId, "예약 확정", payload.phone, templateId, {}, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
     return { sent: false, detail: "미설정 (로컬 기록만 저장됨)" };
   }
+  const variables = {
+    ...buildVariables(payload),
+    "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
+    "#{balanceAmount}": onsiteAmountText(payload.balanceAmount),
+  };
   try {
     const result = await svc.send({
       to: digitsOnly(payload.phone),
       from,
-      kakaoOptions: {
-        pfId: process.env.SOLAPI_PF_ID!,
-        templateId,
-        variables: {
-          ...buildVariables(payload),
-          "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
-          "#{balanceAmount}": onsiteAmountText(payload.balanceAmount),
-        },
-      },
+      kakaoOptions: { pfId: process.env.SOLAPI_PF_ID!, templateId, variables },
     });
     logSendResult(payload.reservationId, result);
+    const reason = failureFor(result, payload.phone);
+    await logKakao(payload.reservationId, "예약 확정", payload.phone, templateId, variables, reason ? { status: "failed", detail: reason } : { status: "sent" });
     if (result.failedMessageList.length > 0) {
       return { sent: false, detail: "전송 실패" };
     }
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
     console.error(`[alimtalk] Solapi confirm send failed for ${payload.reservationId}`, err);
+    await logKakao(payload.reservationId, "예약 확정", payload.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
     return { sent: false, detail: "전송 실패" };
   }
 }
@@ -112,6 +125,7 @@ export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promi
 
   if (!svc || !from || !pfId || !customerTemplateId) {
     console.warn(`[alimtalk] Solapi env vars not fully set — skipping new-reservation send for ${payload.reservationId}.`);
+    await logKakao(payload.reservationId, "신규 예약 접수", payload.phone, customerTemplateId, {}, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
     return;
   }
 
@@ -150,11 +164,17 @@ export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promi
     console.warn(`[alimtalk] SOLAPI_TEMPLATE_NEW_STAFF/SOLAPI_STAFF_PHONES not set — staff Kakao notice skipped for ${payload.reservationId} (Slack 연동 예정).`);
   }
 
+  const logAll = async (outcome: (phone: string) => { status: "sent" | "failed"; detail?: string }) => {
+    await logKakao(payload.reservationId, "신규 예약 접수", payload.phone, customerTemplateId, customerVariables, outcome(payload.phone));
+    if (staffTemplateId) for (const phone of staffPhones) await logKakao(payload.reservationId, "직원 알림", phone, staffTemplateId, variables, outcome(phone), true);
+  };
   try {
     const result = await svc.send(messages);
     logSendResult(payload.reservationId, result);
+    await logAll((phone) => { const r = failureFor(result, phone); return r ? { status: "failed", detail: r } : { status: "sent" }; });
   } catch (err) {
     console.error(`[alimtalk] Solapi new-reservation send failed for ${payload.reservationId}`, err);
+    await logAll(() => ({ status: "failed", detail: err instanceof Error ? err.message : "전송 실패" }));
   }
 }
 
@@ -168,27 +188,25 @@ export async function sendReminderAlimtalk(kind: ReminderKind, payload: Alimtalk
   const templateId = kind === "7d" ? process.env.SOLAPI_TEMPLATE_REMIND_7D : process.env.SOLAPI_TEMPLATE_REMIND_DAY;
   if (!svc || !from || !pfId || !templateId) {
     console.warn(`[alimtalk] Solapi env vars not fully set — skipping ${kind} reminder for ${payload.reservationId}.`);
+    await logKakao(payload.reservationId, kind === "7d" ? "7일 전 안내" : "당일 안내", payload.phone, templateId, {}, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
     return { sent: false, detail: "미설정" };
   }
+  const reminderKind: MessageKind = kind === "7d" ? "7일 전 안내" : "당일 안내";
+  const variables = {
+    ...buildVariables(payload),
+    "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
+    "#{balanceAmount}": onsiteAmountText(payload.balanceAmount),
+  };
   try {
-    const result = await svc.send({
-      to: digitsOnly(payload.phone),
-      from,
-      kakaoOptions: {
-        pfId,
-        templateId,
-        variables: {
-          ...buildVariables(payload),
-          "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
-          "#{balanceAmount}": onsiteAmountText(payload.balanceAmount),
-        },
-      },
-    });
+    const result = await svc.send({ to: digitsOnly(payload.phone), from, kakaoOptions: { pfId, templateId, variables } });
     logSendResult(payload.reservationId, result);
+    const reason = failureFor(result, payload.phone);
+    await logKakao(payload.reservationId, reminderKind, payload.phone, templateId, variables, reason ? { status: "failed", detail: reason } : { status: "sent" });
     if (result.failedMessageList.length > 0) return { sent: false, detail: "전송 실패" };
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
     console.error(`[alimtalk] Solapi ${kind} reminder failed for ${payload.reservationId}`, err);
+    await logKakao(payload.reservationId, reminderKind, payload.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
     return { sent: false, detail: "전송 실패" };
   }
 }
@@ -203,32 +221,29 @@ export async function sendCancelAlimtalk(
   const templateId = process.env.SOLAPI_TEMPLATE_CANCELLED;
   if (!svc || !from || !pfId || !templateId) {
     console.warn(`[alimtalk] Solapi env vars not fully set — skipping cancel send for ${payload.reservationId}.`);
+    await logKakao(payload.reservationId, "예약 취소", payload.phone, templateId, {}, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
     return { sent: false, detail: "미설정" };
   }
+  // 카카오 아이템 리스트 값은 23자까지라(초과 시 3076 오류) 표에 들어갈 수 있는 값은 잘라 보낸다.
+  const variables: Record<string, string> = Object.fromEntries(
+    Object.entries({
+      ...buildVariables(payload),
+      "#{planAmount}": `${payload.planAmount.toLocaleString("ko-KR")}원`,
+      "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
+      "#{refundAmount}": `${payload.refundAmount.toLocaleString("ko-KR")}원`,
+      "#{cancelReason}": payload.cancelReason,
+    }).map(([k, v]) => [k, Array.from(v).length > 23 ? `${Array.from(v).slice(0, 22).join("")}…` : v])
+  );
   try {
-    const result = await svc.send({
-      to: digitsOnly(payload.phone),
-      from,
-      kakaoOptions: {
-        pfId,
-        templateId,
-        // 카카오 아이템 리스트 값은 23자까지라(초과 시 3076 오류) 표에 들어갈 수 있는 값은 잘라 보낸다.
-        variables: Object.fromEntries(
-          Object.entries({
-            ...buildVariables(payload),
-            "#{planAmount}": `${payload.planAmount.toLocaleString("ko-KR")}원`,
-            "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
-            "#{refundAmount}": `${payload.refundAmount.toLocaleString("ko-KR")}원`,
-            "#{cancelReason}": payload.cancelReason,
-          }).map(([k, v]) => [k, Array.from(v).length > 23 ? `${Array.from(v).slice(0, 22).join("")}…` : v])
-        ),
-      },
-    });
+    const result = await svc.send({ to: digitsOnly(payload.phone), from, kakaoOptions: { pfId, templateId, variables } });
     logSendResult(payload.reservationId, result);
+    const reason = failureFor(result, payload.phone);
+    await logKakao(payload.reservationId, "예약 취소", payload.phone, templateId, variables, reason ? { status: "failed", detail: reason } : { status: "sent" });
     if (result.failedMessageList.length > 0) return { sent: false, detail: "전송 실패" };
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
     console.error(`[alimtalk] Solapi cancel send failed for ${payload.reservationId}`, err);
+    await logKakao(payload.reservationId, "예약 취소", payload.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
     return { sent: false, detail: "전송 실패" };
   }
 }
