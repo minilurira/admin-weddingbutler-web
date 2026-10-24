@@ -35,6 +35,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
   const [recon, setRecon] = useState<ReconcileResult | null>(null);
   const [reconMonth, setReconMonth] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
+  const [hideTest, setHideTest] = useState(true); // 테스트 거래([TEST]·1,000원 이하)는 기본으로 숨긴다
 
   /** 선택한 달(접수일 기준)의 결제를 포트원과 맞춰 본다. 읽기 전용이라 언제 눌러도 안전하다. */
   async function checkRecon() {
@@ -378,22 +379,37 @@ export default function FinanceView({ data }: { data: FinanceData }) {
             <p className="note">포트원 API는 카드 수수료와 은행 입금액을 건별로 제공하지 않아서, 수수료와 입금액 대사는 하지 않습니다. 수수료는 수입 탭의 요율로 계산합니다.</p>
           </div>
           {recon && (() => {
-            const bad = recon.rows.filter((r) => r.verdict === "mismatch");
+            const vis = recon.rows.filter((r) => !(hideTest && r.isTest));
+            const hiddenTest = recon.rows.length - vis.length;
+            const bad = vis.filter((r) => r.verdict === "mismatch");
             const order = { mismatch: 0, unpaid: 2, ok: 1 } as const;
-            const rows = recon.rows.slice().sort((a, b) => order[a.verdict] - order[b.verdict]);
+            const rows = vis.slice().sort((a, b) => order[a.verdict] - order[b.verdict]);
+            // 숨긴 테스트 거래를 뺀 합계를 다시 계산한다 (포트원은 취소 금액을 뺀 실제 결제액)
+            const sum = {
+              checked: vis.length,
+              ok: vis.filter((r) => r.verdict === "ok").length,
+              unpaid: vis.filter((r) => r.verdict === "unpaid").length,
+              dbPaidTotal: vis.filter((r) => r.dbStatus === "paid").reduce((a, r) => a + r.dbAmount, 0),
+              pgPaidTotal: vis.filter((r) => r.pgStatus === "PAID" || r.pgStatus === "PARTIAL_CANCELLED").reduce((a, r) => a + r.pgAmount - (r.pgCancelledAmount ?? 0), 0),
+              adminPaidTotal: vis.filter((r) => r.dbStatus === "paid").reduce((a, r) => a + (r.adminPaid ?? 0), 0),
+            };
             return (
               <>
                 {reconMonth !== month && <div className="warnbox">아래 결과는 {reconMonth.replace("-", "년 ")}월 기준입니다. {Number(mm)}월은 다시 대사해 주세요.</div>}
                 <div className={bad.length || recon.summary.failed ? "warnbox" : "okbox"}>
                   {bad.length
                     ? `확인이 필요한 결제가 ${bad.length}건 있습니다.`
-                    : recon.summary.failed ? `${recon.summary.failed}건은 포트원 조회에 실패해 대사하지 못했습니다.` : `대사한 ${recon.summary.checked}건 모두 일치합니다.`}
+                    : recon.summary.failed ? `${recon.summary.failed}건은 포트원 조회에 실패해 대사하지 못했습니다.` : `대사한 ${sum.checked}건 모두 일치합니다.`}
                 </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--text2)", fontWeight: 600 }}>
+                  <input type="checkbox" checked={hideTest} onChange={(e) => setHideTest(e.target.checked)} />
+                  테스트 거래 숨기기 <span className="sub">[TEST] 이름 또는 1,000원 이하 결제{hiddenTest ? ` · 지금 ${hiddenTest}건 숨김` : ""}</span>
+                </label>
                 <div className="sum">
-                  <div className="tile"><small>대사한 결제</small><b className="num">{recon.summary.checked}건</b><span>일치 {recon.summary.ok} · 미결제 {recon.summary.unpaid}</span></div>
-                  <div className="tile net"><small>확인 필요</small><b className="num">{recon.summary.mismatch}건</b><span>조회 실패 {recon.summary.failed}건</span></div>
-                  <div className="tile"><small>포트원 결제 합계</small><b className="num">{won(recon.summary.pgPaidTotal)}</b><span>취소 금액 제외</span></div>
-                  <div className="tile"><small>예약 DB 결제 합계</small><b className="num">{won(recon.summary.dbPaidTotal)}</b><span>어드민 기록 {won(recon.summary.adminPaidTotal)}</span></div>
+                  <div className="tile"><small>대사한 결제</small><b className="num">{sum.checked}건</b><span>일치 {sum.ok} · 미결제 {sum.unpaid}</span></div>
+                  <div className="tile net"><small>확인 필요</small><b className="num">{bad.length}건</b><span>조회 실패 {recon.summary.failed}건</span></div>
+                  <div className="tile"><small>포트원 결제 합계</small><b className="num">{won(sum.pgPaidTotal)}</b><span>취소 금액 제외</span></div>
+                  <div className="tile"><small>예약 DB 결제 합계</small><b className="num">{won(sum.dbPaidTotal)}</b><span>어드민 기록 {won(sum.adminPaidTotal)}</span></div>
                 </div>
                 <div className="box"><h2>대사 결과</h2>
                   <div className="scroll"><table style={{ minWidth: 760 }}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -100,10 +101,12 @@ export default function Sidebar({
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {navItems.map((item) => {
-          const active = pathname?.startsWith(item.href);
+          // 예약 리스트는 /reservations 에서만 켜고, 하위 화면(미결제 예약)은 따로 켠다
+          const unpaidOpen = pathname?.startsWith("/reservations/unpaid") ?? false;
+          const active = item.href === "/reservations" ? Boolean(pathname?.startsWith("/reservations")) && !unpaidOpen : pathname?.startsWith(item.href);
           return (
+            <Fragment key={item.href}>
             <Link
-              key={item.href}
               href={item.href}
               onClick={onNavigate}
               style={{
@@ -119,6 +122,21 @@ export default function Sidebar({
                 <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "#B0567E" }}>{totalCount}</span>
               )}
             </Link>
+              {item.href === "/reservations" && (
+                <Link
+                  href="/reservations/unpaid"
+                  onClick={onNavigate}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, height: 38, padding: "0 14px 0 45px",
+                    borderRadius: 12, fontSize: 13.5, fontWeight: 600,
+                    background: unpaidOpen ? "#F9EFF4" : "transparent",
+                    color: unpaidOpen ? "#B0567E" : "#8C8188",
+                  }}
+                >
+                  미결제 예약
+                </Link>
+              )}
+            </Fragment>
           );
         })}
       </nav>

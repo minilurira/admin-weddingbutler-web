@@ -89,8 +89,13 @@ export interface ReconcileRowView {
   createdAt: string;
   pgStatus: string;
   pgAmount: number;
+  pgCancelledAmount?: number | null;
   verdict: "ok" | "mismatch" | "unpaid";
   reason: string;
+  /** 테스트 거래([TEST] 이름 또는 1,000원 이하) */
+  isTest?: boolean;
+  /** 어드민 예약에 기록된 결제금액 (어드민에 예약이 없으면 null) */
+  adminPaid?: number | null;
 }
 
 export interface ReconcileResult {

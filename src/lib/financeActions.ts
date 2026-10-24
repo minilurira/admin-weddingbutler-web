@@ -152,8 +152,9 @@ export async function runReconciliation(month: string): Promise<ReconcileResult>
   const admin = new Map(adminRows.map((a) => [a.id, a]));
   let adminPaidTotal = 0;
 
-  const rows = data.rows.map((r) => {
-    const a = admin.get(r.bookingNo);
+  const rows = data.rows.map((raw) => {
+    const a = admin.get(raw.bookingNo);
+    const r = { ...raw, adminPaid: a ? a.paidAmount : null };
     if (a && r.dbStatus === "paid") adminPaidTotal += a.paidAmount;
     // 홈페이지 쪽은 맞는데 어드민과 어긋나는 경우
     if (r.verdict === "ok" && r.dbStatus === "paid") {
