@@ -4,7 +4,8 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureFinanceTables } from "@/lib/finance";
+import { ensureFinanceTables, type ReconcileResult } from "@/lib/finance";
+import { homepageUrl } from "@/lib/records";
 
 async function guard() {
   const session = await getServerSession(authOptions);
@@ -107,4 +108,60 @@ export async function saveSettings(input: { feeRate?: number; bankDate?: string;
   }
   for (const r of rows) await prisma.financeSetting.upsert({ where: { key: r.key }, create: r, update: { value: r.value } });
   done();
+}
+
+/**
+ * 결제 건 대사: 홈페이지가 예약 DB와 포트원 결제 기록을 한 건씩 맞춰 본 결과를 받아,
+ * 어드민 예약(결제금액·상태)과도 한 번 더 비교한다. 아무것도 바꾸지 않는 읽기 전용 조회.
+ * month = "YYYY-MM" (접수일 기준)
+ */
+export async function runReconciliation(month: string): Promise<ReconcileResult> {
+  await guard();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("월을 확인해 주세요.");
+  const apiKey = process.env.RESERVATION_API_KEY;
+  if (!apiKey) throw new Error("RESERVATION_API_KEY가 설정되지 않아 홈페이지에 연결할 수 없습니다.");
+
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const qs = new URLSearchParams({ from: `${month}-01`, until: `${month}-${String(last).padStart(2, "0")}` });
+
+  let res: Response;
+  try {
+    res = await fetch(`${homepageUrl()}/api/admin/payment-reconciliation?${qs}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("홈페이지에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  }
+  const data = (await res.json().catch(() => ({}))) as Partial<ReconcileResult> & { code?: string; message?: string };
+  if (res.status === 401) throw new Error("홈페이지 연동 키가 맞지 않습니다.");
+  if (!res.ok || data.code !== "ok" || !data.rows || !data.summary) throw new Error(data.message ?? `대사 조회에 실패했습니다 (${res.status}).`);
+
+  const adminRows = await prisma.reservation.findMany({
+    where: { id: { in: data.rows.map((r) => r.bookingNo) } },
+    select: { id: true, status: true, paidAmount: true },
+  });
+  const admin = new Map(adminRows.map((a) => [a.id, a]));
+  let adminPaidTotal = 0;
+
+  const rows = data.rows.map((r) => {
+    const a = admin.get(r.bookingNo);
+    if (a && r.dbStatus === "paid") adminPaidTotal += a.paidAmount;
+    // 홈페이지 쪽은 맞는데 어드민과 어긋나는 경우
+    if (r.verdict === "ok" && r.dbStatus === "paid") {
+      if (!a) return { ...r, verdict: "mismatch" as const, reason: "결제는 확인되는데 어드민에 예약이 없습니다 (연동 누락)" };
+      if (a.status !== "취소" && a.paidAmount !== r.pgAmount)
+        return { ...r, verdict: "mismatch" as const, reason: `어드민 결제금액(${a.paidAmount.toLocaleString("ko-KR")}원)이 포트원 결제금액(${r.pgAmount.toLocaleString("ko-KR")}원)과 다릅니다` };
+    }
+    return r;
+  });
+
+  return {
+    from: data.from ?? qs.get("from")!,
+    until: data.until ?? qs.get("until")!,
+    summary: { ...data.summary, mismatch: rows.filter((r) => r.verdict === "mismatch").length, ok: rows.filter((r) => r.verdict === "ok").length, adminPaidTotal },
+    rows,
+    failed: data.failed ?? [],
+  };
 }

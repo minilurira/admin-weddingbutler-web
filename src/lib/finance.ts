@@ -80,3 +80,23 @@ export async function getFinanceSettings(): Promise<FinanceSettings> {
     bankBalance: Number.isFinite(bankBalance) && map.bankBalance !== undefined ? bankBalance : 0,
   };
 }
+
+/** 결제 건 대사 결과(홈페이지 /api/admin/payment-reconciliation 응답 + 어드민 예약 비교) */
+export interface ReconcileRowView {
+  bookingNo: string;
+  dbStatus: string;
+  dbAmount: number;
+  createdAt: string;
+  pgStatus: string;
+  pgAmount: number;
+  verdict: "ok" | "mismatch" | "unpaid";
+  reason: string;
+}
+
+export interface ReconcileResult {
+  from: string;
+  until: string;
+  summary: { checked: number; ok: number; unpaid: number; mismatch: number; failed: number; dbPaidTotal: number; pgPaidTotal: number; adminPaidTotal: number };
+  rows: ReconcileRowView[];
+  failed: { bookingNo: string; message: string }[];
+}

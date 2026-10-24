@@ -4,8 +4,9 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, addCost, addShift, deleteCost, deleteShift, saveSettings, setCash, setShiftPaid, updateShiftPay,
+  addButler, addCost, addShift, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftPay,
 } from "@/lib/financeActions";
+import type { ReconcileResult } from "@/lib/finance";
 
 export interface FinanceData {
   today: string;
@@ -16,7 +17,7 @@ export interface FinanceData {
   shifts: { id: string; butlerId: string; date: string; rid: string; pay: number; paid: boolean }[];
 }
 
-type Tab = "income" | "cost" | "butler" | "bank";
+type Tab = "income" | "cost" | "butler" | "bank" | "recon";
 const won = (n: number) => Math.round(n).toLocaleString("ko-KR") + "원";
 const md = (d: string) => d.slice(5).replace("-", "/");
 const toInt = (v: string) => Number(v.replace(/[^0-9]/g, "")) || 0;
@@ -29,6 +30,22 @@ export default function FinanceView({ data }: { data: FinanceData }) {
   const [tab, setTab] = useState<Tab>("income");
   const [sRes, setSRes] = useState(data.reservations[0]?.id ?? "");
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
+  const [recon, setRecon] = useState<ReconcileResult | null>(null);
+  const [reconMonth, setReconMonth] = useState("");
+  const [reconBusy, setReconBusy] = useState(false);
+
+  /** 선택한 달(접수일 기준)의 결제를 포트원과 맞춰 본다. 읽기 전용이라 언제 눌러도 안전하다. */
+  async function checkRecon() {
+    setReconBusy(true);
+    try {
+      setRecon(await runReconciliation(month));
+      setReconMonth(month);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "대사에 실패했습니다.");
+    } finally {
+      setReconBusy(false);
+    }
+  }
 
   const { settings, reservations, costs, butlers, shifts } = data;
   const feeOf = (card: number) => Math.round((card * settings.feeRate) / 100);
@@ -118,7 +135,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
       </div>
 
       <div className="tabs" role="tablist">
-        {([["income", "수입"], ["cost", "비용"], ["butler", "버틀러 관리"], ["bank", "통장 잔액"]] as [Tab, string][]).map(([k, label]) => (
+        {([["income", "수입"], ["cost", "비용"], ["butler", "버틀러 관리"], ["bank", "통장 잔액"], ["recon", "결제 대사"]] as [Tab, string][]).map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -323,6 +340,62 @@ export default function FinanceView({ data }: { data: FinanceData }) {
           </div>
         </section>
       )}
+      {tab === "recon" && (
+        <section className="panel">
+          <div className="box"><h2>결제 건 대사 <small className="sub">{yy}년 {Number(mm)}월 접수분</small></h2>
+            <div className="inline">
+              <button type="button" className="btn" disabled={reconBusy} onClick={checkRecon}>{reconBusy ? "확인하는 중…" : `${Number(mm)}월 결제 대사하기`}</button>
+            </div>
+            <p className="note">예약 DB의 결제 상태·금액을 포트원 결제 기록과 한 건씩 맞춰 보고, 어드민 예약과도 비교합니다. 읽기 전용이라 아무것도 바꾸지 않습니다. 결제일이 아니라 접수일 기준이며, 건수가 많으면 몇 초 걸립니다. 위쪽 월 선택(‹ ›)으로 달을 바꿉니다.</p>
+            <p className="note">포트원 API는 카드 수수료와 은행 입금액을 건별로 제공하지 않아서, 수수료와 입금액 대사는 하지 않습니다. 수수료는 수입 탭의 요율로 계산합니다.</p>
+          </div>
+          {recon && (() => {
+            const bad = recon.rows.filter((r) => r.verdict === "mismatch");
+            const order = { mismatch: 0, unpaid: 2, ok: 1 } as const;
+            const rows = recon.rows.slice().sort((a, b) => order[a.verdict] - order[b.verdict]);
+            return (
+              <>
+                {reconMonth !== month && <div className="warnbox">아래 결과는 {reconMonth.replace("-", "년 ")}월 기준입니다. {Number(mm)}월은 다시 대사해 주세요.</div>}
+                <div className={bad.length || recon.summary.failed ? "warnbox" : "okbox"}>
+                  {bad.length
+                    ? `확인이 필요한 결제가 ${bad.length}건 있습니다.`
+                    : recon.summary.failed ? `${recon.summary.failed}건은 포트원 조회에 실패해 대사하지 못했습니다.` : `대사한 ${recon.summary.checked}건 모두 일치합니다.`}
+                </div>
+                <div className="sum">
+                  <div className="tile"><small>대사한 결제</small><b className="num">{recon.summary.checked}건</b><span>일치 {recon.summary.ok} · 미결제 {recon.summary.unpaid}</span></div>
+                  <div className="tile net"><small>확인 필요</small><b className="num">{recon.summary.mismatch}건</b><span>조회 실패 {recon.summary.failed}건</span></div>
+                  <div className="tile"><small>포트원 결제 합계</small><b className="num">{won(recon.summary.pgPaidTotal)}</b><span>취소 금액 제외</span></div>
+                  <div className="tile"><small>예약 DB 결제 합계</small><b className="num">{won(recon.summary.dbPaidTotal)}</b><span>어드민 기록 {won(recon.summary.adminPaidTotal)}</span></div>
+                </div>
+                <div className="box"><h2>대사 결과</h2>
+                  <div className="scroll"><table style={{ minWidth: 760 }}>
+                    <thead><tr><th>접수일</th><th>예약번호</th><th>예약 상태</th><th className="r">예약 금액</th><th>포트원 상태</th><th className="r">포트원 금액</th><th>판정</th></tr></thead>
+                    <tbody>
+                      {rows.length === 0 && <tr><td colSpan={7} className="empty">이 달에 접수된 예약이 없습니다.</td></tr>}
+                      {rows.map((r) => (
+                        <tr key={r.bookingNo}>
+                          <td className="num">{md(r.createdAt.slice(0, 10))}</td>
+                          <td className="num">{r.bookingNo}</td>
+                          <td>{{ pending: "결제 대기", paid: "결제 완료", failed: "결제 실패", cancelled: "취소" }[r.dbStatus] ?? r.dbStatus}</td>
+                          <td className="r num">{won(r.dbAmount)}</td>
+                          <td>{r.pgStatus}</td>
+                          <td className="r num">{won(r.pgAmount)}</td>
+                          <td>{r.verdict === "ok" ? <span className="pill good">일치</span> : r.verdict === "unpaid" ? <span className="pill mute">미결제</span> : <><span className="pill bad">확인 필요</span><br /><small className="sub" style={{ color: "var(--bad)" }}>{r.reason}</small></>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                </div>
+                {recon.failed.length > 0 && (
+                  <div className="box"><h2>포트원 조회에 실패한 예약</h2>
+                    {recon.failed.map((f) => <p className="note" key={f.bookingNo} style={{ margin: "4px 0" }}>{f.bookingNo} · {f.message}</p>)}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </section>
+      )}
     </div>
   );
 }
@@ -376,6 +449,9 @@ const CSS = `
 .fin .pill { display:inline-block; padding:3px 11px; border-radius:99px; font-size:12px; font-weight:700; }
 .fin .pill.good { background:var(--good-bg); color:var(--good); }
 .fin .pill.warn { background:var(--warn-bg); color:var(--warn); }
+.fin .pill.bad { background:var(--rose-tile); color:var(--bad); }
+.fin .pill.mute { background:var(--panel); color:var(--muted); }
+.fin .btn:disabled { opacity:.6; cursor:default; }
 .fin .field { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .fin .field label { font-size:12.5px; color:var(--muted); font-weight:600; }
 .fin .field input, .fin .field select { border:1px solid var(--line); background:#fff; border-radius:12px; padding:10px 12px; min-width:0; width:100%; }
