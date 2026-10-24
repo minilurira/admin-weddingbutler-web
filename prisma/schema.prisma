@@ -59,6 +59,7 @@ model Reservation {
 
   notes          Note[]
   recordLink     RecordLink?
+  paymentLinks   PaymentLink[]
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -70,6 +71,28 @@ model Note {
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   text          String
   createdAt     DateTime    @default(now())
+}
+
+// 어드민에서 고객에게 보낸 결제 링크 (포트원 V1 링크페이). 다시 보내면 새 행이 생기고 이전 링크는 cancelled.
+// status: "sent" | "paid" | "cancelled" (만료는 expiresAt으로 판단). paymentType: "deposit" | "full" | ""
+model PaymentLink {
+  id             String      @id @default(cuid())
+  reservationId  String
+  reservation    Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  merchantUid    String      @unique
+  amount         Int
+  paymentType    String      @default("")
+  url            String      @default("")
+  expiresAt      DateTime
+  status         String      @default("sent")
+  sentVia        String      @default("")
+  impUid         String?     @unique
+  paidAmount     Int         @default(0)
+  paidAt         DateTime?
+  refundedAmount Int         @default(0)
+  createdAt      DateTime    @default(now())
+
+  @@index([reservationId])
 }
 
 // 고객용 축의 기록 (홈페이지 /r/[token]). 예약 1건당 링크 1개.
