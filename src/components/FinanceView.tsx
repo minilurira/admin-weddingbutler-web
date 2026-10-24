@@ -263,7 +263,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
                       <td className="r num">{all.length}회</td>
                       <td className="r num"><b>{won(total)}</b></td>
                       <td className="r num">{won(paidSum)}</td>
-                      <td className="r num" style={{ color: total - paidSum ? "var(--accent)" : "var(--good)", fontWeight: 700 }}>{total - paidSum ? won(total - paidSum) : "정산 완료"}</td>
+                      <td className="r num" style={{ color: all.length === 0 ? "var(--muted)" : total - paidSum ? "var(--accent)" : "var(--good)", fontWeight: 700 }}>{all.length === 0 ? "-" : total - paidSum ? won(total - paidSum) : "정산 완료"}</td>
                       <td className="r num">{won(monthSum)}</td>
                       <td className="r">
                         {confirming ? (
