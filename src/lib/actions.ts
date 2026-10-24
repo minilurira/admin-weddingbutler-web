@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcConfirm, isPaymentType, isSide, onsiteAmount, paymentTypeName, planMeta, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
+import { getInquiry, updateInquiries } from "@/lib/inquiries";
 import { sendConfirmAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { requestPaymentCancel } from "@/lib/paymentCancel";
@@ -190,13 +191,16 @@ export interface NewReservationInput {
   couple: string;
   side?: string;
   phone: string;
-  wishDateLabel: string;
+  /** 예식 날짜 "YYYY-MM-DD" (필수), 시간 "HH:MM" (미정이면 "") */
+  date: string;
+  time: string;
   venueLabel: string;
   guestsLabel: string;
   memo: string;
   requestedPlan: string;
-  paidAmount?: number;
   paymentType?: string;
+  /** 문의에서 가져온 예약이면 그 문의 id — 등록 후 처리완료로 표시한다 */
+  inquiryId?: string;
   /** 있으면 등록 직후 고객에게 결제 링크를 보낸다 */
   paymentLink?: { amount: number; days: number };
 }
@@ -210,6 +214,8 @@ function generateId() {
 
 export async function createReservation(input: NewReservationInput) {
   await requireSession();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error("예식 날짜를 골라 주세요.");
+  const time = /^\d{2}:\d{2}$/.test(input.time) ? input.time : "";
   const id = generateId();
   const now = new Date();
   const created = await prisma.reservation.create({
@@ -220,30 +226,52 @@ export async function createReservation(input: NewReservationInput) {
       side: isSide(input.side) ? input.side : "",
       phone: input.phone,
       requestedAt: now,
-      wishDateLabel: input.wishDateLabel,
+      wishDateLabel: formatWishDateLabel(input.date, time).trim(),
       venueLabel: input.venueLabel,
       guestsLabel: input.guestsLabel,
       memo: input.memo,
       status: "신규요청",
       requestedPlan: input.requestedPlan,
       confirmPlan: input.requestedPlan,
-      confirmDate: now.toISOString().slice(0, 10),
-      confirmTime: "12:00",
+      confirmDate: input.date,
+      confirmTime: time,
       confirmVenue: input.venueLabel,
       confirmButlers: 2,
       confirmExtraGuests: 0,
       confirmDiscount: 0,
       confirmHours: "",
       confirmNote: "",
-      paidAmount: input.paidAmount ?? 0,
+      paidAmount: 0,
       paymentType: isPaymentType(input.paymentType) ? input.paymentType : "",
     },
   });
+  if (input.inquiryId) await markInquiryBooked(input.inquiryId, id);
   const link = input.paymentLink
     ? await sendPaymentLinkFor(created, { ...input.paymentLink, paymentType: input.paymentType ?? "" })
     : null;
   revalidateAll();
   return { id, linkMessage: link?.message ?? null };
+}
+
+// 문의에서 가져와 만든 예약: 그 문의를 처리완료로 바꾸고 메모에 예약번호를 남긴다. 실패해도 예약은 유지한다.
+async function markInquiryBooked(inquiryId: string, reservationId: string) {
+  try {
+    const inquiry = await getInquiry(inquiryId);
+    if (!inquiry) return;
+    const memo = [inquiry.admin_memo?.trim(), `예약 ${reservationId} 등록`].filter(Boolean).join("\n");
+    await updateInquiries([inquiry.id], { admin_memo: memo, ...(inquiry.handled_at ? {} : { handled_at: new Date().toISOString() }) });
+    revalidatePath("/inquiries");
+  } catch (err) {
+    console.error(`[createReservation] failed to mark inquiry ${inquiryId} for ${reservationId}`, err);
+  }
+}
+
+/** 새 예약 등록 화면: 그 날 이미 잡힌 예식 시각 (취소 제외) */
+export async function bookedTimes(date: string): Promise<string[]> {
+  await requireSession();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  const rows = await prisma.reservation.findMany({ where: { confirmDate: date, status: { not: "취소" } }, select: { confirmTime: true } });
+  return Array.from(new Set(rows.map((r) => r.confirmTime).filter(Boolean))).sort();
 }
 
 export async function sendPaymentLink(id: string, opts: SendLinkOptions) {
