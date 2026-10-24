@@ -32,6 +32,17 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
       ? { reason: r.cancelReason, atLabel: r.cancelledAt ? formatStamp(r.cancelledAt) : "", refundAmount: r.refundAmount }
       : null,
     recordStatus: recordStatusOf(r.recordLink?.status),
+    paymentLinks: r.paymentLinks.map((l) => ({
+      id: l.id,
+      amount: l.amount,
+      url: l.url,
+      status: l.status === "sent" && l.expiresAt.getTime() < Date.now() ? "expired" : (l.status as "sent" | "paid" | "cancelled"),
+      createdLabel: formatStamp(l.createdAt),
+      expiresLabel: formatStamp(l.expiresAt),
+      paidLabel: l.paidAt ? formatStamp(l.paidAt) : "",
+      sentVia: l.sentVia,
+      refundedAmount: l.refundedAmount,
+    })),
     notes: r.notes.map((n) => ({ id: n.id, when: formatStamp(n.createdAt), text: n.text })),
     confirm: {
       plan: r.confirmPlan,
@@ -54,7 +65,11 @@ function recordStatusOf(status: string | undefined): DetailReservation["recordSt
 async function loadReservation(id: string) {
   return prisma.reservation.findUnique({
     where: { id },
-    include: { notes: { orderBy: { createdAt: "asc" } }, recordLink: { select: { status: true } } },
+    include: {
+      notes: { orderBy: { createdAt: "asc" } },
+      recordLink: { select: { status: true } },
+      paymentLinks: { orderBy: { createdAt: "desc" } },
+    },
   });
 }
 

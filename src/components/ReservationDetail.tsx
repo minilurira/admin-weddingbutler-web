@@ -3,19 +3,38 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { calcConfirm, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
+import { calcConfirm, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentLinkDefaultAmount, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
 import { BADGE } from "@/lib/badge";
 import { formatWishDateLabel, toNum } from "@/lib/format";
 import { refundQuote } from "@/lib/refundPolicy";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { useToast } from "./ToastContext";
-import { confirmReservation, holdReservation, addNote, resendAlimtalk, saveConfirmFields, cancelReservation, reopenReservation } from "@/lib/actions";
+import { confirmReservation, holdReservation, addNote, resendAlimtalk, saveConfirmFields, cancelReservation, reopenReservation, sendPaymentLink, cancelPaymentLink } from "@/lib/actions";
 
 export interface DetailNote {
   id: string;
   when: string;
   text: string;
 }
+
+export interface DetailPaymentLink {
+  id: string;
+  amount: number;
+  url: string;
+  status: "sent" | "paid" | "cancelled" | "expired";
+  createdLabel: string;
+  expiresLabel: string;
+  paidLabel: string;
+  sentVia: string;
+  refundedAmount: number;
+}
+
+const LINK_STATUS: Record<DetailPaymentLink["status"], { text: string; bg: string; color: string }> = {
+  sent: { text: "결제 대기", bg: "#FFF4E3", color: "#9A6516" },
+  paid: { text: "결제 완료", bg: "#E9F5EE", color: "#2F7A4C" },
+  cancelled: { text: "취소", bg: "#F1EEEF", color: "#8C8188" },
+  expired: { text: "만료", bg: "#F1EEEF", color: "#8C8188" },
+};
 
 export interface DetailReservation {
   id: string;
@@ -38,6 +57,7 @@ export interface DetailReservation {
   alimtalkLabel: string;
   cancel: { reason: string; atLabel: string; refundAmount: number } | null;
   recordStatus: "none" | "draft" | "published" | "revoked";
+  paymentLinks: DetailPaymentLink[];
   notes: DetailNote[];
   confirm: {
     plan: string;
@@ -77,6 +97,9 @@ export default function ReservationDetail({
   const [noPaymentMessage, setNoPaymentMessage] = useState<string | null>(null);
   const [refundDraft, setRefundDraft] = useState("");
   const [draft, setDraft] = useState<typeof fields | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkAmount, setLinkAmount] = useState("");
+  const [linkDays, setLinkDays] = useState("3");
 
   const [fields, setFields] = useState({
     date: reservation.confirm.date,
@@ -131,6 +154,7 @@ export default function ReservationDetail({
   const cancelReason = reasonType === "고객요청" ? "고객요청" : customReason.trim();
   const quote = refundQuote(reservation.confirm.date, reservation.paidAmount);
   const refundAmount = toNum(refundDraft);
+  const hasOpenLink = reservation.paymentLinks.some((l) => l.status === "sent");
 
   function draftField(key: keyof typeof fields) {
     return {
@@ -241,6 +265,39 @@ export default function ReservationDetail({
         showToast(res.message);
       }
     });
+  }
+
+  function openLink() {
+    setLinkAmount(String(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType)));
+    setLinkDays("3");
+    setLinkOpen(true);
+  }
+
+  function onSendLink() {
+    const amount = toNum(linkAmount);
+    if (!window.confirm(`${reservation.customer} 님(${reservation.phone})에게 ${won(amount)} 결제 링크를 보낼까요?${hasOpenLink ? " 결제 대기 중인 이전 링크는 취소됩니다." : ""}`)) return;
+    startTransition(async () => {
+      const res = await sendPaymentLink(reservation.id, { amount, days: toNum(linkDays) || 3, paymentType: fields.paymentType });
+      if (res.ok) setLinkOpen(false);
+      showToast(res.message);
+    });
+  }
+
+  function onCancelLink(linkId: string) {
+    if (!window.confirm("이 결제 링크를 취소할까요? 고객이 더 이상 결제할 수 없게 됩니다.")) return;
+    startTransition(async () => {
+      const res = await cancelPaymentLink(linkId);
+      showToast(res.message);
+    });
+  }
+
+  async function onCopyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast("결제 링크를 복사했습니다.");
+    } catch {
+      window.prompt("결제 링크", url);
+    }
   }
 
   function onResend() {
@@ -395,6 +452,67 @@ export default function ReservationDetail({
             </div>
           </details>
         </section>
+
+        {/* 결제 링크 (포트원 링크페이) */}
+        {(!isCancelled || reservation.paymentLinks.length > 0) && (
+          <section style={card}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: reservation.paymentLinks.length || linkOpen ? 16 : 0 }}>
+              <div>
+                <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>결제 링크</h2>
+                <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>고객에게 카드 결제 링크를 알림톡으로 보냅니다. 결제되면 결제한 금액에 자동으로 더해집니다.</p>
+              </div>
+              {!isCancelled && !linkOpen && (
+                <button disabled={isPending} onClick={openLink} style={{ ...outlineBtn, height: 38, flex: "0 0 auto" }}>
+                  {hasOpenLink ? "다시 보내기" : "결제 링크 보내기"}
+                </button>
+              )}
+            </div>
+
+            {linkOpen && (
+              <div style={{ background: "#F8F6F7", borderRadius: 14, padding: 14, marginBottom: reservation.paymentLinks.length ? 16 : 0 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  <label style={{ ...labelStyle, flex: "2 1 160px" }}>청구 금액 (원)
+                    <input inputMode="numeric" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ ...editInput, background: "#FFFFFF" }} />
+                  </label>
+                  <label style={{ ...labelStyle, flex: "1 1 100px" }}>유효기간
+                    <select value={linkDays} onChange={(e) => setLinkDays(e.target.value)} style={{ ...editInput, background: "#FFFFFF" }}>
+                      {[1, 2, 3, 5, 7, 14].map((d) => <option key={d} value={d}>{d}일</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                  <button disabled={isPending} onClick={() => setLinkOpen(false)} style={{ height: 40, padding: "0 16px", border: 0, borderRadius: 12, background: "#FFFFFF", color: "#6E646A", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>닫기</button>
+                  <button disabled={isPending || toNum(linkAmount) <= 0} onClick={onSendLink} style={{ ...primaryBtn, height: 40, opacity: isPending ? 0.7 : 1 }}>{won(toNum(linkAmount))} 링크 보내기</button>
+                </div>
+              </div>
+            )}
+
+            {reservation.paymentLinks.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {reservation.paymentLinks.map((l) => {
+                  const st = LINK_STATUS[l.status];
+                  return (
+                    <div key={l.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", padding: "12px 14px", borderRadius: 12, border: "1px solid #EFEBED", fontSize: 13 }}>
+                      <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800, background: st.bg, color: st.color }}>{st.text}</span>
+                      <span style={{ fontWeight: 700, color: "#413A3E" }}>{won(l.amount)}</span>
+                      <span style={{ flex: "1 1 200px", minWidth: 0, color: "#8C8188", fontSize: 12.5 }}>
+                        발송 {l.createdLabel}{l.sentVia === "alimtalk" ? " · 알림톡" : l.sentVia === "sms" ? " · 문자" : " · 발송 실패"}
+                        {l.status === "paid" ? ` · 결제 ${l.paidLabel}` : ` · 만료 ${l.expiresLabel}`}
+                        {l.refundedAmount > 0 ? ` · 환불 ${won(l.refundedAmount)}` : ""}
+                      </span>
+                      {l.status === "sent" && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button disabled={isPending} onClick={() => onCopyLink(l.url)} style={{ ...outlineBtn, height: 32, padding: "0 12px", fontSize: 12 }}>링크 복사</button>
+                          <button disabled={isPending} onClick={() => onCancelLink(l.id)} style={{ ...outlineBtn, height: 32, padding: "0 12px", fontSize: 12, borderColor: "#E5DDE1", color: "#6E646A" }}>링크 취소</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* 3. 협의 내용 */}
         <section style={card}>

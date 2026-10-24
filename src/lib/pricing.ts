@@ -86,6 +86,14 @@ export const PAYMENT_TYPES: Record<PaymentType, { name: string; short: string }>
   full: { name: "전액결제", short: "전액" },
 };
 
+/** 홈페이지 예약금(예약금 결제 후 현장결제) 금액 */
+export const DEPOSIT_AMOUNT = 100000;
+
+/** 결제 링크 기본 청구 금액: 전액결제면 요금제 기본가, 아니면 예약금 */
+export function paymentLinkDefaultAmount(planKey: string, paymentType: string): number {
+  return paymentType === "full" ? planMeta(planKey).base : DEPOSIT_AMOUNT;
+}
+
 export function isPaymentType(v: unknown): v is PaymentType {
   return v === "deposit" || v === "full";
 }

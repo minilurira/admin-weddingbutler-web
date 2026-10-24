@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PAYMENT_TYPES, PLANS, SIDES, type PaymentType } from "@/lib/pricing";
+import { PAYMENT_TYPES, PLANS, SIDES, paymentLinkDefaultAmount, won, type PaymentType } from "@/lib/pricing";
 import { createReservation } from "@/lib/actions";
 import { toNum } from "@/lib/format";
 import { useToast } from "./ToastContext";
@@ -18,6 +18,9 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
   const showToast = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendLink, setSendLink] = useState(false);
+  const [linkAmount, setLinkAmount] = useState("");
+  const [linkDays, setLinkDays] = useState("3");
   const [form, setForm] = useState<{
     customer: string; couple: string; side: string; phone: string; wishDateLabel: string; venueLabel: string; guestsLabel: string; memo: string; requestedPlan: string; paidAmount: string; paymentType: string;
   }>({
@@ -37,12 +40,21 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
       showToast("고객명과 연락처를 입력해 주세요.");
       return;
     }
+    const amount = linkAmount ? toNum(linkAmount) : paymentLinkDefaultAmount(form.requestedPlan, form.paymentType);
+    if (sendLink && !window.confirm(`등록하고 ${form.customer.trim()} 님(${form.phone.trim()})에게 ${won(amount)} 결제 링크를 보낼까요?`)) return;
     setSaving(true);
-    const res = await createReservation({ ...form, paidAmount: toNum(form.paidAmount) });
+    const res = await createReservation({
+      ...form,
+      paidAmount: toNum(form.paidAmount),
+      paymentLink: sendLink ? { amount, days: toNum(linkDays) || 3 } : undefined,
+    });
     setSaving(false);
     setOpen(false);
     setForm({ customer: "", couple: "", side: "", phone: "", wishDateLabel: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: PLANS[1].key, paidAmount: "0", paymentType: "" });
-    showToast("새 예약이 등록되었습니다.");
+    setSendLink(false);
+    setLinkAmount("");
+    setLinkDays("3");
+    showToast(res.linkMessage ? `새 예약을 등록했습니다. ${res.linkMessage}` : "새 예약이 등록되었습니다.");
     router.push(`/reservations?id=${res.id}`);
   }
 
@@ -131,6 +143,37 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
                 결제한 금액 <input style={inputStyle} value={form.paidAmount} onChange={(e) => setForm((f) => ({ ...f, paidAmount: e.target.value }))} placeholder="0" />
               </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 14, borderRadius: 12, background: "#F9F4F7" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: "#7E3855" }}>
+                  <input type="checkbox" checked={sendLink} onChange={(e) => setSendLink(e.target.checked)} />
+                  결제 링크 보내기 <span style={{ fontSize: 12, fontWeight: 500, color: "#A79BA1" }}>등록 후 고객에게 알림톡으로</span>
+                </label>
+                {sendLink && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <label style={{ flex: 2, fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
+                      청구 금액 (원)
+                      <input
+                        style={{ ...inputStyle, background: "#FFFFFF" }}
+                        inputMode="numeric"
+                        value={linkAmount}
+                        onChange={(e) => setLinkAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder={String(paymentLinkDefaultAmount(form.requestedPlan, form.paymentType))}
+                      />
+                    </label>
+                    <label style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
+                      유효기간
+                      <select style={{ ...inputStyle, background: "#FFFFFF" }} value={linkDays} onChange={(e) => setLinkDays(e.target.value)}>
+                        {[1, 2, 3, 5, 7, 14].map((d) => <option key={d} value={d}>{d}일</option>)}
+                      </select>
+                    </label>
+                  </div>
+                )}
+                {sendLink && (
+                  <div style={{ fontSize: 12, color: "#8C8188", lineHeight: 1.5 }}>
+                    비워 두면 {won(paymentLinkDefaultAmount(form.requestedPlan, form.paymentType))} ({form.paymentType === "full" ? "전액결제" : "예약금"}). 고객이 결제하면 결제한 금액에 자동으로 더해집니다.
+                  </div>
+                )}
+              </div>
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
                 요청 사항 <textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} />
               </label>

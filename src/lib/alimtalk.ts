@@ -285,3 +285,24 @@ export async function sendInquiryReplyAlimtalk(phone: string, fields: { name: st
     return false;
   }
 }
+
+/** 결제 링크 알림톡(SOLAPI_TEMPLATE_PAYMENT_LINK). 변수와 본문은 src/lib/paymentLinkText.ts.
+ * 템플릿 ID가 없거나 바로 거절되면 false — 호출부가 문자(LMS)로 대신 보낸다. */
+export async function sendPaymentLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string): Promise<boolean> {
+  const svc = client();
+  const from = process.env.SOLAPI_SENDER_PHONE;
+  const pfId = process.env.SOLAPI_PF_ID;
+  const templateId = process.env.SOLAPI_TEMPLATE_PAYMENT_LINK;
+  if (!svc || !from || !pfId || !templateId) {
+    console.warn(`[alimtalk] SOLAPI_TEMPLATE_PAYMENT_LINK not fully set — ${tag} goes by SMS.`);
+    return false;
+  }
+  try {
+    const result = await svc.send({ to: digitsOnly(phone), from, kakaoOptions: { pfId, templateId, variables } });
+    logSendResult(tag, result);
+    return result.failedMessageList.length === 0;
+  } catch (err) {
+    console.error(`[alimtalk] Solapi payment link send failed for ${tag}`, err);
+    return false;
+  }
+}

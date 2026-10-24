@@ -10,6 +10,7 @@ import { sendConfirmAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
+import { cancelPaymentLinkById, sendPaymentLinkFor, type SendLinkOptions } from "@/lib/paymentLink";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -196,6 +197,8 @@ export interface NewReservationInput {
   requestedPlan: string;
   paidAmount?: number;
   paymentType?: string;
+  /** 있으면 등록 직후 고객에게 결제 링크를 보낸다 */
+  paymentLink?: { amount: number; days: number };
 }
 
 function generateId() {
@@ -209,7 +212,7 @@ export async function createReservation(input: NewReservationInput) {
   await requireSession();
   const id = generateId();
   const now = new Date();
-  await prisma.reservation.create({
+  const created = await prisma.reservation.create({
     data: {
       id,
       customer: input.customer,
@@ -236,8 +239,26 @@ export async function createReservation(input: NewReservationInput) {
       paymentType: isPaymentType(input.paymentType) ? input.paymentType : "",
     },
   });
+  const link = input.paymentLink
+    ? await sendPaymentLinkFor(created, { ...input.paymentLink, paymentType: input.paymentType ?? "" })
+    : null;
   revalidateAll();
-  return { id };
+  return { id, linkMessage: link?.message ?? null };
+}
+
+export async function sendPaymentLink(id: string, opts: SendLinkOptions) {
+  await requireSession();
+  const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
+  const res = await sendPaymentLinkFor(r, opts);
+  revalidateAll();
+  return res;
+}
+
+export async function cancelPaymentLink(linkId: string) {
+  await requireSession();
+  const res = await cancelPaymentLinkById(linkId);
+  revalidateAll();
+  return res;
 }
 
 export async function resendAlimtalk(id: string) {

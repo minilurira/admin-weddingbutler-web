@@ -1,4 +1,5 @@
 import { homepageUrl } from "@/lib/records";
+import { hasLinkPayments, refundLinkPayments } from "@/lib/paymentLink";
 
 // 결제는 홈페이지(포트원 → KG이니시스)에서 받았으므로, 결제취소도 홈페이지의
 // /api/reservations/cancel 에 맡긴다. 포트원 키는 홈페이지에만 있다.
@@ -16,7 +17,23 @@ export interface PaymentCancelOptions {
   requester?: "ADMIN" | "CUSTOMER";
 }
 
+// 어드민에서 보낸 결제 링크(포트원 V1)로 받은 결제가 있으면 그것부터 환불하고, 모자란 몫만 홈페이지 결제에서 환불한다.
 export async function requestPaymentCancel(bookingNo: string, reason: string, opts: PaymentCancelOptions = {}): Promise<PaymentCancelResult> {
+  if (!(await hasLinkPayments(bookingNo))) return requestHomepageCancel(bookingNo, reason, opts);
+
+  const link = await refundLinkPayments(bookingNo, opts.amount ?? Number.MAX_SAFE_INTEGER, reason);
+  // 일부라도 환불됐으면 되돌릴 수 없으니 취소를 진행하고, 실제 환불 금액만 남긴다
+  if (link.error && !link.refunded) return { state: "error", message: `결제 링크 결제취소 실패: ${link.error}` };
+  if (link.error) return { state: "cancelled", refundAmount: link.refunded };
+  if (opts.amount === undefined || link.remaining <= 0) return { state: "cancelled", refundAmount: link.refunded };
+
+  const rest = await requestHomepageCancel(bookingNo, reason, { ...opts, amount: link.remaining });
+  if (rest.state === "cancelled") return { state: "cancelled", refundAmount: link.refunded + rest.refundAmount };
+  if (rest.state === "error") console.error(`[paymentCancel] homepage remainder cancel failed for ${bookingNo}: ${rest.message}`);
+  return { state: "cancelled", refundAmount: link.refunded };
+}
+
+async function requestHomepageCancel(bookingNo: string, reason: string, opts: PaymentCancelOptions): Promise<PaymentCancelResult> {
   const apiKey = process.env.RESERVATION_API_KEY;
   if (!apiKey) return { state: "error", message: "RESERVATION_API_KEY가 설정되지 않아 결제취소를 요청할 수 없습니다." };
 
