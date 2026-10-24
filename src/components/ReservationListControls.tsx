@@ -33,6 +33,9 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
   const [inquiryId, setInquiryId] = useState<string | null>(null);
   const [inquiries, setInquiries] = useState<OpenInquiry[] | null>(null);
   const [inquiryLoading, setInquiryLoading] = useState(false);
+  const [showAllInquiries, setShowAllInquiries] = useState(false);
+  const [pickedHandled, setPickedHandled] = useState(false);
+  const visibleInquiries = inquiries ? inquiries.filter((q) => showAllInquiries || !q.handled) : null;
 
   async function onDateChange(date: string) {
     setForm((f) => ({ ...f, date }));
@@ -45,7 +48,8 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
     const res = await listOpenInquiries();
     setInquiryLoading(false);
     if (!res.ok) { showToast(res.message); return; }
-    if (res.items.length === 0) { showToast("미처리 문의가 없습니다."); return; }
+    if (res.items.length === 0) { showToast("문의가 없습니다."); return; }
+    setShowAllInquiries(!res.items.some((q) => !q.handled));
     setInquiries(res.items);
   }
 
@@ -54,6 +58,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
     setForm((f) => ({ ...f, customer: q.name, couple: q.name, phone: formatPhone(q.phone), date: date || f.date, time: date ? "" : f.time }));
     if (date) void onDateChange(date);
     setInquiryId(q.id);
+    setPickedHandled(q.handled);
     setInquiries(null);
     showToast(date || !q.ceremonyDate ? `${q.name} 님 문의를 가져왔습니다.` : `${q.name} 님 문의를 가져왔습니다. 예식일(${q.ceremonyDate})은 직접 골라 주세요.`);
   }
@@ -148,18 +153,29 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
                 {inquiryLoading ? "불러오는 중…" : inquiries ? "닫기" : "문의에서 가져오기"}
               </button>
             </div>
-            {inquiries && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", marginBottom: 16, padding: 8, borderRadius: 12, background: "#F8F6F7" }}>
-                {inquiries.map((q) => (
+            {visibleInquiries && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto", marginBottom: 16, padding: 8, borderRadius: 12, background: "#F8F6F7" }}>
+                <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 10, background: "#EEE9EC" }}>
+                  {([false, true] as const).map((all) => (
+                    <button key={String(all)} type="button" onClick={() => setShowAllInquiries(all)} style={{ flex: 1, height: 30, border: 0, borderRadius: 8, background: showAllInquiries === all ? "#FFFFFF" : "transparent", color: showAllInquiries === all ? "#8A3F61" : "#7A6F75", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                      {all ? `전체 ${inquiries?.length ?? 0}` : `미처리 ${inquiries?.filter((q) => !q.handled).length ?? 0}`}
+                    </button>
+                  ))}
+                </div>
+                {visibleInquiries.length === 0 && <div style={{ padding: "10px 4px", fontSize: 12.5, color: "#8C8188" }}>미처리 문의가 없습니다.</div>}
+                {visibleInquiries.map((q) => (
                   <button key={q.id} type="button" onClick={() => pickInquiry(q)} style={{ textAlign: "left", border: 0, borderRadius: 10, background: "#FFFFFF", padding: "10px 12px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "#1E1A1C" }}>{q.name} <span style={{ fontWeight: 500, color: "#6E646A" }}>· {formatPhone(q.phone)}</span></span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: "#1E1A1C" }}>
+                      {q.name} <span style={{ fontWeight: 500, color: "#6E646A" }}>· {formatPhone(q.phone)}</span>
+                      {q.handled && <span style={{ marginLeft: 6, padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "#F1EEEF", color: "#8C8188" }}>처리완료</span>}
+                    </span>
                     <span style={{ fontSize: 12, color: "#8C8188" }}>{q.topic} · 예식일 {q.ceremonyDate || "-"} · 접수 {formatStamp(new Date(q.createdAt))}</span>
                   </button>
                 ))}
               </div>
             )}
             {inquiryId && !inquiries && (
-              <div style={{ marginBottom: 14, fontSize: 12, color: "#8A3F61" }}>문의에서 가져온 예약이에요. 등록하면 그 문의는 처리완료로 바뀝니다.</div>
+              <div style={{ marginBottom: 14, fontSize: 12, color: "#8A3F61" }}>{pickedHandled ? "처리완료된 문의에서 가져온 예약이에요. 등록하면 문의 메모에 예약번호가 남습니다." : "문의에서 가져온 예약이에요. 등록하면 그 문의는 처리완료로 바뀝니다."}</div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
