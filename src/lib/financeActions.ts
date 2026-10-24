@@ -48,6 +48,13 @@ export async function addButler(name: string) {
   done();
 }
 
+/** 버틀러를 삭제한다. 그 버틀러의 참석·정산 기록도 함께 지워진다(DB 관계 cascade). */
+export async function deleteButler(id: string) {
+  await guard();
+  await prisma.butler.deleteMany({ where: { id } });
+  done();
+}
+
 export async function addShift(input: { butlerId: string; date: string; reservationId: string; pay: number }) {
   await guard();
   if (!isDate(input.date)) throw new Error("참석일을 확인해 주세요.");

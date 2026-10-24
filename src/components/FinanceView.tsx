@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, addCost, addShift, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftPay,
+  addButler, addCost, addShift, deleteButler, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { CARD_SETTLE_BUSINESS_DAYS, addBusinessDays, cardFee } from "@/lib/financeCalc";
@@ -31,6 +31,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
   const [tab, setTab] = useState<Tab>("income");
   const [sRes, setSRes] = useState(data.reservations[0]?.id ?? "");
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
+  const [delButler, setDelButler] = useState(""); // 삭제 확인 중인 버틀러 id
   const [recon, setRecon] = useState<ReconcileResult | null>(null);
   const [reconMonth, setReconMonth] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
@@ -166,10 +167,10 @@ export default function FinanceView({ data }: { data: FinanceData }) {
             </div>
           </div>
           <div className="box"><h2>예약별 수입 <small className="sub">확정된 예약 · 결제일 순</small></h2>
-            <div className="scroll"><table>
-              <thead><tr><th>결제일</th><th>예식일</th><th>예약</th><th className="r">카드결제</th><th className="r">카드수수료</th><th className="r">현금결제</th><th className="r">실수입</th><th>상태</th></tr></thead>
+            <div className="scroll"><table style={{ minWidth: 860 }}>
+              <thead><tr><th>결제일</th><th>예식일</th><th>예약</th><th className="r">카드결제</th><th className="r">카드수수료</th><th className="r">현금결제</th><th className="r">실수입</th><th>카드 입금 예정 <small className="sub">(예상)</small></th><th>상태</th></tr></thead>
               <tbody>
-                {rs.length === 0 && <tr><td colSpan={8} className="empty">이 달에 결제된 확정 예약이 없습니다.</td></tr>}
+                {rs.length === 0 && <tr><td colSpan={9} className="empty">이 달에 결제된 확정 예약이 없습니다.</td></tr>}
                 {rs.map((r) => {
                   const f = feeOf(r.card), unentered = r.cash === null;
                   return (
@@ -182,14 +183,15 @@ export default function FinanceView({ data }: { data: FinanceData }) {
                       <td className="r"><input className="cell num" key={`${r.id}:${r.cash}`} inputMode="numeric" defaultValue={r.cash ?? ""} placeholder={`예상 ${Math.max(0, r.total - r.card).toLocaleString("ko-KR")}`} aria-label={`${r.couple} 현금결제 금액`}
                         onBlur={(e) => { const t = e.target.value.trim(); const next = t === "" ? null : toInt(t); if (next !== r.cash) run(() => setCash(r.id, next)); }} /></td>
                       <td className="r num"><b>{won(r.card - f + (r.cash ?? 0))}</b></td>
+                      <td className="num">{(() => { const d = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); return <>{md(d)}<br /><small className="sub">{won(r.card - f)}{d <= data.today ? " · 입금일 경과" : ""}</small></>; })()}</td>
                       <td>{unentered ? (r.date > data.today ? <span className="pill mute">예식 전</span> : <span className="pill warn">잔금 확인 필요</span>) : <span className="pill good">수금 완료</span>}</td>
                     </tr>
                   );
                 })}
               </tbody>
-              <tfoot><tr><td colSpan={3}>합계</td><td className="r num">{won(card)}</td><td className="r num neg">−{won(fee)}</td><td className="r num">{won(cash)}</td><td className="r num">{won(income)}</td><td /></tr></tfoot>
+              <tfoot><tr><td colSpan={3}>합계</td><td className="r num">{won(card)}</td><td className="r num neg">−{won(fee)}</td><td className="r num">{won(cash)}</td><td className="r num">{won(income)}</td><td colSpan={2} /></tr></tfoot>
             </table></div>
-            <p className="note">월은 결제일(예약 접수일) 기준입니다. 카드결제는 예약에 기록된 결제 금액(홈페이지 KG이니시스)을 그대로 가져옵니다. 현금결제는 예식 당일 받은 잔금을 입력하세요(칸을 벗어나면 저장). 예식일이 아직 안 지난 예약은 잔금이 비어 있어도 "예식 전"으로 표시합니다. 실수입 = 카드결제 − 카드수수료 + 현금결제. 취소된 예약은 포함하지 않습니다.</p>
+            <p className="note">월은 결제일(예약 접수일) 기준입니다. 카드결제는 예약에 기록된 결제 금액(홈페이지 KG이니시스)을 그대로 가져옵니다. 현금결제는 예식 당일 받은 잔금을 입력하세요(칸을 벗어나면 저장). 예식일이 아직 안 지난 예약은 잔금이 비어 있어도 "예식 전"으로 표시합니다. 실수입 = 카드결제 − 카드수수료 + 현금결제. 취소된 예약은 포함하지 않습니다. "카드 입금 예정"은 결제 후 7영업일에 수수료를 뗀 금액이 들어온다고 가정한 예상입니다. 실제 입금일과 입금액은 이니시스 정산 내역을 연동하면 보여 드릴 수 있습니다.</p>
           </div>
         </section>
       )}
@@ -244,21 +246,40 @@ export default function FinanceView({ data }: { data: FinanceData }) {
 
       {tab === "butler" && (
         <section className="panel">
-          <div className="box"><h2>버틀러별 현황 <small className="sub">{yy}년 {Number(mm)}월</small></h2>
-            <div className="butlers">
-              {butlers.length === 0 && <p className="empty">아래에서 버틀러를 먼저 추가해 주세요.</p>}
-              {butlers.map((b) => {
-                const mine = ms.filter((s) => s.butlerId === b.id);
-                const owe = mine.filter((s) => !s.paid).reduce((a, s) => a + s.pay, 0);
-                return (
-                  <div className="bcard" key={b.id}>
-                    <b>{b.name}</b>
-                    <small>이번 달 {mine.length}회 참석 · 정산 합계 {won(mine.reduce((a, s) => a + s.pay, 0))}</small>
-                    <span className={`owe num ${owe ? "" : "zero"}`}>{owe ? `받을 금액 ${won(owe)}` : "정산 완료"}</span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="box"><h2>버틀러 리스트 <small className="sub">총 수입은 전체 기간 정산 합계</small></h2>
+            <div className="scroll"><table style={{ minWidth: 700 }}>
+              <thead><tr><th>이름</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
+              <tbody>
+                {butlers.length === 0 && <tr><td colSpan={7} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
+                {butlers.map((b) => {
+                  const all = shifts.filter((s) => s.butlerId === b.id);
+                  const total = all.reduce((a, s) => a + s.pay, 0);
+                  const paidSum = all.filter((s) => s.paid).reduce((a, s) => a + s.pay, 0);
+                  const monthSum = ms.filter((s) => s.butlerId === b.id).reduce((a, s) => a + s.pay, 0);
+                  const confirming = delButler === b.id;
+                  return (
+                    <tr key={b.id}>
+                      <td><b>{b.name}</b></td>
+                      <td className="r num">{all.length}회</td>
+                      <td className="r num"><b>{won(total)}</b></td>
+                      <td className="r num">{won(paidSum)}</td>
+                      <td className="r num" style={{ color: total - paidSum ? "var(--accent)" : "var(--good)", fontWeight: 700 }}>{total - paidSum ? won(total - paidSum) : "정산 완료"}</td>
+                      <td className="r num">{won(monthSum)}</td>
+                      <td className="r">
+                        {confirming ? (
+                          <>
+                            <small className="sub" style={{ color: "var(--bad)" }}>참석 기록 {all.length}건도 함께 삭제됩니다</small>{" "}
+                            <button type="button" className="del" style={{ color: "var(--bad)", fontWeight: 700 }} onClick={() => { setDelButler(""); run(() => deleteButler(b.id), "버틀러를 삭제했습니다."); }}>삭제 확인</button>
+                            <button type="button" className="del" onClick={() => setDelButler("")}>취소</button>
+                          </>
+                        ) : <button type="button" className="del" onClick={() => setDelButler(b.id)}>삭제</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot><tr><td>버틀러 총 수입</td><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + s.pay, 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + s.pay, 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + s.pay, 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
+            </table></div>
             <form className="form" key={butlers.length} style={{ marginTop: 14, gridTemplateColumns: "minmax(0,1fr) auto" }}
               onSubmit={(e) => { const f = form(e); run(() => addButler(String(f.get("name"))), "버틀러를 추가했습니다."); }}>
               <div className="field"><label htmlFor="bNew">버틀러 추가</label><input id="bNew" name="name" required placeholder="이름" /></div>
