@@ -254,3 +254,34 @@ export async function sendLookupOtpAlimtalk(phone: string, code: string): Promis
     return false;
   }
 }
+
+/** 문의 답변 알림톡(#{name}, #{topic}, #{answer}). 답변은 템플릿 본문에 들어가서 아이템 리스트 23자 제한은 없다.
+ * 템플릿 ID가 없거나 바로 거절되면 false — 호출부가 문자(LMS)로 대신 보낸다. 카카오톡 미사용 등으로
+ * 나중에 실패하는 건은 솔라피가 템플릿 본문으로 문자 대체발송한다. */
+export async function sendInquiryReplyAlimtalk(phone: string, fields: { name: string; topic: string; answer: string }): Promise<boolean> {
+  const svc = client();
+  const from = process.env.SOLAPI_SENDER_PHONE;
+  const pfId = process.env.SOLAPI_PF_ID;
+  const templateId = process.env.SOLAPI_TEMPLATE_INQUIRY_REPLY;
+  const tag = `inquiry reply ${phone.slice(-4)}`;
+  if (!svc || !from || !pfId || !templateId) {
+    console.warn(`[alimtalk] SOLAPI_TEMPLATE_INQUIRY_REPLY not fully set — ${tag} goes by SMS.`);
+    return false;
+  }
+  try {
+    const result = await svc.send({
+      to: digitsOnly(phone),
+      from,
+      kakaoOptions: {
+        pfId,
+        templateId,
+        variables: { "#{name}": fields.name, "#{topic}": fields.topic, "#{answer}": fields.answer },
+      },
+    });
+    logSendResult(tag, result);
+    return result.failedMessageList.length === 0;
+  } catch (err) {
+    console.error(`[alimtalk] Solapi inquiry reply send failed for ${tag}`, err);
+    return false;
+  }
+}
