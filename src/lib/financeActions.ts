@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, type ReconcileResult } from "@/lib/finance";
 import { homepageUrl } from "@/lib/records";
+import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 
 async function guard() {
   const session = await getServerSession(authOptions);
@@ -42,9 +43,17 @@ export async function deleteCost(id: string) {
   done();
 }
 
-export async function addButler(name: string) {
+export async function addButler(name: string, grade: string) {
   await guard();
-  await prisma.butler.create({ data: { name: text(name, "이름", 30) } });
+  if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
+  await prisma.butler.create({ data: { name: text(name, "이름", 30), grade } });
+  done();
+}
+
+export async function setButlerGrade(id: string, grade: string) {
+  await guard();
+  if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
+  await prisma.butler.updateMany({ where: { id }, data: { grade } });
   done();
 }
 
@@ -55,7 +64,8 @@ export async function deleteButler(id: string) {
   done();
 }
 
-export async function addShift(input: { butlerId: string; date: string; reservationId: string; pay: number }) {
+/** pay를 비우면 버틀러 등급의 기본 정산금을 쓴다. extra는 스페셜 차지(오너가 추가로 지급하는 돈). */
+export async function addShift(input: { butlerId: string; date: string; reservationId: string; pay?: number | null; extra?: number }) {
   await guard();
   if (!isDate(input.date)) throw new Error("참석일을 확인해 주세요.");
   const [butler, reservation] = await Promise.all([
@@ -65,7 +75,13 @@ export async function addShift(input: { butlerId: string; date: string; reservat
   if (!butler) throw new Error("버틀러를 찾을 수 없습니다.");
   if (!reservation) throw new Error("예약을 찾을 수 없습니다.");
   await prisma.butlerShift.create({
-    data: { butlerId: butler.id, date: input.date, reservationId: reservation.id, pay: money(input.pay) },
+    data: {
+      butlerId: butler.id,
+      date: input.date,
+      reservationId: reservation.id,
+      pay: input.pay == null ? gradePay(butler.grade) : money(input.pay),
+      extra: input.extra ? money(input.extra) : 0,
+    },
   });
   done();
 }
@@ -73,6 +89,12 @@ export async function addShift(input: { butlerId: string; date: string; reservat
 export async function updateShiftPay(id: string, pay: number) {
   await guard();
   await prisma.butlerShift.updateMany({ where: { id }, data: { pay: money(pay) } });
+  done();
+}
+
+export async function updateShiftExtra(id: string, extra: number) {
+  await guard();
+  await prisma.butlerShift.updateMany({ where: { id }, data: { extra: money(extra) } });
   done();
 }
 

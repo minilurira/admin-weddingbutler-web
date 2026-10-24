@@ -27,3 +27,17 @@ export function addBusinessDays(date: string, n: number): string {
   }
   return iso(d);
 }
+
+/** 버틀러 등급과 건당 기본 정산금. 오너 버틀러는 대표(이강, 최소연). 금액을 바꿀 땐 여기만 고친다. */
+export const BUTLER_GRADES = {
+  staff: { label: "스태프 버틀러", pay: 75000 },
+  manager: { label: "매니저 버틀러", pay: 95000 },
+  owner: { label: "오너 버틀러", pay: 150000 },
+} as const;
+export type ButlerGrade = keyof typeof BUTLER_GRADES;
+
+export const isButlerGrade = (v: unknown): v is ButlerGrade => typeof v === "string" && v in BUTLER_GRADES;
+/** 등급의 건당 기본 정산금 (알 수 없는 등급은 스태프로 본다) */
+export const gradePay = (grade: string): number => BUTLER_GRADES[isButlerGrade(grade) ? grade : "staff"].pay;
+/** 한 건의 정산 합계 = 기본 정산금 + 스페셜 차지(오너가 추가로 지급하는 돈) */
+export const shiftTotal = (s: { pay: number; extra: number }): number => s.pay + s.extra;

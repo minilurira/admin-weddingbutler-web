@@ -178,6 +178,8 @@ model FinanceCost {
 model Butler {
   id        String        @id @default(cuid())
   name      String
+  // "staff" | "manager" | "owner" — 건당 기본 정산금이 등급마다 정해져 있다 (src/lib/financeCalc.ts)
+  grade     String        @default("staff")
   createdAt DateTime      @default(now())
   shifts    ButlerShift[]
 }
@@ -190,6 +192,8 @@ model ButlerShift {
   date          String
   reservationId String
   pay           Int
+  // 스페셜 차지: 오너가 기본 정산금 외에 추가로 지급하는 돈
+  extra         Int      @default(0)
   paid          Boolean  @default(false)
   createdAt     DateTime @default(now())
 

@@ -35,8 +35,8 @@ export default async function FinancePage() {
         cash: cashMap.get(r.id) ?? null,
       })),
       costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo })),
-      butlers: butlers.map((b) => ({ id: b.id, name: b.name })),
-      shifts: shifts.map((s) => ({ id: s.id, butlerId: s.butlerId, date: s.date, rid: s.reservationId, pay: s.pay, paid: s.paid })),
+      butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade })),
+      shifts: shifts.map((s) => ({ id: s.id, butlerId: s.butlerId, date: s.date, rid: s.reservationId, pay: s.pay, extra: s.extra, paid: s.paid })),
     };
   } catch (e) {
     console.error("[finance] load failed", e);

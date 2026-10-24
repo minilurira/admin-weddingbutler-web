@@ -40,6 +40,8 @@ const DDL = [
       "updatedAt" TIMESTAMP(3) NOT NULL,
       CONSTRAINT "FinanceCash_pkey" PRIMARY KEY ("reservationId")
   )`,
+  `ALTER TABLE "Butler" ADD COLUMN IF NOT EXISTS "grade" TEXT NOT NULL DEFAULT 'staff'`,
+  `ALTER TABLE "ButlerShift" ADD COLUMN IF NOT EXISTS "extra" INTEGER NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS "FinanceSetting" (
       "key" TEXT NOT NULL,
       "value" TEXT NOT NULL,
@@ -53,6 +55,9 @@ export function ensureFinanceTables(): Promise<void> {
   if (!ready) {
     ready = (async () => {
       for (const stmt of DDL) await prisma.$executeRawUnsafe(stmt);
+      // 등급 도입 직후 한 번만: 이미 등록된 대표 두 명은 오너 버틀러로 맞춘다 (이후에는 화면에서 등급을 직접 바꾼다)
+      await prisma.$executeRawUnsafe(`UPDATE "Butler" SET "grade" = 'owner' WHERE "name" IN ('이강', '최소연') AND NOT EXISTS (SELECT 1 FROM "FinanceSetting" WHERE "key" = 'gradeSeeded')`);
+      await prisma.$executeRawUnsafe(`INSERT INTO "FinanceSetting" ("key", "value") VALUES ('gradeSeeded', '1') ON CONFLICT ("key") DO NOTHING`);
     })().catch((e) => {
       ready = null; // 실패하면 다음 요청에서 다시 시도
       throw e;
