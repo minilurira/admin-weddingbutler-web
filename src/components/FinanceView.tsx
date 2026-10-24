@@ -75,7 +75,8 @@ export default function FinanceView({ data }: { data: FinanceData }) {
   }
 
   /* 이번 달 집계 */
-  const rs = reservations.filter((r) => inMonth(r.date));
+  // 수입 리스트는 결제일(예약 접수일) 기준으로 모으고 정렬한다. 예식일은 옆에 함께 보여 준다.
+  const rs = reservations.filter((r) => inMonth(r.paidDate)).sort((a, b) => a.paidDate.localeCompare(b.paidDate) || a.date.localeCompare(b.date));
   const card = rs.reduce((s, r) => s + r.card, 0);
   const cash = rs.reduce((s, r) => s + (r.cash ?? 0), 0);
   const fee = rs.reduce((s, r) => s + feeOf(r.card), 0);
@@ -164,15 +165,16 @@ export default function FinanceView({ data }: { data: FinanceData }) {
               <span style={{ ["--c" as string]: "var(--bad)" }}>카드수수료 <b className="num neg">−{won(fee)}</b></span>
             </div>
           </div>
-          <div className="box"><h2>예약별 수입 <small className="sub">확정된 예약 · 예식일 기준</small></h2>
+          <div className="box"><h2>예약별 수입 <small className="sub">확정된 예약 · 결제일 순</small></h2>
             <div className="scroll"><table>
-              <thead><tr><th>예식일</th><th>예약</th><th className="r">카드결제</th><th className="r">카드수수료</th><th className="r">현금결제</th><th className="r">실수입</th><th>상태</th></tr></thead>
+              <thead><tr><th>결제일</th><th>예식일</th><th>예약</th><th className="r">카드결제</th><th className="r">카드수수료</th><th className="r">현금결제</th><th className="r">실수입</th><th>상태</th></tr></thead>
               <tbody>
-                {rs.length === 0 && <tr><td colSpan={7} className="empty">이 달에 확정된 예약이 없습니다.</td></tr>}
+                {rs.length === 0 && <tr><td colSpan={8} className="empty">이 달에 결제된 확정 예약이 없습니다.</td></tr>}
                 {rs.map((r) => {
                   const f = feeOf(r.card), unentered = r.cash === null;
                   return (
                     <tr key={r.id}>
+                      <td className="num">{md(r.paidDate)}</td>
                       <td className="num">{md(r.date)}</td>
                       <td>{r.couple}<br /><small className="sub">{r.id} · {r.plan}</small></td>
                       <td className="r num">{won(r.card)}</td>
@@ -180,14 +182,14 @@ export default function FinanceView({ data }: { data: FinanceData }) {
                       <td className="r"><input className="cell num" key={`${r.id}:${r.cash}`} inputMode="numeric" defaultValue={r.cash ?? ""} placeholder={`예상 ${Math.max(0, r.total - r.card).toLocaleString("ko-KR")}`} aria-label={`${r.couple} 현금결제 금액`}
                         onBlur={(e) => { const t = e.target.value.trim(); const next = t === "" ? null : toInt(t); if (next !== r.cash) run(() => setCash(r.id, next)); }} /></td>
                       <td className="r num"><b>{won(r.card - f + (r.cash ?? 0))}</b></td>
-                      <td>{unentered ? <span className="pill warn">잔금 확인 필요</span> : <span className="pill good">수금 완료</span>}</td>
+                      <td>{unentered ? (r.date > data.today ? <span className="pill mute">예식 전</span> : <span className="pill warn">잔금 확인 필요</span>) : <span className="pill good">수금 완료</span>}</td>
                     </tr>
                   );
                 })}
               </tbody>
-              <tfoot><tr><td colSpan={2}>합계</td><td className="r num">{won(card)}</td><td className="r num neg">−{won(fee)}</td><td className="r num">{won(cash)}</td><td className="r num">{won(income)}</td><td /></tr></tfoot>
+              <tfoot><tr><td colSpan={3}>합계</td><td className="r num">{won(card)}</td><td className="r num neg">−{won(fee)}</td><td className="r num">{won(cash)}</td><td className="r num">{won(income)}</td><td /></tr></tfoot>
             </table></div>
-            <p className="note">카드결제는 예약에 기록된 결제 금액(홈페이지 KG이니시스)을 그대로 가져옵니다. 현금결제는 예식 당일 받은 잔금을 입력하세요(칸을 벗어나면 저장). 실수입 = 카드결제 − 카드수수료 + 현금결제. 취소된 예약은 포함하지 않습니다.</p>
+            <p className="note">월은 결제일(예약 접수일) 기준입니다. 카드결제는 예약에 기록된 결제 금액(홈페이지 KG이니시스)을 그대로 가져옵니다. 현금결제는 예식 당일 받은 잔금을 입력하세요(칸을 벗어나면 저장). 예식일이 아직 안 지난 예약은 잔금이 비어 있어도 "예식 전"으로 표시합니다. 실수입 = 카드결제 − 카드수수료 + 현금결제. 취소된 예약은 포함하지 않습니다.</p>
           </div>
         </section>
       )}
