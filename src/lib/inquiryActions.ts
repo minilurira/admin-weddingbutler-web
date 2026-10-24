@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
-import { getInquiry, updateInquiries } from "@/lib/inquiries";
+import { getInquiry, listInquiries, updateInquiries } from "@/lib/inquiries";
 import { sendInquiryReplyAlimtalk } from "@/lib/alimtalk";
 import { sendSms } from "@/lib/sms";
 import { INQUIRY_REPLY_MAX, charCount, inquiryReplyText } from "@/lib/inquiryReply";
@@ -65,4 +65,30 @@ export async function sendInquiryReply(id: string, text: string): Promise<ReplyR
   }
   revalidatePath("/inquiries");
   return { ok: true, channel, saved };
+}
+
+export interface OpenInquiry {
+  id: string;
+  name: string;
+  phone: string;
+  ceremonyDate: string;
+  topic: string;
+  createdAt: string;
+}
+
+/** 새 예약 등록의 [문의에서 가져오기]: 미처리 문의만 최신순 */
+export async function listOpenInquiries(): Promise<{ ok: true; items: OpenInquiry[] } | { ok: false; message: string }> {
+  await requireSession();
+  try {
+    const rows = await listInquiries();
+    return {
+      ok: true,
+      items: rows
+        .filter((r) => !r.handled_at)
+        .map((r) => ({ id: r.id, name: r.name, phone: r.phone, ceremonyDate: r.ceremony_date ?? "", topic: r.topic, createdAt: r.created_at })),
+    };
+  } catch (err) {
+    console.error("[listOpenInquiries] failed", err);
+    return { ok: false, message: "문의 목록을 불러오지 못했습니다." };
+  }
 }
