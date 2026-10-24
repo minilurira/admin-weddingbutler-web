@@ -1,10 +1,10 @@
 import type { Reservation } from "@prisma/client";
-import { calcConfirm, onsiteAmount, PAYMENT_TYPES, planMeta, resolvePaymentType, won } from "@/lib/pricing";
+import { confirmTotalOf, onsiteAmount, PAYMENT_TYPES, planBaseOf, resolvePaymentType, won } from "@/lib/pricing";
 import { BADGE } from "@/lib/badge";
 import type { GridEvent } from "@/lib/calendarGrid";
 
 export function reservationTotal(r: Reservation) {
-  return calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount }).total;
+  return confirmTotalOf(r);
 }
 
 export function toRow(r: Reservation) {
@@ -20,7 +20,7 @@ export function toRow(r: Reservation) {
     staffLine: `버틀러 ${r.confirmButlers}명`,
     dateLine: r.confirmDate.replace(/-/g, ". "),
     amountLine: won(total),
-    planAmountLine: won(planMeta(r.confirmPlan).base),
+    planAmountLine: won(planBaseOf(r)),
     paidAmountLine: won(r.paidAmount),
     onsiteAmountLine: won(onsiteAmount(total, r.paidAmount)),
     paymentTypeLine: paymentType ? PAYMENT_TYPES[paymentType].short : "유형 미지정",

@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcConfirm, isPaymentType, isSide, onsiteAmount, paymentTypeName, planMeta, won } from "@/lib/pricing";
+import { calcConfirm, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { getInquiry, updateInquiries } from "@/lib/inquiries";
 import { sendConfirmAlimtalk } from "@/lib/alimtalk";
@@ -81,7 +81,7 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
     },
   });
 
-  const price = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount });
+  const price = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount, baseOverride: updated.requestedTotal });
   const result = await sendConfirmAlimtalk({
     reservationId: updated.id,
     customer: updated.customer,
@@ -91,7 +91,7 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
     venueLabel: updated.confirmVenue,
     guestsLabel: updated.guestsLabel,
     requestedPlan: updated.confirmPlan,
-    planAmount: planMeta(updated.confirmPlan).base,
+    planAmount: planBaseOf(updated),
     paidAmount: updated.paidAmount,
     confirmAmount: price.total,
     balanceAmount: Math.max(0, price.total - updated.paidAmount),
@@ -292,7 +292,7 @@ export async function cancelPaymentLink(linkId: string) {
 export async function resendAlimtalk(id: string) {
   await requireSession();
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
-  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount });
+  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
   const result = await sendConfirmAlimtalk({
     reservationId: r.id,
     customer: r.customer,
@@ -302,7 +302,7 @@ export async function resendAlimtalk(id: string) {
     venueLabel: r.confirmVenue,
     guestsLabel: r.guestsLabel,
     requestedPlan: r.confirmPlan,
-    planAmount: planMeta(r.confirmPlan).base,
+    planAmount: planBaseOf(r),
     paidAmount: r.paidAmount,
     confirmAmount: price.total,
     balanceAmount: Math.max(0, price.total - r.paidAmount),

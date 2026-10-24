@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { calcConfirm, planMeta } from "@/lib/pricing";
+import { calcConfirm, planBaseOf } from "@/lib/pricing";
 import { formatWishDateLabel, pad2 } from "@/lib/format";
 import { sendReminderAlimtalk, type ReminderKind } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const lines: string[] = [];
   for (const r of reservations) {
     if (r.notes.length > 0) continue;
-    const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount });
+    const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
     const result = await sendReminderAlimtalk(kind, {
       reservationId: r.id,
       customer: r.customer,
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       venueLabel: r.confirmVenue,
       guestsLabel: r.guestsLabel,
       requestedPlan: r.confirmPlan,
-      planAmount: planMeta(r.confirmPlan).base,
+      planAmount: planBaseOf(r),
       paidAmount: r.paidAmount,
       confirmAmount: price.total,
       balanceAmount: Math.max(0, price.total - r.paidAmount),

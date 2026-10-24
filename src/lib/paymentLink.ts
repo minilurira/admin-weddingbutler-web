@@ -135,7 +135,7 @@ export async function applyPaymentWebhook(impUid: string): Promise<WebhookOutcom
   });
   await prisma.note.create({ data: { reservationId: r.id, text: `결제 링크로 결제 완료 · ${won(pay.amount)} · ${formatStamp(pay.paidAt ?? new Date())}` } });
 
-  const total = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount }).total;
+  const total = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount, baseOverride: updated.requestedTotal }).total;
   const onsite = onsiteAmount(total, updated.paidAmount);
   await sendNewReservationAlimtalk({
     reservationId: updated.id,

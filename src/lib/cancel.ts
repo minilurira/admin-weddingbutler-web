@@ -1,6 +1,6 @@
 import type { Reservation } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { planMeta, won } from "@/lib/pricing";
+import { planBaseOf, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendCancelAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
@@ -56,7 +56,7 @@ export async function finishCancel(r: Reservation, input: FinishCancelInput): Pr
     venueLabel: r.confirmVenue || r.venueLabel,
     guestsLabel: r.guestsLabel,
     requestedPlan: r.confirmPlan || r.requestedPlan,
-    planAmount: planMeta(r.confirmPlan || r.requestedPlan).base,
+    planAmount: planBaseOf({ confirmPlan: r.confirmPlan || r.requestedPlan, requestedTotal: r.requestedTotal }),
     paidAmount: r.paidAmount,
     confirmAmount: 0,
     balanceAmount: 0,

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import SpecialLinkPanel from "./SpecialLinkPanel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PAYMENT_TYPES, PLANS, SIDES, paymentLinkDefaultAmount, won, type PaymentType } from "@/lib/pricing";
+import { PAYMENT_TYPES, PLANS, SIDES, SPECIAL_PLAN, paymentLinkDefaultAmount, won, type PaymentType } from "@/lib/pricing";
 import { bookedTimes, createReservation } from "@/lib/actions";
 import { listOpenInquiries, type OpenInquiry } from "@/lib/inquiryActions";
 import { formatPhone, formatStamp, parseLooseDate, TIME_SLOTS, toNum } from "@/lib/format";
@@ -22,6 +23,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
   const searchParams = useSearchParams();
   const showToast = useToast();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"normal" | "special">("normal");
   const [saving, setSaving] = useState(false);
   const [sendLink, setSendLink] = useState(false);
   const [linkAmount, setLinkAmount] = useState("");
@@ -148,11 +150,17 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
         <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(40,26,33,0.32)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setOpen(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: 18, padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, margin: "0 0 18px" }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>새 예약 등록</h2>
-              <button type="button" disabled={inquiryLoading} onClick={openInquiries} style={{ height: 36, padding: "0 12px", border: "1px solid #D9A3BC", borderRadius: 10, background: "#FFFFFF", color: "#8A3F61", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>{mode === "special" ? "스페셜 링크 만들기" : "새 예약 등록"}</h2>
+              {mode === "normal" && <button type="button" disabled={inquiryLoading} onClick={openInquiries} style={{ height: 36, padding: "0 12px", border: "1px solid #D9A3BC", borderRadius: 10, background: "#FFFFFF", color: "#8A3F61", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
                 {inquiryLoading ? "불러오는 중…" : inquiries ? "닫기" : "문의에서 가져오기"}
-              </button>
+              </button>}
             </div>
+            <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 12, background: "#F4F1F3", marginBottom: 16 }}>
+              {([["normal", "일반 예약"], ["special", "스페셜"]] as const).map(([k, t]) => (
+                <button key={k} type="button" onClick={() => setMode(k)} style={{ flex: 1, height: 36, border: 0, borderRadius: 10, background: mode === k ? "#FFFFFF" : "transparent", color: mode === k ? "#B0567E" : "#6E646A", fontSize: 13.5, fontWeight: 700, cursor: "pointer", boxShadow: mode === k ? "0 1px 3px rgba(60,30,45,0.12)" : "none" }}>{t}</button>
+              ))}
+            </div>
+            {mode === "special" ? <SpecialLinkPanel /> : (<>
             {visibleInquiries && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto", marginBottom: 16, padding: 8, borderRadius: 12, background: "#F8F6F7" }}>
                 <div style={{ display: "flex", gap: 4, padding: 3, borderRadius: 10, background: "#EEE9EC" }}>
@@ -214,7 +222,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
                 요금제
                 <select style={inputStyle} value={form.requestedPlan} onChange={(e) => setForm((f) => ({ ...f, requestedPlan: e.target.value }))}>
-                  {PLANS.map((p) => <option key={p.key} value={p.key}>{p.key} ({p.desc})</option>)}
+                  {PLANS.filter((p) => p.key !== SPECIAL_PLAN).map((p) => <option key={p.key} value={p.key}>{p.key} ({p.desc})</option>)}
                 </select>
               </label>
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -263,6 +271,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
               <button onClick={() => { setOpen(false); resetForm(); }} style={{ flex: 1, height: 48, border: 0, borderRadius: 12, background: "#F6F3F5", color: "#6E646A", fontSize: 14, fontWeight: 700 }}>취소</button>
               <button disabled={saving} onClick={onSubmit} style={{ flex: 1, height: 48, border: 0, borderRadius: 12, background: "#B0567E", color: "#fff", fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>등록</button>
             </div>
+            </>)}
           </div>
         </div>
       )}

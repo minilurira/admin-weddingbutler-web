@@ -115,7 +115,7 @@ export default function ReservationDetail({
       resolvePaymentType(
         reservation.paymentType,
         reservation.paidAmount,
-        calcConfirm({ plan: reservation.confirm.plan, butlers: reservation.confirm.butlers, extraGuests: reservation.confirm.extraGuests, discount: reservation.confirm.discount }).total
+        calcConfirm({ plan: reservation.confirm.plan, butlers: reservation.confirm.butlers, extraGuests: reservation.confirm.extraGuests, discount: reservation.confirm.discount, baseOverride: reservation.requestedTotal }).total
       ) ?? "",
   });
 
@@ -135,7 +135,7 @@ export default function ReservationDetail({
     [fields]
   );
 
-  const money = useMemo(() => calcConfirm({ plan: reservation.confirm.plan, butlers: parsedFields.butlers, extraGuests: parsedFields.extraGuests, discount: parsedFields.discount }), [reservation.confirm.plan, parsedFields]);
+  const money = useMemo(() => calcConfirm({ plan: reservation.confirm.plan, butlers: parsedFields.butlers, extraGuests: parsedFields.extraGuests, discount: parsedFields.discount, baseOverride: reservation.requestedTotal }), [reservation.confirm.plan, reservation.requestedTotal, parsedFields]);
   const req = useMemo(() => {
     const est = requestedTotal(reservation.requestedPlan, reservation.guestsLabel);
     // 홈페이지 예약은 홈페이지가 보낸 금액을 그대로 보여준다(초과 식권은 당일 정산이라 총액에 없음).
@@ -177,7 +177,7 @@ export default function ReservationDetail({
     const fromHomepage = reservation.requestedTotal > 0;
     const extraGuests = fromHomepage ? 0 : requestedTotal(reservation.requestedPlan, reservation.guestsLabel).extraGuests;
     const discount = fromHomepage
-      ? Math.max(0, calcConfirm({ plan: reservation.confirm.plan, butlers, extraGuests: 0, discount: 0 }).total - reservation.requestedTotal)
+      ? Math.max(0, calcConfirm({ plan: reservation.confirm.plan, butlers, extraGuests: 0, discount: 0, baseOverride: reservation.requestedTotal }).total - reservation.requestedTotal)
       : 0;
     return {
       ...(draft ?? fields),

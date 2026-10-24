@@ -208,3 +208,18 @@ model FinanceSetting {
   key   String @id
   value String
 }
+
+// 스페셜 예약 링크: 관리자가 금액을 정해 만들고, 고객이 링크에서 날짜·예식장·시간을 골라 전액 결제한다.
+// status: "open" | "held"(결제 진행 중) | "used" | "cancelled". 만료는 expiresAt 로 판단한다.
+model SpecialOffer {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  amount    Int
+  label     String    @default("")
+  status    String    @default("open")
+  bookingNo String    @default("")
+  heldAt    DateTime?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}

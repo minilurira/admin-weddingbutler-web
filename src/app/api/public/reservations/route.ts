@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
-import { PAYMENT_TYPES, PLANS, calcConfirm, isPaymentType, onsiteAmount, planMeta, sideFromHomepage, won } from "@/lib/pricing";
+import { PAYMENT_TYPES, PLANS, SPECIAL_PLAN, calcConfirm, isPaymentType, onsiteAmount, planMeta, sideFromHomepage, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
@@ -74,6 +74,9 @@ export async function POST(req: NextRequest) {
     return badRequest(`plan must be one of: ${PLANS.map((p) => p.key).join(", ")}`);
   }
 
+  // 스페셜은 요금표가 없어서 홈페이지가 보내는 총액이 곧 기본 요금이다
+  if (plan === SPECIAL_PLAN && !(typeof totalAmount === "number" && totalAmount > 0)) return badRequest("totalAmount is required for the 스페셜 plan");
+
   const id = externalId?.trim() || generateId();
 
   const existing = await prisma.reservation.findUnique({ where: { id } });
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
   // 현장 정산) 추가 하객은 0으로 두고, 어드민 계산과 차이(테스트 결제 등)는 할인 금액으로 맞춘다.
   const useHomepageAmounts = typeof totalAmount === "number" && totalAmount >= 0;
   const extraGuests = useHomepageAmounts ? 0 : estimatedExtraGuests;
-  const computedTotal = calcConfirm({ plan, butlers, extraGuests, discount: 0 }).total;
+  const computedTotal = calcConfirm({ plan, butlers, extraGuests, discount: 0, baseOverride: plan === SPECIAL_PLAN ? totalAmount : undefined }).total;
   const discount = useHomepageAmounts ? Math.max(0, computedTotal - totalAmount) : 0;
   const total = computedTotal - discount;
   const onsite =

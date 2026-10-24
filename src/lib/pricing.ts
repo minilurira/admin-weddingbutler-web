@@ -1,4 +1,7 @@
-export type PlanKey = "스몰케어" | "스탠다드" | "프리미엄";
+export type PlanKey = "스몰케어" | "스탠다드" | "프리미엄" | "스페셜";
+
+/** 스페셜: 요금표 없이 예약마다 금액을 정하는 요금제. 금액은 예약의 requestedTotal(홈페이지가 보낸 총액)에 담긴다. */
+export const SPECIAL_PLAN = "스페셜";
 
 export interface PlanMeta {
   key: PlanKey;
@@ -12,6 +15,7 @@ export const PLANS: PlanMeta[] = [
   { key: "스몰케어", desc: "하객 200명 이하 · 웨딩버틀러 2명", butlers: 2, base: 390000, guestLimit: 200 },
   { key: "스탠다드", desc: "하객 300명 이하 · 웨딩버틀러 2명", butlers: 2, base: 450000, guestLimit: 300 },
   { key: "프리미엄", desc: "양가 각 200명 기준 · 웨딩버틀러 4명", butlers: 4, base: 800000, guestLimit: 400 },
+  { key: "스페셜", desc: "맞춤 금액 · 웨딩버틀러 2명", butlers: 2, base: 0, guestLimit: 9999 },
 ];
 
 // 축의대 구분. 스몰케어·스탠다드는 한쪽(신랑측/신부측), 프리미엄은 양가.
@@ -47,6 +51,8 @@ export interface ConfirmInput {
   butlers: number;
   extraGuests: number;
   discount: number;
+  /** 스페셜 요금제의 기본 금액(= 예약의 requestedTotal). 다른 요금제에서는 무시한다. */
+  baseOverride?: number;
 }
 
 export interface PriceBreakdown {
@@ -60,7 +66,8 @@ export interface PriceBreakdown {
 }
 
 export function calcConfirm(input: ConfirmInput): PriceBreakdown {
-  const meta = planMeta(input.plan);
+  const found = planMeta(input.plan);
+  const meta = found.key === SPECIAL_PLAN ? { ...found, base: Math.max(0, Math.floor(input.baseOverride ?? 0)) } : found;
   const extraButlers = Math.max(0, input.butlers - meta.butlers);
   const guestFee = input.extraGuests * EXTRA_GUEST_FEE;
   const butlerFee = extraButlers * EXTRA_BUTLER_FEE;
@@ -113,4 +120,22 @@ export function paymentTypeName(stored: string, paidAmount: number, total: numbe
 /** 현장에서 현금으로 받을 금액 = 총 금액 − 결제한 금액. */
 export function onsiteAmount(total: number, paidAmount: number): number {
   return Math.max(0, total - paidAmount);
+}
+
+interface PricedReservation {
+  confirmPlan: string;
+  confirmButlers: number;
+  confirmExtraGuests: number;
+  confirmDiscount: number;
+  requestedTotal: number;
+}
+
+/** 예약 1건의 확정 총액. 스페셜은 예약에 담긴 금액(requestedTotal)이 기본 요금이 된다. */
+export function confirmTotalOf(r: PricedReservation): number {
+  return calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal }).total;
+}
+
+/** 알림톡 등에 보여 줄 "플랜 가격". 스페셜은 그 예약의 금액. */
+export function planBaseOf(r: { confirmPlan: string; requestedTotal: number }): number {
+  return r.confirmPlan === SPECIAL_PLAN ? r.requestedTotal : planMeta(r.confirmPlan).base;
 }
