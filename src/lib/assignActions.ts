@@ -12,6 +12,7 @@ async function guard() {
 
 const done = () => {
   revalidatePath("/finance");
+  revalidatePath("/butlers");
   revalidatePath("/reservations");
 };
 

@@ -23,12 +23,13 @@ const won = (n: number) => Math.round(n).toLocaleString("ko-KR") + "원";
 const md = (d: string) => d.slice(5).replace("-", "/");
 const toInt = (v: string) => Number(v.replace(/[^0-9]/g, "")) || 0;
 
-export default function FinanceView({ data }: { data: FinanceData }) {
+export default function FinanceView({ data, view = "finance" }: { data: FinanceData; view?: "finance" | "butlers" }) {
+  const butlerView = view === "butlers"; // 버틀러 관리 화면: 버틀러 탭만 보여 준다
   const router = useRouter();
   const toast = useToast();
   const [, startTransition] = useTransition();
   const [month, setMonth] = useState(data.today.slice(0, 7));
-  const [tab, setTab] = useState<Tab>("income");
+  const [tab, setTab] = useState<Tab>(butlerView ? "butler" : "income");
   const [sRes, setSRes] = useState(data.reservations[0]?.id ?? "");
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
   const [delButler, setDelButler] = useState(""); // 삭제 확인 중인 버틀러 id
@@ -130,7 +131,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
       <style>{CSS}</style>
 
       <div className="top">
-        <h1>정산 관리</h1>
+        <h1>{butlerView ? "버틀러 관리" : "지출관리"}</h1>
         <div className="month" role="group" aria-label="월 선택">
           <button type="button" onClick={() => shiftMonth(-1)} aria-label="이전 달">‹</button>
           <b className="num">{yy}년 {Number(mm)}월</b>
@@ -138,6 +139,14 @@ export default function FinanceView({ data }: { data: FinanceData }) {
         </div>
       </div>
 
+      {butlerView ? (
+        <div className="sum">
+          <div className="tile"><small>{Number(mm)}월 버틀러 정산</small><b className="num">{won(pay)}</b><span>기본 정산금 {won(ms.reduce((a, s) => a + s.pay, 0))} · 스페셜 차지 {won(ms.reduce((a, s) => a + s.extra, 0))}</span></div>
+          <div className="tile"><small>{Number(mm)}월 참석</small><b className="num">{ms.length}회</b><span>버틀러 {new Set(ms.map((s) => s.butlerId)).size}명</span></div>
+          <div className="tile net"><small>미지급 (이번 달)</small><b className="num">{won(unpaid.reduce((a, s) => a + shiftTotal(s), 0))}</b><span>{unpaid.length}건 지급 대기</span></div>
+          <div className="tile"><small>누적 총 수입 (전체 기간)</small><b className="num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</b><span>지급 완료 {won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</span></div>
+        </div>
+      ) : (
       <div className="sum">
         <div className="tile"><small>실수입 (카드수수료 제외)</small><b className="num">{won(income)}</b><span>매출 {won(gross)} − 수수료 {won(fee)}</span></div>
         <div className="tile"><small>총 비용</small><b className="num">{won(cost)}</b><span>월 {won(monthly)} · 일회성 {won(once)} · 버틀러 {won(pay)}</span></div>
@@ -145,12 +154,15 @@ export default function FinanceView({ data }: { data: FinanceData }) {
         <div className="tile"><small>버틀러 미정산</small><b className="num">{won(unpaid.reduce((a, s) => a + shiftTotal(s), 0))}</b><span>{unpaid.length}건 지급 대기</span></div>
         <div className="tile"><small>월말 예상 통장 잔액</small><b className={`num ${curProj && curProj.end < 0 ? "neg" : ""}`}>{curProj ? won(curProj.end) : "-"}</b><span>{curProj ? `기준일 ${md(base)} 잔액에서 계산` : "기준일 이후 달만 계산"}</span></div>
       </div>
+      )}
 
-      <div className="tabs" role="tablist">
-        {([["income", "수입"], ["cost", "비용"], ["butler", "버틀러 관리"], ["bank", "통장 잔액"], ["recon", "결제 대사"]] as [Tab, string][]).map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{label}</button>
-        ))}
-      </div>
+      {!butlerView && (
+        <div className="tabs" role="tablist">
+          {([["income", "수입"], ["cost", "비용"], ["bank", "통장 잔액"], ["recon", "결제 대사"]] as [Tab, string][]).map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{label}</button>
+          ))}
+        </div>
+      )}
 
       {tab === "income" && (
         <section className="panel">

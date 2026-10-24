@@ -53,8 +53,20 @@ const navItems = [
     ),
   },
   {
+    href: "/butlers",
+    label: "버틀러 관리",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <circle cx="7.6" cy="6.8" r="3" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M2.4 16.4c.4-2.9 2.6-4.6 5.2-4.6s4.8 1.7 5.2 4.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <circle cx="14.2" cy="7.6" r="2.3" fill="currentColor" />
+        <path d="M13.6 12.2c2.2.1 3.6 1.5 4 3.9h-3.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/finance",
-    label: "정산 관리",
+    label: "지출관리",
     icon: (
       <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
         <rect x="2.6" y="3.4" width="14.8" height="13.2" rx="3.4" stroke="currentColor" strokeWidth="1.7" />

@@ -3,7 +3,7 @@ import { ensureFinanceTables } from "@/lib/finance";
 import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 
 // 예약건에 버틀러를 배정하는 DB 로직. 배정 = 그 예약의 참석·정산 기록(ButlerShift)을 미리 만들어 두는 것이라
-// 정산 관리의 버틀러 정산·비용·통장 잔액 예상에 그대로 들어간다. 별도 테이블은 없다.
+// 버틀러 관리의 참석·정산 기록과 지출관리의 비용·통장 잔액 예상에 그대로 들어간다. 별도 테이블은 없다.
 // 로그인 확인은 호출하는 서버 액션(assignActions.ts)이 맡는다.
 
 export interface AssignedView {
@@ -79,9 +79,9 @@ export async function createAssignment(reservationId: string, butlerId: string, 
   await prisma.butlerShift.create({ data: { butlerId, reservationId, date: r.confirmDate, grade, pay: gradePay(grade) } });
 }
 
-/** 배정을 해제한다. 이미 지급 완료로 표시된 기록은 정산 관리에서 직접 처리해야 한다. */
+/** 배정을 해제한다. 이미 지급 완료로 표시된 기록은 버틀러 관리에서 직접 처리해야 한다. */
 export async function removeAssignment(shiftId: string): Promise<void> {
   await ensureFinanceTables();
   const { count } = await prisma.butlerShift.deleteMany({ where: { id: shiftId, paid: false } });
-  if (!count) throw new Error("이미 지급 완료된 기록이라 여기서 해제할 수 없습니다. 정산 관리에서 처리해 주세요.");
+  if (!count) throw new Error("이미 지급 완료된 기록이라 여기서 해제할 수 없습니다. 버틀러 관리에서 처리해 주세요.");
 }

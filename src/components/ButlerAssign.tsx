@@ -42,7 +42,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>버틀러 배정</h2>
-          <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>배정하면 정산 관리의 참석·정산 기록에 자동으로 들어갑니다.</p>
+          <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>배정하면 버틀러 관리의 참석·정산 기록에 자동으로 들어갑니다.</p>
         </div>
         {data && (
           <span style={{ padding: "4px 12px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, background: full ? "#E3F1E8" : "#FBEFD9", color: full ? "#2B6A45" : "#8A5A00" }}>
@@ -80,7 +80,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
           ) : !data.date ? (
             <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#8C8188" }}>예식 날짜가 정해지면 배정할 수 있습니다.</p>
           ) : free.length === 0 ? (
-            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#8C8188" }}>{(data.butlers.length === 0) ? "정산 관리 > 버틀러 관리에서 버틀러를 먼저 추가해 주세요." : "배정할 수 있는 다른 버틀러가 없습니다."}</p>
+            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#8C8188" }}>{(data.butlers.length === 0) ? "버틀러 관리에서 버틀러를 먼저 추가해 주세요." : "배정할 수 있는 다른 버틀러가 없습니다."}</p>
           ) : (
             <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
               <select style={{ ...selectStyle, flex: "1 1 190px" }} value={sel?.id ?? ""} onChange={(e) => { setPick(e.target.value); setPickGrade(""); }} aria-label="배정할 버틀러">
