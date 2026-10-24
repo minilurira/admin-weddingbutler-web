@@ -74,18 +74,17 @@ export interface OpenInquiry {
   ceremonyDate: string;
   topic: string;
   createdAt: string;
+  handled: boolean;
 }
 
-/** 새 예약 등록의 [문의에서 가져오기]: 미처리 문의만 최신순 */
+/** 새 예약 등록의 [문의에서 가져오기]: 문의 전체를 최신순으로 (화면에서 미처리/전체를 고른다) */
 export async function listOpenInquiries(): Promise<{ ok: true; items: OpenInquiry[] } | { ok: false; message: string }> {
   await requireSession();
   try {
     const rows = await listInquiries();
     return {
       ok: true,
-      items: rows
-        .filter((r) => !r.handled_at)
-        .map((r) => ({ id: r.id, name: r.name, phone: r.phone, ceremonyDate: r.ceremony_date ?? "", topic: r.topic, createdAt: r.created_at })),
+      items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, ceremonyDate: r.ceremony_date ?? "", topic: r.topic, createdAt: r.created_at, handled: Boolean(r.handled_at) })),
     };
   } catch (err) {
     console.error("[listOpenInquiries] failed", err);
