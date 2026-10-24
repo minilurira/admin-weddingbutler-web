@@ -13,6 +13,10 @@ export interface Inquiry {
   created_at: string;
   handled_at: string | null;
   admin_memo: string;
+  // 고객에게 보낸 답변. 홈페이지 Supabase에 alter table로 추가한 컬럼 — 추가 전에는 undefined.
+  reply_text?: string | null;
+  replied_at?: string | null;
+  reply_channel?: string | null;
 }
 
 function supabaseConfig() {
@@ -44,12 +48,22 @@ async function supabaseFetch(path: string, init: RequestInit = {}) {
 
 export async function listInquiries(): Promise<Inquiry[]> {
   const res = await supabaseFetch(
-    "contact_messages?select=id,name,phone,ceremony_date,area,topic,message,created_at,handled_at,admin_memo&order=created_at.desc"
+    // select=* — 답변 컬럼 SQL을 실행하기 전에도 목록이 깨지지 않게 컬럼을 나열하지 않는다.
+    "contact_messages?select=*&order=created_at.desc"
   );
   return res.json();
 }
 
-export async function updateInquiries(ids: string[], fields: { handled_at?: string | null; admin_memo?: string }) {
+export async function getInquiry(id: string): Promise<Inquiry | null> {
+  const res = await supabaseFetch(`contact_messages?select=*&id=eq.${encodeURIComponent(id)}`);
+  const rows: Inquiry[] = await res.json();
+  return rows[0] ?? null;
+}
+
+export async function updateInquiries(
+  ids: string[],
+  fields: { handled_at?: string | null; admin_memo?: string; reply_text?: string; replied_at?: string; reply_channel?: string }
+) {
   if (ids.length === 0) return;
   const list = ids.map((id) => encodeURIComponent(id)).join(",");
   await supabaseFetch(`contact_messages?id=in.(${list})`, {

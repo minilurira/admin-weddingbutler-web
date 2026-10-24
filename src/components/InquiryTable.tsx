@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { Inquiry } from "@/lib/inquiries";
-import { saveInquiryMemo, setInquiriesHandled } from "@/lib/inquiryActions";
+import { saveInquiryMemo, sendInquiryReply, setInquiriesHandled } from "@/lib/inquiryActions";
+import { INQUIRY_REPLY_MAX, charCount, inquiryReplyText } from "@/lib/inquiryReply";
 import { formatStamp } from "@/lib/format";
 import { useToast } from "./ToastContext";
 
@@ -123,6 +124,93 @@ function MemoEditor({ id, memo }: { id: string; memo: string }) {
   );
 }
 
+function ReplyEditor({ item }: { item: Inquiry }) {
+  const showToast = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [draft, setDraft] = useState("");
+  const [preview, setPreview] = useState(false);
+  const count = charCount(draft.trim());
+  const over = count > INQUIRY_REPLY_MAX;
+  const canSend = count > 0 && !over && !isPending;
+  const replied = Boolean(item.replied_at);
+
+  const send = () => {
+    if (!canSend) return;
+    const ask = replied ? `${item.name} 님에게 이미 답변을 보냈습니다. 새 답변을 다시 보낼까요?` : `${item.name} 님(${item.phone})에게 답변을 보낼까요?`;
+    if (!window.confirm(ask)) return;
+    startTransition(async () => {
+      try {
+        const res = await sendInquiryReply(item.id, draft);
+        if (!res.ok) {
+          showToast(res.message);
+          return;
+        }
+        setDraft("");
+        setPreview(false);
+        showToast(res.saved ? `${res.channel}으로 답변을 보냈습니다.` : `${res.channel}으로 보냈지만 기록 저장에 실패했습니다. 답변 컬럼 SQL을 확인해 주세요.`);
+      } catch {
+        showToast("답변을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#413A3E" }}>고객 답변 (카카오 알림톡, 안 되면 문자)</div>
+      {item.reply_text && (
+        <div style={{ padding: "10px 12px", borderRadius: 10, background: "#F7F4F6", fontSize: 13, color: "#5E555A", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#A9647E", marginBottom: 4 }}>
+            보낸 답변 · {item.replied_at ? formatStamp(new Date(item.replied_at)) : ""}{item.reply_channel ? ` · ${item.reply_channel}` : ""}
+          </div>
+          {item.reply_text}
+        </div>
+      )}
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={replied ? "추가 답변을 보내려면 입력하세요" : "고객에게 보낼 답변을 입력하세요"}
+        rows={5}
+        style={{
+          width: "100%", boxSizing: "border-box", resize: "vertical", padding: "10px 12px", borderRadius: 10,
+          border: `1px solid ${over ? "#D9534F" : "#E8E2E5"}`, fontSize: 13, fontFamily: "inherit", color: "#413A3E", background: "#FFFFFF",
+        }}
+      />
+      {preview && count > 0 && (
+        <div style={{ padding: "12px 14px", borderRadius: 12, background: "#FEF9DC", fontSize: 12.5, color: "#3C3A2E", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          {inquiryReplyText(item.name, item.topic, draft.trim())}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 12, color: over ? "#D9534F" : "#A79BA1", fontVariantNumeric: "tabular-nums" }}>
+          {count} / {INQUIRY_REPLY_MAX}자
+        </span>
+        <button
+          type="button"
+          onClick={() => setPreview(!preview)}
+          disabled={count === 0}
+          style={{
+            marginLeft: "auto", height: 36, padding: "0 14px", borderRadius: 10, fontSize: 13, fontFamily: "inherit", fontWeight: 700, border: "none",
+            background: "#FFFFFF", color: "#6E646A", boxShadow: "inset 0 0 0 1px #E0D9DD", cursor: count === 0 ? "default" : "pointer", opacity: count === 0 ? 0.5 : 1,
+          }}
+        >
+          {preview ? "미리보기 닫기" : "미리보기"}
+        </button>
+        <button
+          type="button"
+          onClick={send}
+          disabled={!canSend}
+          style={{
+            height: 36, padding: "0 16px", borderRadius: 10, fontSize: 13, fontFamily: "inherit", fontWeight: 700, border: "none",
+            background: canSend ? "#B0567E" : "#F4F3F3", color: canSend ? "#FFFFFF" : "#A79BA1", cursor: canSend ? "pointer" : "default",
+          }}
+        >
+          {isPending ? "보내는 중…" : replied ? "답변 다시 보내기" : "답변 보내기"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function InquiryTable({ items }: { items: Inquiry[] }) {
   const showToast = useToast();
   const [isPending, startTransition] = useTransition();
@@ -139,7 +227,7 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
       const matchesFilter = filter === "전체" || (filter === "처리완료" ? Boolean(it.handled_at) : !it.handled_at);
       const matchesQuery =
         !q ||
-        `${it.name} ${it.message} ${it.area ?? ""} ${it.topic} ${it.admin_memo ?? ""}`.toLowerCase().includes(q) ||
+        `${it.name} ${it.message} ${it.area ?? ""} ${it.topic} ${it.admin_memo ?? ""} ${it.reply_text ?? ""}`.toLowerCase().includes(q) ||
         (qDigits.length >= 3 && it.phone.replace(/[^0-9]/g, "").includes(qDigits));
       return matchesFilter && matchesQuery;
     });
@@ -241,6 +329,9 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
                 <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontSize: 15, fontWeight: 800, color: "#2B2126", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name} 님</span>
                   <span style={{ flex: "0 0 auto", fontSize: 12.5, fontWeight: 600, color: "#8C8188" }}>{it.topic}</span>
+                  {it.replied_at && !open && (
+                    <span style={{ flex: "0 0 auto", fontSize: 11.5, fontWeight: 700, color: "#4F9A72" }}>답변함</span>
+                  )}
                   {it.admin_memo && !open && (
                     <span style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11.5, fontWeight: 700, color: "#A9647E" }}>
                       <MemoIcon />메모
@@ -273,9 +364,10 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><ClockIcon />접수 {formatStamp(new Date(it.created_at))}</span>
               </div>
 
-              {/* 펼쳤을 때: 메모 · 처리완료 (안쪽 클릭은 카드를 접지 않는다) */}
+              {/* 펼쳤을 때: 답변 · 메모 · 처리완료 (안쪽 클릭은 카드를 접지 않는다) */}
               {open && (
                 <div onClick={stop} style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 12, borderTop: "1px solid #F3EEF1", cursor: "default" }}>
+                  <ReplyEditor item={it} />
                   <MemoEditor key={it.admin_memo ?? ""} id={it.id} memo={it.admin_memo ?? ""} />
                   <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                     {it.handled_at && (
