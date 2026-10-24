@@ -7,11 +7,12 @@ import {
   addButler, addCost, addShift, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
+import { CARD_SETTLE_BUSINESS_DAYS, addBusinessDays, cardFee } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
   settings: { feeRate: number; bankDate: string; bankBalance: number };
-  reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; cash: number | null }[];
+  reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string }[];
   butlers: { id: string; name: string }[];
   shifts: { id: string; butlerId: string; date: string; rid: string; pay: number; paid: boolean }[];
@@ -48,7 +49,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
   }
 
   const { settings, reservations, costs, butlers, shifts } = data;
-  const feeOf = (card: number) => Math.round((card * settings.feeRate) / 100);
+  const feeOf = (card: number) => cardFee(card, settings.feeRate);
   const inMonth = (d: string) => d.startsWith(month);
   const bName = (id: string) => butlers.find((b) => b.id === id)?.name ?? "?";
 
@@ -87,7 +88,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
   const unpaid = ms.filter((s) => !s.paid);
 
   /* 통장 잔액 예상: 기준일 이후의 입금·출금만 더해 월말 잔액을 이어서 계산한다.
-     입금 = 예식일 기준 (카드 − 수수료 + 현금, 미입력 잔금은 총액−카드로 예상)
+     입금 = 카드는 결제일 + 7영업일에 (카드 − 수수료), 현금은 예식일에 (미입력 잔금은 총액−카드로 예상)
      출금 = 월 비용(시작일의 일자마다) + 일회성 + 미지급 버틀러 정산 */
   const base = settings.bankDate, bm = base.slice(0, 7);
   const projection = (() => {
@@ -97,8 +98,12 @@ export default function FinanceView({ data }: { data: FinanceData }) {
       m += i;
       while (m > 12) { m -= 12; y++; }
       const key = `${y}-${String(m).padStart(2, "0")}`;
-      const inc = reservations.filter((r) => r.date.startsWith(key) && r.date > base)
-        .reduce((a, r) => a + r.card - feeOf(r.card) + (r.cash ?? Math.max(0, r.total - r.card)), 0);
+      const inc = reservations.reduce((a, r) => {
+        const settle = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); // 카드: 결제 후 7영업일에 수수료를 뗀 금액이 입금
+        const cardIn = settle.startsWith(key) && settle > base ? r.card - feeOf(r.card) : 0;
+        const cashIn = r.date.startsWith(key) && r.date > base ? (r.cash ?? Math.max(0, r.total - r.card)) : 0; // 현금: 예식 당일
+        return a + cardIn + cashIn;
+      }, 0);
       const mon = costs.filter((x) => x.kind === "monthly" && x.date.slice(0, 7) <= key && `${key}-${x.date.slice(8)}` > base).reduce((a, x) => a + x.amount, 0);
       const one = costs.filter((x) => x.kind === "once" && x.date.startsWith(key) && x.date > base).reduce((a, x) => a + x.amount, 0);
       const py = shifts.filter((x) => !x.paid && (x.date.slice(0, 7) < bm ? bm : x.date.slice(0, 7)) === key).reduce((a, x) => a + x.pay, 0);
@@ -143,10 +148,10 @@ export default function FinanceView({ data }: { data: FinanceData }) {
       {tab === "income" && (
         <section className="panel">
           <div className="box"><div className="inline">
-            <div className="field"><label htmlFor="feeRate">카드 수수료율 (%)</label>
+            <div className="field"><label htmlFor="feeRate">카드 수수료율 (%, 부가세 별도)</label>
               <input id="feeRate" key={settings.feeRate} inputMode="decimal" defaultValue={settings.feeRate}
                 onBlur={(e) => { const v = parseFloat(e.target.value.replace(",", ".")); if (Number.isFinite(v) && v !== settings.feeRate) run(() => saveSettings({ feeRate: v }), "수수료율을 저장했습니다."); }} /></div>
-            <p className="note" style={{ margin: "0 0 6px", flex: 1, minWidth: 220 }}>카드결제 금액에만 적용됩니다. 3.3%는 기본값이니 KG이니시스 계약서의 실제 요율로 바꿔 주세요. 수수료는 입금(정산)될 때 PG가 미리 떼고 보냅니다.</p>
+            <p className="note" style={{ margin: "0 0 6px", flex: 1, minWidth: 220 }}>카드결제 금액에만 적용됩니다. 신용카드 3.2%는 부가세 별도라서 실제로는 {(settings.feeRate * 1.1).toFixed(2)}%({settings.feeRate}% × 1.1)를 뺍니다. 수수료는 결제 후 {CARD_SETTLE_BUSINESS_DAYS}영업일에 입금(정산)될 때 PG가 미리 떼고 보냅니다.</p>
           </div></div>
           <div className="box"><h2>결제수단별 수입</h2>
             <div className="bar" role="img" aria-label={`카드 ${gross ? Math.round((card / gross) * 100) : 0}%`}>
@@ -336,7 +341,7 @@ export default function FinanceView({ data }: { data: FinanceData }) {
                 ))}
               </tbody>
             </table></div>
-            <p className="note">입금 예정은 예식일에 들어오는 것으로 계산합니다(카드 − 수수료 + 현금). 아직 입력하지 않은 잔금은 &quot;총액 − 카드결제&quot;로 예상합니다. 버틀러 정산은 기록한 것만 반영하며, 미지급 건은 지급 예정으로 봅니다. 출금은 월 비용의 시작일 일자, 일회성 비용의 날짜에 나가는 것으로 봅니다.</p>
+            <p className="note">입금 예정은 카드결제는 결제일 + {CARD_SETTLE_BUSINESS_DAYS}영업일(주말·공휴일 제외)에 수수료를 뗀 금액이, 현금은 예식일에 들어오는 것으로 계산합니다. 아직 입력하지 않은 잔금은 &quot;총액 − 카드결제&quot;로 예상합니다. 결제일은 예약 접수일입니다. 버틀러 정산은 기록한 것만 반영하며, 미지급 건은 지급 예정으로 봅니다. 출금은 월 비용의 시작일 일자, 일회성 비용의 날짜에 나가는 것으로 봅니다.</p>
           </div>
         </section>
       )}

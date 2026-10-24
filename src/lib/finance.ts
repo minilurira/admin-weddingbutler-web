@@ -75,7 +75,7 @@ export async function getFinanceSettings(): Promise<FinanceSettings> {
   const feeRate = Number(map.feeRate);
   const bankBalance = Number(map.bankBalance);
   return {
-    feeRate: Number.isFinite(feeRate) && map.feeRate !== undefined ? feeRate : 3.3, // 3.3%는 예시. 계약 요율로 바꿔 쓴다
+    feeRate: Number.isFinite(feeRate) && map.feeRate !== undefined ? feeRate : 3.2, // 신용카드 3.2% (부가세 별도 계약)
     bankDate: /^\d{4}-\d{2}-\d{2}$/.test(map.bankDate ?? "") ? map.bankDate : kstToday(),
     bankBalance: Number.isFinite(bankBalance) && map.bankBalance !== undefined ? bankBalance : 0,
   };

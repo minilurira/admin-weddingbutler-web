@@ -31,6 +31,7 @@ export default async function FinancePage() {
         plan: r.confirmPlan,
         total: reservationTotal(r),
         card: r.paidAmount,
+        paidDate: new Date(r.requestedAt.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10), // 접수(결제) 날짜, 한국시간
         cash: cashMap.get(r.id) ?? null,
       })),
       costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo })),
