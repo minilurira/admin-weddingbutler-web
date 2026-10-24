@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import type { Inquiry } from "@/lib/inquiries";
 import { saveInquiryMemo, sendInquiryReply, setInquiriesHandled } from "@/lib/inquiryActions";
 import { INQUIRY_REPLY_MAX, charCount, inquiryReplyText } from "@/lib/inquiryReply";
+import { parseReplies, repliesPlainText } from "@/lib/inquiryReplyLog";
 import { formatStamp } from "@/lib/format";
 import { useToast } from "./ToastContext";
 
@@ -132,11 +133,12 @@ function ReplyEditor({ item }: { item: Inquiry }) {
   const count = charCount(draft.trim());
   const over = count > INQUIRY_REPLY_MAX;
   const canSend = count > 0 && !over && !isPending;
-  const replied = Boolean(item.replied_at);
+  const replies = parseReplies(item);
+  const replied = replies.length > 0;
 
   const send = () => {
     if (!canSend) return;
-    const ask = replied ? `${item.name} 님에게 이미 답변을 보냈습니다. 새 답변을 다시 보낼까요?` : `${item.name} 님(${item.phone})에게 답변을 보낼까요?`;
+    const ask = replied ? `${item.name} 님에게 이미 답변을 보냈습니다. 추가 답변을 보낼까요? (이전 답변은 그대로 남습니다)` : `${item.name} 님(${item.phone})에게 답변을 보낼까요?`;
     if (!window.confirm(ask)) return;
     startTransition(async () => {
       try {
@@ -157,14 +159,14 @@ function ReplyEditor({ item }: { item: Inquiry }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: "#413A3E" }}>고객 답변 (카카오 알림톡, 안 되면 문자)</div>
-      {item.reply_text && (
-        <div style={{ padding: "10px 12px", borderRadius: 10, background: "#F7F4F6", fontSize: 13, color: "#5E555A", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+      {replies.map((r, i) => (
+        <div key={i} style={{ padding: "10px 12px", borderRadius: 10, background: "#F7F4F6", fontSize: 13, color: "#5E555A", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#A9647E", marginBottom: 4 }}>
-            보낸 답변 · {item.replied_at ? formatStamp(new Date(item.replied_at)) : ""}{item.reply_channel ? ` · ${item.reply_channel}` : ""}
+            보낸 답변{replies.length > 1 ? ` ${i + 1}` : ""} · {r.at ? formatStamp(new Date(r.at)) : ""}{r.channel ? ` · ${r.channel}` : ""}
           </div>
-          {item.reply_text}
+          {r.text}
         </div>
-      )}
+      ))}
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -204,7 +206,7 @@ function ReplyEditor({ item }: { item: Inquiry }) {
             background: canSend ? "#B0567E" : "#F4F3F3", color: canSend ? "#FFFFFF" : "#A79BA1", cursor: canSend ? "pointer" : "default",
           }}
         >
-          {isPending ? "보내는 중…" : replied ? "답변 다시 보내기" : "답변 보내기"}
+          {isPending ? "보내는 중…" : replied ? "추가 답변 보내기" : "답변 보내기"}
         </button>
       </div>
     </div>
@@ -227,7 +229,7 @@ export default function InquiryTable({ items }: { items: Inquiry[] }) {
       const matchesFilter = filter === "전체" || (filter === "처리완료" ? Boolean(it.handled_at) : !it.handled_at);
       const matchesQuery =
         !q ||
-        `${it.name} ${it.message} ${it.area ?? ""} ${it.topic} ${it.admin_memo ?? ""} ${it.reply_text ?? ""}`.toLowerCase().includes(q) ||
+        `${it.name} ${it.message} ${it.area ?? ""} ${it.topic} ${it.admin_memo ?? ""} ${repliesPlainText(it)}`.toLowerCase().includes(q) ||
         (qDigits.length >= 3 && it.phone.replace(/[^0-9]/g, "").includes(qDigits));
       return matchesFilter && matchesQuery;
     });

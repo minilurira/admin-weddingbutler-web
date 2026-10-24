@@ -7,6 +7,7 @@ import { getInquiry, listInquiries, updateInquiries } from "@/lib/inquiries";
 import { sendInquiryReplyAlimtalk } from "@/lib/alimtalk";
 import { sendSms } from "@/lib/sms";
 import { INQUIRY_REPLY_MAX, charCount, inquiryReplyText } from "@/lib/inquiryReply";
+import { appendReply } from "@/lib/inquiryReplyLog";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -54,7 +55,8 @@ export async function sendInquiryReply(id: string, text: string): Promise<ReplyR
   let saved = true;
   try {
     await updateInquiries([id], {
-      reply_text: answer,
+      // 이전에 보낸 답변을 지우지 않고 뒤에 쌓는다
+      reply_text: appendReply(inquiry, { at: now, channel, text: answer }),
       replied_at: now,
       reply_channel: channel,
       ...(inquiry.handled_at ? {} : { handled_at: now }),
