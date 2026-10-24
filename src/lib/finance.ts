@@ -1,0 +1,82 @@
+import { prisma } from "@/lib/prisma";
+
+/**
+ * 정산 관리 테이블 생성문. prisma/migrations/20261024090000_add_finance/migration.sql 과 같은 내용이다.
+ * 운영 DB에는 마이그레이션이 자동 적용되지 않으므로(README 참고), /finance 가 처음 열릴 때 한 번 실행해 둔다.
+ * 모두 IF NOT EXISTS 라서 이미 테이블이 있거나 나중에 migrate deploy 를 돌려도 안전하다.
+ */
+const DDL = [
+  `CREATE TABLE IF NOT EXISTS "FinanceCost" (
+      "id" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "amount" INTEGER NOT NULL,
+      "kind" TEXT NOT NULL,
+      "date" TEXT NOT NULL,
+      "memo" TEXT NOT NULL DEFAULT '',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "FinanceCost_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "Butler" (
+      "id" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "Butler_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "ButlerShift" (
+      "id" TEXT NOT NULL,
+      "butlerId" TEXT NOT NULL,
+      "date" TEXT NOT NULL,
+      "reservationId" TEXT NOT NULL,
+      "pay" INTEGER NOT NULL,
+      "paid" BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ButlerShift_pkey" PRIMARY KEY ("id"),
+      CONSTRAINT "ButlerShift_butlerId_fkey" FOREIGN KEY ("butlerId") REFERENCES "Butler"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "ButlerShift_date_idx" ON "ButlerShift"("date")`,
+  `CREATE TABLE IF NOT EXISTS "FinanceCash" (
+      "reservationId" TEXT NOT NULL,
+      "amount" INTEGER NOT NULL,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "FinanceCash_pkey" PRIMARY KEY ("reservationId")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "FinanceSetting" (
+      "key" TEXT NOT NULL,
+      "value" TEXT NOT NULL,
+      CONSTRAINT "FinanceSetting_pkey" PRIMARY KEY ("key")
+  )`,
+];
+
+let ready: Promise<void> | null = null;
+
+export function ensureFinanceTables(): Promise<void> {
+  if (!ready) {
+    ready = (async () => {
+      for (const stmt of DDL) await prisma.$executeRawUnsafe(stmt);
+    })().catch((e) => {
+      ready = null; // 실패하면 다음 요청에서 다시 시도
+      throw e;
+    });
+  }
+  return ready;
+}
+
+export interface FinanceSettings {
+  feeRate: number;
+  bankDate: string;
+  bankBalance: number;
+}
+
+const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+
+export async function getFinanceSettings(): Promise<FinanceSettings> {
+  const rows = await prisma.financeSetting.findMany();
+  const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const feeRate = Number(map.feeRate);
+  const bankBalance = Number(map.bankBalance);
+  return {
+    feeRate: Number.isFinite(feeRate) && map.feeRate !== undefined ? feeRate : 3.3, // 3.3%는 예시. 계약 요율로 바꿔 쓴다
+    bankDate: /^\d{4}-\d{2}-\d{2}$/.test(map.bankDate ?? "") ? map.bankDate : kstToday(),
+    bankBalance: Number.isFinite(bankBalance) && map.bankBalance !== undefined ? bankBalance : 0,
+  };
+}

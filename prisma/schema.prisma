@@ -140,3 +140,48 @@ model LookupOtp {
 
   @@index([phone, createdAt])
 }
+
+// 정산 관리 (/finance). 날짜는 "YYYY-MM-DD" 문자열. kind: "once" | "monthly"
+model FinanceCost {
+  id        String   @id @default(cuid())
+  name      String
+  amount    Int
+  kind      String
+  date      String
+  memo      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Butler {
+  id        String        @id @default(cuid())
+  name      String
+  createdAt DateTime      @default(now())
+  shifts    ButlerShift[]
+}
+
+// 버틀러 1명이 예약 1건에 참석한 기록과 정산 금액. reservationId는 Reservation.id (삭제와 무관하게 남기려고 관계를 걸지 않는다)
+model ButlerShift {
+  id            String   @id @default(cuid())
+  butlerId      String
+  butler        Butler   @relation(fields: [butlerId], references: [id], onDelete: Cascade)
+  date          String
+  reservationId String
+  pay           Int
+  paid          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([date])
+}
+
+// 예식 당일 현금으로 받은 잔금. 행이 없으면 아직 입력하지 않은 것.
+model FinanceCash {
+  reservationId String   @id
+  amount        Int
+  updatedAt     DateTime @updatedAt
+}
+
+// key: "feeRate"(카드 수수료율 %) | "bankDate" | "bankBalance"
+model FinanceSetting {
+  key   String @id
+  value String
+}

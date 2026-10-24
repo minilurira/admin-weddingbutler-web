@@ -51,6 +51,17 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/finance",
+    label: "정산 관리",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <rect x="2.6" y="3.4" width="14.8" height="13.2" rx="3.4" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M6.6 8.2 10 12.2l3.4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="9.15" y="11" width="1.7" height="3.4" rx="0.85" fill="currentColor" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({
