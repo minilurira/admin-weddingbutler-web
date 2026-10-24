@@ -178,7 +178,7 @@ model FinanceCost {
 model Butler {
   id        String        @id @default(cuid())
   name      String
-  // "staff" | "manager" | "owner" — 건당 기본 정산금이 등급마다 정해져 있다 (src/lib/financeCalc.ts)
+  // 새 참석 기록을 입력할 때 처음 보여 줄 등급(기본값). 실제 등급은 참석 기록(ButlerShift.grade)마다 정한다.
   grade     String        @default("staff")
   createdAt DateTime      @default(now())
   shifts    ButlerShift[]
@@ -191,6 +191,8 @@ model ButlerShift {
   butler        Butler   @relation(fields: [butlerId], references: [id], onDelete: Cascade)
   date          String
   reservationId String
+  // 이번 참석의 등급: "staff" | "manager" | "owner" — 등급마다 건당 기본 정산금이 정해져 있다 (src/lib/financeCalc.ts)
+  grade         String   @default("staff")
   pay           Int
   // 스페셜 차지: 오너가 기본 정산금 외에 추가로 지급하는 돈
   extra         Int      @default(0)

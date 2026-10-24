@@ -43,17 +43,9 @@ export async function deleteCost(id: string) {
   done();
 }
 
-export async function addButler(name: string, grade: string) {
+export async function addButler(name: string) {
   await guard();
-  if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
-  await prisma.butler.create({ data: { name: text(name, "이름", 30), grade } });
-  done();
-}
-
-export async function setButlerGrade(id: string, grade: string) {
-  await guard();
-  if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
-  await prisma.butler.updateMany({ where: { id }, data: { grade } });
+  await prisma.butler.create({ data: { name: text(name, "이름", 30) } });
   done();
 }
 
@@ -65,7 +57,7 @@ export async function deleteButler(id: string) {
 }
 
 /** pay를 비우면 버틀러 등급의 기본 정산금을 쓴다. extra는 스페셜 차지(오너가 추가로 지급하는 돈). */
-export async function addShift(input: { butlerId: string; date: string; reservationId: string; pay?: number | null; extra?: number }) {
+export async function addShift(input: { butlerId: string; date: string; reservationId: string; grade?: string; pay?: number | null; extra?: number }) {
   await guard();
   if (!isDate(input.date)) throw new Error("참석일을 확인해 주세요.");
   const [butler, reservation] = await Promise.all([
@@ -73,13 +65,17 @@ export async function addShift(input: { butlerId: string; date: string; reservat
     prisma.reservation.findUnique({ where: { id: input.reservationId }, select: { id: true } }),
   ]);
   if (!butler) throw new Error("버틀러를 찾을 수 없습니다.");
+  // 등급은 이번 참석마다 정한다. 말하지 않으면 그 버틀러의 기본 등급.
+  const grade = input.grade === undefined ? butler.grade : input.grade;
+  if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
   if (!reservation) throw new Error("예약을 찾을 수 없습니다.");
   await prisma.butlerShift.create({
     data: {
       butlerId: butler.id,
       date: input.date,
       reservationId: reservation.id,
-      pay: input.pay == null ? gradePay(butler.grade) : money(input.pay),
+      grade,
+      pay: input.pay == null ? gradePay(grade) : money(input.pay),
       extra: input.extra ? money(input.extra) : 0,
     },
   });
@@ -89,6 +85,14 @@ export async function addShift(input: { butlerId: string; date: string; reservat
 export async function updateShiftPay(id: string, pay: number) {
   await guard();
   await prisma.butlerShift.updateMany({ where: { id }, data: { pay: money(pay) } });
+  done();
+}
+
+/** 이 참석 기록의 등급을 바꾸고, 기본 정산금도 새 등급 금액으로 다시 맞춘다. 스페셜 차지는 그대로. */
+export async function updateShiftGrade(id: string, grade: string) {
+  await guard();
+  if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
+  await prisma.butlerShift.updateMany({ where: { id }, data: { grade, pay: gradePay(grade) } });
   done();
 }
 
