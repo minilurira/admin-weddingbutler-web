@@ -138,7 +138,7 @@ export async function updateShiftExtra(id: string, extra: number) {
   done();
 }
 
-/** 입금 완료로 처리하고 실제 입금일을 기록한다. 날짜를 안 주면 오늘(한국시간). paid=false면 날짜도 지운다. */
+/** 지급 완료로 처리하고 실제 입금일을 기록한다. 날짜를 안 주면 오늘(한국시간). paid=false면 날짜도 지운다. */
 export async function setShiftPaid(id: string, paid: boolean, date?: string) {
   await guard();
   if (date !== undefined && !isDate(date)) throw new Error("입금일을 확인해 주세요.");

@@ -66,3 +66,33 @@ export function ownerPool(shifts: readonly { rid: string; grade: string; pay: nu
 
 /** 오너 등급 한 건에서 대표 한 명의 기본 정산금: 두 대표 합 300,000원을 49:51로 → 이강 147,000 / 최소연 153,000 */
 export const ownerPay = (name: keyof typeof OWNER_SPLIT): number => splitOwnerPay(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)[name];
+
+/**
+ * 통장 잔액 예상용 비용 출금: 비용의 각 지급 건(월 비용은 시작월부터 마지막 달까지 달마다, 일회성은 한 번)이 나가는 날을
+ * 정하고(지급 완료면 실제 지급일, 아니면 예정일) 기준일 이후인 건만 그 날이 속한 달(keys 안)에 더한다.
+ */
+export function costOutflowByMonth(
+  costs: readonly { kind: string; amount: number; date: string; payments: Record<string, string> }[],
+  keys: readonly string[],
+  base: string,
+): Record<string, { mon: number; one: number }> {
+  const out: Record<string, { mon: number; one: number }> = Object.fromEntries(keys.map((k) => [k, { mon: 0, one: 0 }]));
+  const last = keys[keys.length - 1];
+  for (const x of costs) {
+    const months: string[] = [];
+    if (x.kind === "once") months.push(x.date.slice(0, 7));
+    else {
+      let [y, m] = x.date.slice(0, 7).split("-").map(Number);
+      for (; `${y}-${String(m).padStart(2, "0")}` <= last; m++) {
+        if (m > 12) { m = 1; y++; }
+        months.push(`${y}-${String(m).padStart(2, "0")}`);
+      }
+    }
+    for (const mk of months) {
+      const when = x.payments[mk] ?? (x.kind === "once" ? x.date : `${mk}-${x.date.slice(8)}`);
+      const bucket = out[when.slice(0, 7)];
+      if (when > base && bucket) bucket[x.kind === "once" ? "one" : "mon"] += x.amount;
+    }
+  }
+  return out;
+}

@@ -7,7 +7,7 @@ import {
   addButler, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
-import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowByMonth, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
@@ -99,24 +99,28 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
 
   /* 통장 잔액 예상: 기준일 이후의 입금·출금만 더해 월말 잔액을 이어서 계산한다.
      입금 = 카드는 결제일 + 7영업일에 (카드 − 수수료), 현금은 예식일에 (미입력 잔금은 총액−카드로 예상)
-     출금 = 월 비용(시작일의 일자마다) + 일회성 + 미지급 버틀러 정산 */
+     출금 = 월 비용·일회성 비용·버틀러 정산. 지급 완료로 기록한 건은 실제 지급일에, 아직 지급하지 않은 건은 예정일에 나가는 것으로 본다
+     (기준일 전에 이미 지급한 건은 잔액에 반영됐다고 보고 뺀다) */
   const base = settings.bankDate, bm = base.slice(0, 7);
   const projection = (() => {
     let bal = settings.bankBalance;
-    return Array.from({ length: 6 }, (_, i) => {
+    const keys = Array.from({ length: 6 }, (_, i) => {
       let [y, m] = bm.split("-").map(Number);
       m += i;
       while (m > 12) { m -= 12; y++; }
-      const key = `${y}-${String(m).padStart(2, "0")}`;
+      return `${y}-${String(m).padStart(2, "0")}`;
+    });
+    const costOut = costOutflowByMonth(costs, keys, base);
+    return keys.map((key) => {
       const inc = reservations.reduce((a, r) => {
         const settle = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); // 카드: 결제 후 7영업일에 수수료를 뗀 금액이 입금
         const cardIn = settle.startsWith(key) && settle > base ? r.card - feeOf(r.card) : 0;
         const cashIn = r.date.startsWith(key) && r.date > base ? (r.cash ?? Math.max(0, r.total - r.card)) : 0; // 현금: 예식 당일
         return a + cardIn + cashIn;
       }, 0);
-      const mon = costs.filter((x) => x.kind === "monthly" && x.date.slice(0, 7) <= key && `${key}-${x.date.slice(8)}` > base).reduce((a, x) => a + x.amount, 0);
-      const one = costs.filter((x) => x.kind === "once" && x.date.startsWith(key) && x.date > base).reduce((a, x) => a + x.amount, 0);
-      const py = shifts.filter((x) => !x.paid && (x.date.slice(0, 7) < bm ? bm : x.date.slice(0, 7)) === key).reduce((a, x) => a + shiftTotal(x), 0);
+      const { mon, one } = costOut[key];
+      // 버틀러: 미지급은 참석월(기준월 이전이면 기준월)에, 기준일 이후에 지급한 건은 실제 지급일의 달에 나간다
+      const py = shifts.filter((x) => (x.paid ? x.paidDate > base && x.paidDate.slice(0, 7) === key : (x.date.slice(0, 7) < bm ? bm : x.date.slice(0, 7)) === key)).reduce((a, x) => a + shiftTotal(x), 0);
       bal += inc - (mon + one + py);
       return { m: key, inc, mon, one, pay: py, end: bal };
     });
@@ -449,7 +453,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                 ))}
               </tbody>
             </table></div>
-            <p className="note">입금 예정은 카드결제는 결제일 + {CARD_SETTLE_BUSINESS_DAYS}영업일(주말·공휴일 제외)에 수수료를 뗀 금액이, 현금은 예식일에 들어오는 것으로 계산합니다. 아직 입력하지 않은 잔금은 &quot;총액 − 카드결제&quot;로 예상합니다. 결제일은 예약 접수일입니다. 버틀러 정산은 기록한 것만 반영하며, 미지급 건은 지급 예정으로 봅니다. 출금은 월 비용의 시작일 일자, 일회성 비용의 날짜에 나가는 것으로 봅니다.</p>
+            <p className="note">입금 예정은 카드결제는 결제일 + {CARD_SETTLE_BUSINESS_DAYS}영업일(주말·공휴일 제외)에 수수료를 뗀 금액이, 현금은 예식일에 들어오는 것으로 계산합니다. 아직 입력하지 않은 잔금은 &quot;총액 − 카드결제&quot;로 예상합니다. 결제일은 예약 접수일입니다. 비용과 버틀러 정산은 지급 완료로 기록한 건은 실제 지급일에, 아직 지급하지 않은 건은 예정일(월 비용의 시작일 일자, 일회성 비용의 날짜, 버틀러는 참석한 달)에 나가는 것으로 봅니다. 기준일 전에 이미 지급한 건은 잔액에 반영된 것으로 보고 뺍니다.</p>
           </div>
         </section>
       )}

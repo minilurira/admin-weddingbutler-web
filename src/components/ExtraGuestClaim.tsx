@@ -60,7 +60,7 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
               {data.claims.map((c) => (
                 <div key={c.id} style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", padding: "10px 12px", borderRadius: 12, border: "1px solid #EFEBED", fontSize: 13 }}>
-                  <b>{won(c.amount)}</b><span style={{ color: "#8C8188" }}>{STATUS[c.status] ?? c.status} · 발송 {c.createdLabel}{c.paidLabel ? ` · 결제 ${c.paidLabel}` : ""}</span>
+                  <b>{won(c.amount)}</b><span style={{ color: "#8C8188" }}>{c.expired ? "만료" : STATUS[c.status] ?? c.status} · 발송 {c.createdLabel}{c.paidLabel ? ` · 결제 ${c.paidLabel}` : ""}</span>
                 </div>
               ))}
             </div>

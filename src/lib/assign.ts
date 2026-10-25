@@ -3,7 +3,7 @@ import { ensureFinanceTables } from "@/lib/finance";
 import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 
 // 예약건에 버틀러를 배정하는 DB 로직. 배정 = 그 예약의 참석·정산 기록(ButlerShift)을 미리 만들어 두는 것이라
-// 버틀러 관리의 참석·정산 기록과 지출관리의 비용·통장 잔액 예상에 그대로 들어간다. 별도 테이블은 없다.
+// 버틀러 관리의 참석·정산 기록과 손익관리의 비용·통장 잔액 예상에 그대로 들어간다. 별도 테이블은 없다.
 // 로그인 확인은 호출하는 서버 액션(assignActions.ts)이 맡는다.
 
 export interface AssignedView {

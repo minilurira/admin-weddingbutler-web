@@ -15,7 +15,7 @@ export interface ExtraGuestView {
   fee: number;
   /** 예약 때 고객이 적어 낸 인원(참고용) */
   declaredLabel: string;
-  claims: { id: string; amount: number; status: string; createdLabel: string; paidLabel: string; url: string }[];
+  claims: { id: string; amount: number; status: string; createdLabel: string; paidLabel: string; url: string; expired: boolean }[];
   paidClaim: number;
 }
 
@@ -34,7 +34,7 @@ export async function loadExtraGuest(reservationId: string): Promise<ExtraGuestV
     billedExtraGuests: r.confirmExtraGuests,
     fee: EXTRA_GUEST_FEE,
     declaredLabel: r.guestsLabel,
-    claims: claims.map((l) => ({ id: l.id, amount: l.amount, status: l.status, createdLabel: formatStamp(l.createdAt), paidLabel: l.paidAt ? formatStamp(l.paidAt) : "", url: l.url })),
+    claims: claims.map((l) => ({ id: l.id, amount: l.amount, status: l.status, createdLabel: formatStamp(l.createdAt), paidLabel: l.paidAt ? formatStamp(l.paidAt) : "", url: l.url, expired: l.status === "sent" && l.expiresAt.getTime() <= Date.now() })),
     paidClaim: claims.filter((l) => l.status === "paid").reduce((a, l) => a + (l.paidAmount || l.amount), 0),
   };
 }

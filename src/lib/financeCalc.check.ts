@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { addBusinessDays, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
+import { addBusinessDays, costOutflowByMonth, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -27,4 +27,16 @@ assert.equal(gradePay("owner", "이강"), 147000);
 assert.equal(gradePay("owner", "최소연"), 153000);
 assert.equal(gradePay("owner", "다른사람"), 150000);
 assert.equal(gradePay("staff", "이강"), 75000);
+const keys = ["2026-10", "2026-11", "2026-12"];
+const rent = { kind: "monthly", amount: 100, date: "2026-09-05", payments: {} as Record<string, string> };
+let o = costOutflowByMonth([rent], keys, "2026-10-10");
+assert.deepEqual([o["2026-10"].mon, o["2026-11"].mon, o["2026-12"].mon], [0, 100, 100]);                     // 10/5 월세는 이미 나간 것으로 본다
+o = costOutflowByMonth([{ ...rent, payments: { "2026-11": "2026-10-20" } }], keys, "2026-10-10");
+assert.deepEqual([o["2026-10"].mon, o["2026-11"].mon, o["2026-12"].mon], [100, 0, 100]);                     // 11월분을 10/20에 미리 지급 → 10월에 나감
+o = costOutflowByMonth([{ ...rent, payments: { "2026-10": "2026-10-05" } }], keys, "2026-10-10");
+assert.equal(o["2026-10"].mon, 0);                                                                           // 기준일 전에 지급한 건은 뺀다
+o = costOutflowByMonth([{ kind: "once", amount: 50, date: "2026-12-30", payments: { "2026-12": "2026-12-01" } }], keys, "2026-10-10");
+assert.equal(o["2026-12"].one, 50);                                                                          // 일회성도 실제 지급일 기준
+const y = costOutflowByMonth([{ ...rent, date: "2026-11-15" }], ["2026-12", "2027-01"], "2026-12-01");
+assert.deepEqual([y["2026-12"].mon, y["2027-01"].mon], [100, 100]);                                          // 연도 넘김
 console.log("financeCalc: all checks passed");
