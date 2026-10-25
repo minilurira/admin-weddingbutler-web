@@ -10,6 +10,19 @@ export function formatStamp(d: Date) {
   return `${pad2(k.getUTCMonth() + 1)}.${pad2(k.getUTCDate())} ${pad2(k.getUTCHours())}:${pad2(k.getUTCMinutes())}`;
 }
 
+/**
+ * 예식 일시(KST)가 지났는지. 시간이 없으면 그날 자정(KST)이 지난 뒤로 본다.
+ * 서버는 UTC로 돌기 때문에 KST 기준으로 계산한다. 날짜가 없으면 false.
+ */
+export function isWeddingPast(date: string, time: string, now: Date = new Date()) {
+  const dm = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dm) return false;
+  const tm = time.match(/^(\d{1,2}):(\d{2})$/);
+  const [h, min] = tm ? [Number(tm[1]), Number(tm[2])] : [24, 0];
+  const at = Date.UTC(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), h, min) - KST_OFFSET_MS;
+  return now.getTime() >= at;
+}
+
 export function toNum(v: string | number) {
   return Number(String(v).replace(/[^0-9]/g, "")) || 0;
 }

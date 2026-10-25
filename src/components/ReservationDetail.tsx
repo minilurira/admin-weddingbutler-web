@@ -51,6 +51,8 @@ export interface DetailReservation {
   memo: string;
   customerMemo: string;
   status: string;
+  /** 예식 일시(KST)가 지난 예약. 취소된 예약은 false. 변경·취소 버튼이 잠긴다 */
+  weddingPast: boolean;
   requestedPlan: string;
   paidAmount: number;
   paymentType: string;
@@ -154,8 +156,10 @@ export default function ReservationDetail({
   const badge = BADGE[reservation.status] ?? BADGE["신규요청"];
   const isConfirmed = reservation.status === "확정";
   const isCancelled = reservation.status === "취소";
+  // 예식이 끝난 예약은 변경·취소·결제 링크를 모두 잠근다 (축의 기록·버틀러 배정·협의 기록은 계속 쓸 수 있다)
+  const past = reservation.weddingPast;
   // 확정된 예약은 잠그고, 고치려면 재협의로 되돌린다
-  const locked = isConfirmed;
+  const locked = isConfirmed || past;
   const cancelReason = reasonType === "고객요청" ? "고객요청" : customReason.trim();
   const quote = refundQuote(reservation.confirm.date, reservation.paidAmount);
   const refundAmount = toNum(refundDraft);
@@ -321,6 +325,7 @@ export default function ReservationDetail({
   const amt: React.CSSProperties = { fontWeight: 600, color: "#413A3E" };
   const primaryBtn: React.CSSProperties = { height: 44, padding: "0 20px", border: 0, borderRadius: 12, background: "#B0567E", color: "#FFFFFF", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 6px rgba(176,86,126,0.25)" };
   const outlineBtn: React.CSSProperties = { height: 40, padding: "0 16px", border: "1px solid #D9A3BC", borderRadius: 12, background: "#FFFFFF", color: "#8A3F61", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+  const lockedBtn: React.CSSProperties = { opacity: 0.45, cursor: "not-allowed" };
   const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(fields.date)
     ? formatWishDateLabel(fields.date, fields.time)
     : [fields.date, fields.time].filter(Boolean).join(" ") || reservation.wishDateLabel || "-";
@@ -365,6 +370,25 @@ export default function ReservationDetail({
               </div>
             )}
           </section>
+        ) : past ? (
+          <section style={{ ...card, background: "#F1EFF0", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14 }}>
+            <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: "#413A3E" }}>예식이 끝난 예약입니다</div>
+              <div style={{ marginTop: 4, fontSize: 12.5, color: "#8C8188", lineHeight: 1.6 }}>
+                예식 일시({dateLabel})가 지나 예약 변경·취소와 결제 링크가 잠겼습니다. 축의 기록과 버틀러 정산은 계속 관리할 수 있어요.
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {isConfirmed ? (
+                <>
+                  <button disabled style={{ ...outlineBtn, ...lockedBtn }}>확정 알림톡 재발송</button>
+                  <button disabled style={{ ...outlineBtn, borderColor: "#E5DDE1", color: "#6E646A", ...lockedBtn }}>재협의</button>
+                </>
+              ) : (
+                <button disabled style={{ ...primaryBtn, ...lockedBtn }}>확정하기</button>
+              )}
+            </div>
+          </section>
         ) : isConfirmed ? (
           <section style={{ ...card, background: "#F9EFF4", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14 }}>
             <div style={{ flex: "1 1 260px", minWidth: 0 }}>
@@ -401,10 +425,12 @@ export default function ReservationDetail({
             <div>
               <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>예약 내역</h2>
               <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>
-                {locked ? "확정된 내용입니다. 고치려면 재협의를 눌러 주세요." : "협의 후 확정할 내용입니다"}
+                {past ? "예식이 끝나 더 이상 고칠 수 없습니다." : locked ? "확정된 내용입니다. 고치려면 재협의를 눌러 주세요." : "협의 후 확정할 내용입니다"}
               </p>
             </div>
-            {!locked && !isCancelled && (
+            {past ? (
+              <button disabled style={{ ...outlineBtn, height: 38, ...lockedBtn }}>예약 내역 수정</button>
+            ) : !locked && !isCancelled && (
               <button onClick={openEdit} style={{ ...outlineBtn, height: 38 }}>예약 내역 수정</button>
             )}
           </div>
@@ -473,7 +499,7 @@ export default function ReservationDetail({
                 <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>고객에게 카드 결제 링크를 알림톡으로 보냅니다. 결제되면 결제한 금액에 자동으로 더해집니다.</p>
               </div>
               {!isCancelled && !linkOpen && (
-                <button disabled={isPending} onClick={openLink} style={{ ...outlineBtn, height: 38, flex: "0 0 auto" }}>
+                <button disabled={isPending || past} onClick={openLink} style={{ ...outlineBtn, height: 38, flex: "0 0 auto", ...(past ? lockedBtn : null) }}>
                   {hasOpenLink ? "다시 보내기" : "결제 링크 보내기"}
                 </button>
               )}
@@ -513,8 +539,8 @@ export default function ReservationDetail({
                       </span>
                       {l.status === "sent" && (
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button disabled={isPending} onClick={() => onCopyLink(l.url)} style={{ ...outlineBtn, height: 32, padding: "0 12px", fontSize: 12 }}>링크 복사</button>
-                          <button disabled={isPending} onClick={() => onCancelLink(l.id)} style={{ ...outlineBtn, height: 32, padding: "0 12px", fontSize: 12, borderColor: "#E5DDE1", color: "#6E646A" }}>링크 취소</button>
+                          <button disabled={isPending || past} onClick={() => onCopyLink(l.url)} style={{ ...outlineBtn, height: 32, padding: "0 12px", fontSize: 12, ...(past ? lockedBtn : null) }}>링크 복사</button>
+                          <button disabled={isPending || past} onClick={() => onCancelLink(l.id)} style={{ ...outlineBtn, height: 32, padding: "0 12px", fontSize: 12, borderColor: "#E5DDE1", color: "#6E646A", ...(past ? lockedBtn : null) }}>링크 취소</button>
                         </div>
                       )}
                     </div>
@@ -583,7 +609,7 @@ export default function ReservationDetail({
         {/* 예약 취소 */}
         {!isCancelled && (
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button disabled={isPending} onClick={openCancel} style={{ ...outlineBtn, borderColor: "#E3B4B4", color: "#B04A4A" }}>
+            <button disabled={isPending || past} onClick={openCancel} title={past ? "예식 일시가 지난 예약은 취소할 수 없습니다." : undefined} style={{ ...outlineBtn, borderColor: "#E3B4B4", color: "#B04A4A", ...(past ? lockedBtn : null) }}>
               예약 취소
             </button>
           </div>
