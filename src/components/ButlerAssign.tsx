@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { assignButler, getAssignment, unassignButler } from "@/lib/assignActions";
-import type { AssignmentView } from "@/lib/assign";
+import type { AssignedView, AssignmentView } from "@/lib/assign";
 import { updateShiftGrade } from "@/lib/financeActions";
-import { BUTLER_GRADES, shiftTotal, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, OWNER_HEADCOUNT, OWNER_SPLIT, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 import { won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
 
@@ -35,7 +35,13 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
   const sel = free.find((b) => b.id === pick) ?? free[0];
   const grade = pickGrade || sel?.grade || "staff";
   const full = assigned.length >= required;
-  const total = assigned.reduce((a, s) => a + shiftTotal(s), 0);
+  // 오너 등급은 버틀러 관리의 오너 배분과 같은 규칙: 이 예약 1건 = 1인 기본금 × 2명을 이강 49 : 최소연 51로 나눈다
+  const { pool } = ownerPool(assigned.map((a) => ({ rid: reservationId, grade: a.grade, pay: a.pay })));
+  const split = splitOwnerPay(pool);
+  const ownerShare = (name: string): number | null => (name === "이강" || name === "최소연" ? split[name] : null);
+  const amountOf = (a: AssignedView): number => (a.grade === "owner" ? ownerShare(a.name) ?? a.pay : a.pay) + a.extra;
+  const total = assigned.filter((a) => a.grade !== "owner").reduce((sum, a) => sum + shiftTotal(a), 0)
+    + pool + assigned.filter((a) => a.grade === "owner").reduce((sum, a) => sum + a.extra, 0);
 
   return (
     <section style={card}>
@@ -65,7 +71,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
                 {GRADES.map((g) => <option key={g} value={g}>{BUTLER_GRADES[g].label}</option>)}
               </select>
               <span style={{ fontSize: 13, color: "#6E646A", fontVariantNumeric: "tabular-nums" }}>
-                {won(shiftTotal(a))}{a.extra ? ` (스페셜 차지 ${won(a.extra)} 포함)` : ""}
+                {won(amountOf(a))}{a.grade === "owner" && ownerShare(a.name) !== null ? ` (오너 배분 ${OWNER_SPLIT[a.name as keyof typeof OWNER_SPLIT]}%)` : ""}{a.extra ? ` (스페셜 차지 ${won(a.extra)} 포함)` : ""}
               </span>
               {a.paid && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#2B6A45", background: "#E3F1E8", padding: "2px 9px", borderRadius: 99 }}>지급 완료</span>}
               <span style={{ flex: 1 }} />
@@ -74,6 +80,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
             </div>
           ))}
           {assigned.length > 0 && <div style={{ padding: "10px 0 0", fontSize: 13, color: "#6E646A" }}>정산 예정 합계 <b style={{ color: "#B0567E" }}>{won(total)}</b></div>}
+          {pool > 0 && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#A79BA1" }}>오너 버틀러는 버틀러 관리의 오너 배분 규칙대로 이 예약 1건을 {won(pool / OWNER_HEADCOUNT)} × {OWNER_HEADCOUNT}명 = {won(pool)}으로 보고 이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}로 나눈 금액입니다 (이강 {won(split.이강)} · 최소연 {won(split.최소연)}).</p>}
 
           {cancelled ? (
             <p style={{ margin: "12px 0 0", fontSize: 12.5, color: "#8C8188" }}>취소된 예약에는 새로 배정할 수 없습니다. 배정되어 있던 버틀러는 위에서 해제해 주세요.</p>
