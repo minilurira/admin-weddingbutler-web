@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, addCost, addShift, deleteButler, deleteCost, setCostPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
+  addButler, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
@@ -38,6 +38,8 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const [recon, setRecon] = useState<ReconcileResult | null>(null);
   const [reconMonth, setReconMonth] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
+  const [selCost, setSelCost] = useState<string[]>([]); // 합계로 지급할 비용 id
+  const [payDate, setPayDate] = useState(data.today);
   const [hideTest, setHideTest] = useState(true); // 테스트 거래([TEST]·1,000원 이하)는 기본으로 숨긴다
 
   /** 선택한 달(접수일 기준)의 결제를 포트원과 맞춰 본다. 읽기 전용이라 언제 눌러도 안전하다. */
@@ -246,7 +248,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                                   <input className="cell" type="date" key={`${x.id}:${month}:${x.payments[month]}`} defaultValue={x.payments[month]} aria-label="실제 지급일" style={{ width: "auto" }}
                                     onBlur={(e) => { if (e.target.value && e.target.value !== x.payments[month]) run(() => setCostPaid(x.id, month, true, e.target.value), "지급일을 저장했습니다."); }} />{" "}
                                   <button type="button" className="del" onClick={() => run(() => setCostPaid(x.id, month, false), "지급 완료를 취소했습니다.")}>취소</button></>
-                              : <><span className="pill warn">미지급</span>{" "}
+                              : <><input type="checkbox" aria-label={`${x.name} 선택`} checked={selCost.includes(x.id)} onChange={(e) => setSelCost((p) => (e.target.checked ? [...p, x.id] : p.filter((i) => i !== x.id)))} />{" "}<span className="pill warn">미지급</span>{" "}
                                   <button type="button" className="btn" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => run(() => setCostPaid(x.id, month, true), "지급 완료로 처리하고 오늘 날짜를 기록했습니다.")}>지급 완료 처리</button></>}
                           </td>
                           <td className="r"><button type="button" className="del" onClick={() => run(() => deleteCost(x.id), "삭제했습니다.")}>삭제</button></td>
@@ -259,6 +261,23 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               );
             })}
           </div>
+          {(() => {
+            const open = costs.filter((x) => !x.payments[month] && (x.kind === "monthly" ? x.date.slice(0, 7) <= month : inMonth(x.date)));
+            const ids = open.map((x) => x.id), picked = open.filter((x) => selCost.includes(x.id));
+            const sum = picked.reduce((a, x) => a + x.amount, 0);
+            return (
+              <div className="box"><h2>합계로 지급 <small className="sub">{yy}년 {Number(mm)}월 미지급 {won(open.reduce((a, x) => a + x.amount, 0))} ({open.length}건)</small></h2>
+                <div className="inline">
+                  <button type="button" className="btn" disabled={!open.length} onClick={() => setSelCost(picked.length === open.length ? [] : ids)}>{picked.length === open.length && open.length ? "선택 해제" : "미지급 전체 선택"}</button>
+                  <div className="field"><label htmlFor="payDate">실제 지급일</label><input id="payDate" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></div>
+                  <div style={{ flex: 1, minWidth: 180 }}><small className="sub">선택 {picked.length}건 총액</small><br /><b className="num" style={{ fontSize: 20 }}>{won(sum)}</b></div>
+                  <button type="button" className="btn" disabled={!picked.length || !payDate}
+                    onClick={() => { if (window.confirm(`선택한 ${picked.length}건, 총 ${won(sum)}을 ${payDate}에 지급한 것으로 기록할까요?`)) { run(() => setCostsPaid(picked.map((x) => x.id), month, payDate), "지급 완료로 기록했습니다."); setSelCost([]); } }}>선택 항목 지급 완료 처리</button>
+                </div>
+                <p className="note">위 표에서 지급할 비용의 체크박스를 고르거나 &quot;미지급 전체 선택&quot;을 누르면 총액이 계산됩니다. 한 번에 입금한 날짜를 정해 &quot;지급 완료 처리&quot;하면 선택한 비용에 같은 지급일이 기록됩니다.</p>
+              </div>
+            );
+          })()}
           <div className="box"><h2>이번 달 비용 한눈에</h2>
             <div className="legend">
               <span style={{ ["--c" as string]: "var(--accent)" }}>월 비용 <b className="num">{won(monthly)}</b></span>

@@ -55,6 +55,22 @@ export async function setCostPaid(id: string, month: string, paid: boolean, date
   done();
 }
 
+/** 여러 비용을 한 번에(합계로) 지급했다고 기록한다. 같은 지급일이 모두에게 들어간다. */
+export async function setCostsPaid(ids: string[], month: string, date: string) {
+  await guard();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("대상 월을 확인해 주세요.");
+  if (!isDate(date)) throw new Error("지급일을 확인해 주세요.");
+  if (!ids.length || ids.length > 500) throw new Error("지급할 비용을 선택해 주세요.");
+  const costs = await prisma.financeCost.findMany({ where: { id: { in: ids } } });
+  for (const c of costs) {
+    let map: Record<string, string> = {};
+    try { map = JSON.parse(c.payments) ?? {}; } catch { /* 깨진 값은 비우고 다시 쓴다 */ }
+    map[month] = date;
+    await prisma.financeCost.update({ where: { id: c.id }, data: { payments: JSON.stringify(map) } });
+  }
+  done();
+}
+
 export async function deleteCost(id: string) {
   await guard();
   await prisma.financeCost.deleteMany({ where: { id } });
