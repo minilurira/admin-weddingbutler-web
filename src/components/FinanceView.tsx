@@ -368,7 +368,11 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                       <td className="r"><input className="cell num" key={`${s.id}:x${s.extra}`} inputMode="numeric" defaultValue={s.extra || ""} placeholder="0" aria-label="스페셜 차지"
                         onBlur={(e) => { const v = toInt(e.target.value); if (v !== s.extra) run(() => updateShiftExtra(s.id, v)); }} /></td>
                       <td className="r num"><b>{won(shiftTotal(s))}</b></td>
-                      <td><button type="button" className={`pill ${s.paid ? "good" : "warn"}`} onClick={() => run(() => setShiftPaid(s.id, !s.paid), s.paid ? undefined : "입금 완료로 처리하고 오늘 날짜를 기록했습니다.")}>{s.paid ? "입금 완료" : "미지급"}</button></td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <span className={`pill ${s.paid ? "good" : "warn"}`}>{s.paid ? "지급 완료" : "미지급"}</span>{" "}
+                        <button type="button" className="btn" style={{ padding: "5px 10px", fontSize: 12.5 }}
+                          onClick={() => run(() => setShiftPaid(s.id, !s.paid), s.paid ? "지급 완료를 취소했습니다." : "지급 완료로 처리하고 오늘 날짜를 기록했습니다.")}>{s.paid ? "지급 취소" : "지급 완료 처리"}</button>
+                      </td>
                       <td>{s.paid ? <input className="cell" type="date" key={`${s.id}:${s.paidDate}`} defaultValue={s.paidDate} aria-label="실제 입금일" style={{ width: "auto" }}
                         onBlur={(e) => { if (e.target.value && e.target.value !== s.paidDate) run(() => setShiftPaid(s.id, true, e.target.value), "입금일을 저장했습니다."); }} /> : <small className="sub">-</small>}</td>
                       <td className="r"><button type="button" className="del" onClick={() => run(() => deleteShift(s.id), "삭제했습니다.")}>삭제</button></td>
@@ -378,7 +382,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               </tbody>
               <tfoot><tr><td colSpan={4}>합계</td><td className="r num">{won(ms.reduce((a, s) => a + s.pay, 0))}</td><td className="r num">{won(ms.reduce((a, s) => a + s.extra, 0))}</td><td className="r num">{won(pay)}</td><td colSpan={3} /></tr></tfoot>
             </table></div>
-            <p className="note">버틀러에게 실제로 입금한 뒤 &quot;미지급&quot;을 누르면 &quot;입금 완료&quot;로 바뀌고 오늘 날짜가 기록됩니다. 다른 날 입금했다면 실제 입금일 칸에서 날짜를 고치세요. 등급을 바꾸면 기본 정산금이 그 등급 금액으로 다시 맞춰지고, 기본 정산금이나 스페셜 차지를 고치면 합계가 바로 갱신됩니다.</p>
+            <p className="note">버틀러에게 실제로 입금한 뒤 &quot;지급 완료 처리&quot; 버튼을 누르면 &quot;지급 완료&quot;로 바뀌고 오늘 날짜가 기록됩니다. 잘못 눌렀다면 &quot;지급 취소&quot;로 되돌릴 수 있습니다. 다른 날 입금했다면 실제 입금일 칸에서 날짜를 고치세요. 등급을 바꾸면 기본 정산금이 그 등급 금액으로 다시 맞춰지고, 기본 정산금이나 스페셜 차지를 고치면 합계가 바로 갱신됩니다.</p>
           </div>
         </section>
       )}
