@@ -18,6 +18,8 @@ export interface SendLinkOptions {
   amount: number;
   paymentType: string;
   days: number;
+  /** true면 예식 후 추가 하객 차액 청구 링크 (주문번호 끝이 -X, 결제창 이름에 "추가 하객 차액") */
+  extraGuests?: boolean;
 }
 
 export type SendLinkResult = { ok: true; message: string } | { ok: false; message: string };
@@ -31,14 +33,14 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   const expiresAt = expiryAfterDays(days);
 
   const seq = (await prisma.paymentLink.count({ where: { reservationId: r.id } })) + 1;
-  const merchantUid = `${r.id}-L${seq}`;
+  const merchantUid = `${r.id}-${opts.extraGuests ? "X" : "L"}${seq}`;
   const plan = r.confirmPlan || r.requestedPlan;
 
   let url: string;
   try {
     url = await createPaymentLink({
       merchantUid,
-      name: `웨딩버틀러 ${plan}`,
+      name: opts.extraGuests ? `웨딩버틀러 ${plan} 추가 하객 차액` : `웨딩버틀러 ${plan}`,
       amount,
       buyerName: r.customer,
       buyerTel: r.phone,

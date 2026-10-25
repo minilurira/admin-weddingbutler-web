@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, addCost, addShift, deleteButler, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
+  addButler, addCost, addShift, deleteButler, deleteCost, setCostPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
@@ -13,7 +13,7 @@ export interface FinanceData {
   today: string;
   settings: { feeRate: number; bankDate: string; bankBalance: number };
   reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
-  costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string }[];
+  costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string; payments: Record<string, string> }[];
   butlers: { id: string; name: string; grade: string }[];
   shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
 }
@@ -232,19 +232,28 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                 <div className="box" key={kind}>
                   <h2>{kind === "monthly" ? "월 비용" : "일회성 비용"} <small className="sub">{kind === "monthly" ? "매달 반복" : `${yy}년 ${Number(mm)}월`}</small></h2>
                   <div className="scroll"><table style={{ minWidth: 420 }}>
-                    <thead><tr><th>항목</th><th className="r">금액</th><th>{kind === "monthly" ? "시작월" : "날짜"}</th><th /></tr></thead>
+                    <thead><tr><th>항목</th><th className="r">금액</th><th>{kind === "monthly" ? "시작월" : "날짜"}</th><th>{Number(mm)}월 지급</th><th /></tr></thead>
                     <tbody>
-                      {items.length === 0 && <tr><td colSpan={4} className="empty">등록된 비용이 없습니다.</td></tr>}
+                      {items.length === 0 && <tr><td colSpan={5} className="empty">등록된 비용이 없습니다.</td></tr>}
                       {items.map((x) => (
                         <tr key={x.id}>
                           <td>{x.name}{x.memo && <><br /><small className="sub">{x.memo}</small></>}</td>
                           <td className="r num">{won(x.amount)}</td>
                           <td className="num">{kind === "monthly" ? x.date.slice(0, 7) : md(x.date)}</td>
+                          <td style={{ whiteSpace: "nowrap" }}>
+                            {x.payments[month]
+                              ? <><span className="pill good">지급 완료</span>{" "}
+                                  <input className="cell" type="date" key={`${x.id}:${month}:${x.payments[month]}`} defaultValue={x.payments[month]} aria-label="실제 지급일" style={{ width: "auto" }}
+                                    onBlur={(e) => { if (e.target.value && e.target.value !== x.payments[month]) run(() => setCostPaid(x.id, month, true, e.target.value), "지급일을 저장했습니다."); }} />{" "}
+                                  <button type="button" className="del" onClick={() => run(() => setCostPaid(x.id, month, false), "지급 완료를 취소했습니다.")}>취소</button></>
+                              : <><span className="pill warn">미지급</span>{" "}
+                                  <button type="button" className="btn" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => run(() => setCostPaid(x.id, month, true), "지급 완료로 처리하고 오늘 날짜를 기록했습니다.")}>지급 완료 처리</button></>}
+                          </td>
                           <td className="r"><button type="button" className="del" onClick={() => run(() => deleteCost(x.id), "삭제했습니다.")}>삭제</button></td>
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot><tr><td>소계</td><td className="r num">{won(items.reduce((s, x) => s + x.amount, 0))}</td><td colSpan={2} /></tr></tfoot>
+                    <tfoot><tr><td>소계</td><td className="r num">{won(items.reduce((s, x) => s + x.amount, 0))}</td><td colSpan={3}><small className="sub">지급 완료 {won(items.filter((x) => x.payments[month]).reduce((s, x) => s + x.amount, 0))} · 미지급 {won(items.filter((x) => !x.payments[month]).reduce((s, x) => s + x.amount, 0))}</small></td></tr></tfoot>
                   </table></div>
                 </div>
               );

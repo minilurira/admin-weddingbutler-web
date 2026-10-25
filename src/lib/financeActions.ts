@@ -40,6 +40,21 @@ export async function addCost(input: { name: string; amount: number; kind: strin
   done();
 }
 
+/** 비용을 실제로 통장에서 지급했다고 기록한다(month = 지급 대상 달 "YYYY-MM"). paid=false면 그 달 기록을 지운다. 날짜를 안 주면 오늘(한국시간). */
+export async function setCostPaid(id: string, month: string, paid: boolean, date?: string) {
+  await guard();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("대상 월을 확인해 주세요.");
+  if (date !== undefined && !isDate(date)) throw new Error("지급일을 확인해 주세요.");
+  const cost = await prisma.financeCost.findUnique({ where: { id } });
+  if (!cost) throw new Error("비용을 찾을 수 없습니다.");
+  let map: Record<string, string> = {};
+  try { map = JSON.parse(cost.payments) ?? {}; } catch { /* 깨진 값은 비우고 다시 쓴다 */ }
+  if (paid) map[month] = date ?? new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  else delete map[month];
+  await prisma.financeCost.update({ where: { id }, data: { payments: JSON.stringify(map) } });
+  done();
+}
+
 export async function deleteCost(id: string) {
   await guard();
   await prisma.financeCost.deleteMany({ where: { id } });

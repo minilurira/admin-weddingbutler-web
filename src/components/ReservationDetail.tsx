@@ -1,6 +1,7 @@
 "use client";
 
 import ButlerAssign from "./ButlerAssign";
+import ExtraGuestClaim from "./ExtraGuestClaim";
 import MessageHistory from "./MessageHistory";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
@@ -486,6 +487,9 @@ export default function ReservationDetail({
 
         {/* 버틀러 배정: 필요한 인원만큼 실제 버틀러를 정한다 */}
         <ButlerAssign reservationId={reservation.id} required={parsedFields.butlers} cancelled={isCancelled} card={card} />
+
+        {/* 예식 후 추가 하객 차액 청구 */}
+        {!isCancelled && <ExtraGuestClaim reservationId={reservation.id} card={card} />}
 
         {/* 알림톡 발송 내역과 내용 */}
         <MessageHistory reservationId={reservation.id} card={card} legacyLabel={reservation.alimtalkLabel} />

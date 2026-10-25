@@ -149,3 +149,13 @@ export function confirmTotalOf(r: PricedReservation): number {
 export function planBaseOf(r: { confirmPlan: string; requestedTotal: number }): number {
   return r.confirmPlan === SPECIAL_PLAN ? r.requestedTotal : planMeta(r.confirmPlan).base;
 }
+
+/**
+ * 예식 후 추가 하객 차액: 실제 접수 인원이 기준 하객을 넘은 만큼의 추가 요금에서, 예약 때 이미 청구한 추가 하객(확정 내역)과
+ * 이미 결제된 차액을 뺀 금액. 음수면 청구할 차액이 없다(환불은 하지 않는다).
+ */
+export function extraGuestDue(input: { actualGuests: number; guestLimit: number; billedExtraGuests: number; paidClaim: number }): { actualExtra: number; amount: number } {
+  const actualExtra = Math.max(0, Math.floor(input.actualGuests) - input.guestLimit);
+  const amount = (actualExtra - input.billedExtraGuests) * EXTRA_GUEST_FEE - input.paidClaim;
+  return { actualExtra, amount: Math.max(0, amount) };
+}

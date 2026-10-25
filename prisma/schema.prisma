@@ -172,6 +172,8 @@ model FinanceCost {
   kind      String
   date      String
   memo      String   @default("")
+  // 실제로 통장에서 지급한 달별 기록. JSON {"YYYY-MM": "지급일 YYYY-MM-DD"} (월 비용은 달마다, 일회성은 그 달 한 번)
+  payments  String   @default("{}")
   createdAt DateTime @default(now())
 }
 

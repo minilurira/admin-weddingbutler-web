@@ -5,6 +5,13 @@ import type { FinanceData } from "@/components/FinanceView";
 
 const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
+function parsePayments(raw: string): Record<string, string> {
+  try {
+    const o = JSON.parse(raw);
+    return o && typeof o === "object" ? Object.fromEntries(Object.entries(o).filter(([k, v]) => /^\d{4}-\d{2}$/.test(k) && typeof v === "string")) as Record<string, string> : {};
+  } catch { return {}; }
+}
+
 /** 손익관리·버틀러 관리 두 화면이 함께 쓰는 데이터 */
 export async function loadFinanceData(): Promise<FinanceData> {
   await ensureFinanceTables();
@@ -30,7 +37,7 @@ export async function loadFinanceData(): Promise<FinanceData> {
       paidDate: new Date(r.requestedAt.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10), // 접수(결제) 날짜, 한국시간
       cash: cashMap.get(r.id) ?? null,
     })),
-    costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo })),
+    costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo, payments: parsePayments(c.payments) })),
     butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade })),
     shifts: shifts.map((s) => ({ id: s.id, butlerId: s.butlerId, date: s.date, rid: s.reservationId, grade: s.grade, pay: s.pay, extra: s.extra, paid: s.paid, paidDate: s.paidDate })),
   };
