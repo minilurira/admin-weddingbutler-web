@@ -52,3 +52,15 @@ export function splitOwnerPay(pool: number): { 이강: number; 최소연: number
   const 이강 = Math.round((pool * OWNER_SPLIT.이강) / 100);
   return { 이강, 최소연: pool - 이강 };
 }
+
+/**
+ * 오너 정산금 배분 대상 합계. 오너 등급 기록이 있는 예약마다 한 번, 1인 기본 정산금 × 2명으로 센다.
+ * 두 대표를 한 예약에 각각 배정해 오너 기록이 2개여도 그 예약은 한 번만 들어간다.
+ */
+export function ownerPool(shifts: readonly { rid: string; grade: string; pay: number }[]): { count: number; pool: number } {
+  const per = new Map<string, number>();
+  for (const s of shifts) if (s.grade === "owner") per.set(s.rid, Math.max(per.get(s.rid) ?? 0, s.pay));
+  let pool = 0;
+  per.forEach((pay) => { pool += pay * OWNER_HEADCOUNT; });
+  return { count: per.size, pool };
+}

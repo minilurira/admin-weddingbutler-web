@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { addBusinessDays, cardFee, gradePay, shiftTotal, splitOwnerPay } from "./financeCalc";
+import { addBusinessDays, cardFee, gradePay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -16,4 +16,8 @@ assert.deepEqual(splitOwnerPay(300000), { 이강: 147000, 최소연: 153000 }); 
 assert.deepEqual(splitOwnerPay(300000), { 이강: 147000, 최소연: 153000 });
 const odd = splitOwnerPay(150001); assert.equal(odd.이강 + odd.최소연, 150001); // 반올림해도 합이 맞는다
 assert.deepEqual(splitOwnerPay(0), { 이강: 0, 최소연: 0 });
+const both = [{ rid: "r1", grade: "owner", pay: 150000 }, { rid: "r1", grade: "owner", pay: 150000 }];
+assert.deepEqual(ownerPool(both), { count: 1, pool: 300000 });            // 두 대표를 각각 배정해도 한 건 = 300,000
+assert.deepEqual(ownerPool([{ rid: "r2", grade: "owner", pay: 150000 }]), { count: 1, pool: 300000 }); // 한 분만 배정돼도 건당 300,000
+assert.deepEqual(ownerPool([...both, { rid: "r2", grade: "owner", pay: 150000 }, { rid: "r3", grade: "staff", pay: 75000 }]), { count: 2, pool: 600000 });
 console.log("financeCalc: all checks passed");
