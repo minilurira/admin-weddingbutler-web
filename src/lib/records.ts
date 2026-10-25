@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import type { RecordEntry, RecordLink, Reservation } from "@prisma/client";
-import { EXTRA_GUEST_FEE, planMeta } from "@/lib/pricing";
+import { EXTRA_GUEST_FEE, guestLimitAt, planMeta } from "@/lib/pricing";
 
 // 고객 축의 기록 공용 로직 (서버 전용). 홈페이지 /r/[token]이 /api/public/records/* 로 읽어 간다.
 
@@ -117,7 +117,7 @@ export function buildRecordPayload(link: RecordLink & { reservation: Reservation
       staffCount: link.staffCount || r.confirmButlers,
       version: Math.max(1, link.version),
       expiresAt: (link.expiresAt ?? addDays(publishedAt, RETENTION_DAYS)).toISOString(),
-      baseGuests: meta.guestLimit,
+      baseGuests: guestLimitAt(meta, r.createdAt),
       extraGuestFee: EXTRA_GUEST_FEE,
       ...(link.videoUrl ? { videoUrl: link.videoUrl } : {}),
     },
