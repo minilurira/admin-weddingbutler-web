@@ -43,6 +43,8 @@ export const gradePay = (grade: string): number => BUTLER_GRADES[isButlerGrade(g
 export const shiftTotal = (s: { pay: number; extra: number }): number => s.pay + s.extra;
 
 /** 오너 버틀러 정산금을 두 대표가 나누는 비율 (%). 합이 100이어야 한다. */
+/** 오너 등급 한 건은 두 대표가 함께 하는 것으로 보아, 건당 정산금 × 2명이 배분 대상이다. */
+export const OWNER_HEADCOUNT = 2;
 export const OWNER_SPLIT = { 이강: 49, 최소연: 51 } as const;
 
 /** 오너 정산금 합계를 이강:최소연 = 49:51로 나눈다. 이강 몫을 원 단위로 반올림하고 나머지를 최소연 몫으로 해서 합이 항상 정확히 맞는다. */
