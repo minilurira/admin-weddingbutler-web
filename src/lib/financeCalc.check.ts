@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { addBusinessDays, cardFee, gradePay, shiftTotal } from "./financeCalc";
+import { addBusinessDays, cardFee, gradePay, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -12,4 +12,8 @@ assert.equal(gradePay("manager"), 95000); // 매니저 버틀러
 assert.equal(gradePay("owner"), 150000);  // 오너 버틀러 (이강, 최소연)
 assert.equal(gradePay("???"), 75000);     // 모르는 등급은 스태프
 assert.equal(shiftTotal({ pay: 150000, extra: 30000 }), 180000); // 스페셜 차지는 기본 정산금에 더해진다
+assert.deepEqual(splitOwnerPay(150000), { 이강: 73500, 최소연: 76500 });   // 한 건 150,000원 → 49:51
+assert.deepEqual(splitOwnerPay(300000), { 이강: 147000, 최소연: 153000 });
+const odd = splitOwnerPay(150001); assert.equal(odd.이강 + odd.최소연, 150001); // 반올림해도 합이 맞는다
+assert.deepEqual(splitOwnerPay(0), { 이강: 0, 최소연: 0 });
 console.log("financeCalc: all checks passed");

@@ -41,3 +41,12 @@ export const isButlerGrade = (v: unknown): v is ButlerGrade => typeof v === "str
 export const gradePay = (grade: string): number => BUTLER_GRADES[isButlerGrade(grade) ? grade : "staff"].pay;
 /** 한 건의 정산 합계 = 기본 정산금 + 스페셜 차지(오너가 추가로 지급하는 돈) */
 export const shiftTotal = (s: { pay: number; extra: number }): number => s.pay + s.extra;
+
+/** 오너 버틀러 정산금을 두 대표가 나누는 비율 (%). 합이 100이어야 한다. */
+export const OWNER_SPLIT = { 이강: 49, 최소연: 51 } as const;
+
+/** 오너 정산금 합계를 이강:최소연 = 49:51로 나눈다. 이강 몫을 원 단위로 반올림하고 나머지를 최소연 몫으로 해서 합이 항상 정확히 맞는다. */
+export function splitOwnerPay(pool: number): { 이강: number; 최소연: number } {
+  const 이강 = Math.round((pool * OWNER_SPLIT.이강) / 100);
+  return { 이강, 최소연: pool - 이강 };
+}

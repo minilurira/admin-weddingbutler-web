@@ -7,7 +7,7 @@ import {
   addButler, addCost, addShift, deleteButler, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
-import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, addBusinessDays, cardFee, gradePay, shiftTotal, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_SPLIT, addBusinessDays, cardFee, gradePay, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
@@ -304,6 +304,25 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
             </form>
             <p className="note">등급은 버틀러가 아니라 <b>참석할 때마다</b> 정합니다. 건당 기본 정산금: 스태프 {won(BUTLER_GRADES.staff.pay)} · 매니저 {won(BUTLER_GRADES.manager.pay)} · 오너 {won(BUTLER_GRADES.owner.pay)}. 스페셜 차지는 오너가 기본 정산금 외에 추가로 지급하는 돈으로, 기록마다 따로 입력합니다.</p>
           </div>
+          {(() => {
+            // 오너 등급 참석의 기본 정산금 합계를 이강 49 : 최소연 51로 나눈다 (누가 참석했는지와 무관, 스페셜 차지는 제외)
+            const ownerMonth = ms.filter((s) => s.grade === "owner"), ownerAll = shifts.filter((s) => s.grade === "owner");
+            const poolM = ownerMonth.reduce((a, s) => a + s.pay, 0), poolA = ownerAll.reduce((a, s) => a + s.pay, 0);
+            const m = splitOwnerPay(poolM), t = splitOwnerPay(poolA);
+            return (
+              <div className="box"><h2>오너 버틀러 배분 <small className="sub">이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}</small></h2>
+                <div className="scroll"><table style={{ minWidth: 520 }}>
+                  <thead><tr><th>구분</th><th className="r">{Number(mm)}월</th><th className="r">전체 기간</th></tr></thead>
+                  <tbody>
+                    <tr><td>오너 정산금 합계 <small className="sub">오너 등급 {ownerMonth.length}회 · 전체 {ownerAll.length}회</small></td><td className="r num">{won(poolM)}</td><td className="r num">{won(poolA)}</td></tr>
+                    <tr><td><b>이강</b> <small className="sub">{OWNER_SPLIT.이강}%</small></td><td className="r num"><b>{won(m.이강)}</b></td><td className="r num"><b>{won(t.이강)}</b></td></tr>
+                    <tr><td><b>최소연</b> <small className="sub">{OWNER_SPLIT.최소연}%</small></td><td className="r num"><b>{won(m.최소연)}</b></td><td className="r num"><b>{won(t.최소연)}</b></td></tr>
+                  </tbody>
+                </table></div>
+                <p className="note">오너 등급으로 기록된 참석의 기본 정산금(건당 {won(BUTLER_GRADES.owner.pay)}) 합계를 두 분이 {OWNER_SPLIT.이강}:{OWNER_SPLIT.최소연}로 나눈 금액입니다. 실제로 누가 참석했는지와 관계없이 계산하고, 스페셜 차지(오너가 추가로 지급하는 돈)는 포함하지 않습니다. 위의 버틀러 리스트와 비용 합계는 기록한 그대로이며 이 배분으로 바뀌지 않습니다.</p>
+              </div>
+            );
+          })()}
           <div className="box"><h2>참석·정산 기록 입력</h2>
             {butlers.length === 0 || reservations.length === 0 ? (
               <p className="empty">버틀러와 확정된 예약이 모두 있어야 기록할 수 있습니다.</p>
