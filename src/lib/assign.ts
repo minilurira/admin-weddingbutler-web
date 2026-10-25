@@ -76,7 +76,7 @@ export async function createAssignment(reservationId: string, butlerId: string, 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.confirmDate)) throw new Error("예식 날짜가 정해진 뒤에 배정할 수 있습니다.");
   if (!butler) throw new Error("버틀러를 찾을 수 없습니다.");
   if (existing) throw new Error(`${butler.name} 님은 이미 이 예약에 배정되어 있습니다.`);
-  await prisma.butlerShift.create({ data: { butlerId, reservationId, date: r.confirmDate, grade, pay: gradePay(grade) } });
+  await prisma.butlerShift.create({ data: { butlerId, reservationId, date: r.confirmDate, grade, pay: gradePay(grade, butler.name) } });
 }
 
 /** 배정을 해제한다. 이미 지급 완료로 표시된 기록은 버틀러 관리에서 직접 처리해야 한다. */

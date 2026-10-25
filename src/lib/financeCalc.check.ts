@@ -23,4 +23,8 @@ assert.deepEqual(ownerPool([...both, { rid: "r2", grade: "owner", pay: 150000 },
 assert.deepEqual(ownerPool([{ rid: "r1", grade: "owner", pay: 147000 }, { rid: "r1", grade: "owner", pay: 153000 }]), { count: 1, pool: 300000 }); // 49:51 두 줄도 한 건 = 300,000
 assert.equal(ownerPay("이강"), 147000);
 assert.equal(ownerPay("최소연"), 153000);
+assert.equal(gradePay("owner", "이강"), 147000);
+assert.equal(gradePay("owner", "최소연"), 153000);
+assert.equal(gradePay("owner", "다른사람"), 150000);
+assert.equal(gradePay("staff", "이강"), 75000);
 console.log("financeCalc: all checks passed");

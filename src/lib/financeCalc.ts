@@ -37,8 +37,9 @@ export const BUTLER_GRADES = {
 export type ButlerGrade = keyof typeof BUTLER_GRADES;
 
 export const isButlerGrade = (v: unknown): v is ButlerGrade => typeof v === "string" && v in BUTLER_GRADES;
-/** 등급의 건당 기본 정산금 (알 수 없는 등급은 스태프로 본다) */
-export const gradePay = (grade: string): number => BUTLER_GRADES[isButlerGrade(grade) ? grade : "staff"].pay;
+/** 등급의 건당 기본 정산금 (알 수 없는 등급은 스태프로 본다). 오너 등급은 이강 147,000 / 최소연 153,000, 그 밖의 이름은 150,000. */
+export const gradePay = (grade: string, name?: string): number =>
+  grade === "owner" && (name === "이강" || name === "최소연") ? ownerPay(name) : BUTLER_GRADES[isButlerGrade(grade) ? grade : "staff"].pay;
 /** 한 건의 정산 합계 = 기본 정산금 + 스페셜 차지(오너가 추가로 지급하는 돈) */
 export const shiftTotal = (s: { pay: number; extra: number }): number => s.pay + s.extra;
 

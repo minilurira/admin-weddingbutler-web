@@ -319,7 +319,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                     <tr><td><b>최소연</b> <small className="sub">{OWNER_SPLIT.최소연}%</small></td><td className="r num"><b>{won(m.최소연)}</b></td><td className="r num"><b>{won(t.최소연)}</b></td></tr>
                   </tbody>
                 </table></div>
-                <p className="note">오너 등급 참석이 있는 예약마다 기본 정산금(1인 {won(BUTLER_GRADES.owner.pay)} × {OWNER_HEADCOUNT}명 = 건당 {won(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)}) 을 더해 두 분이 {OWNER_SPLIT.이강}:{OWNER_SPLIT.최소연}로 나눈 금액입니다. 오너 등급으로 참석을 기록하면 이강 {won(ownerPay("이강"))}, 최소연 {won(ownerPay("최소연"))} 두 줄이 한 번에 만들어집니다. 실제로 누가 참석했는지와 관계없이 계산하고, 스페셜 차지(오너가 추가로 지급하는 돈)는 포함하지 않습니다. 위의 버틀러 리스트와 비용 합계는 기록한 그대로이며 이 배분으로 바뀌지 않습니다.</p>
+                <p className="note">오너 등급 참석이 있는 예약마다 기본 정산금(1인 {won(BUTLER_GRADES.owner.pay)} × {OWNER_HEADCOUNT}명 = 건당 {won(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)}) 을 더해 두 분이 {OWNER_SPLIT.이강}:{OWNER_SPLIT.최소연}로 나눈 금액입니다. 오너 등급 기본 정산금은 이강 {won(ownerPay("이강"))}, 최소연 {won(ownerPay("최소연"))}입니다. 실제로 누가 참석했는지와 관계없이 계산하고, 스페셜 차지(오너가 추가로 지급하는 돈)는 포함하지 않습니다. 위의 버틀러 리스트와 비용 합계는 기록한 그대로이며 이 배분으로 바뀌지 않습니다.</p>
               </div>
             );
           })()}
@@ -338,7 +338,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                   <select id="sGrade" value={sgGrade} onChange={(e) => setSGrade(e.target.value)}>
                     {(Object.keys(BUTLER_GRADES) as ButlerGrade[]).map((g) => <option key={g} value={g}>{BUTLER_GRADES[g].label} · {won(BUTLER_GRADES[g].pay)}</option>)}
                   </select></div>
-                <div className="field"><label htmlFor="sPay">기본 정산금(원)</label><input id="sPay" name="pay" inputMode="numeric" placeholder={`${gradePay(sgGrade).toLocaleString("ko-KR")} (등급 기본)`} /></div>
+                <div className="field"><label htmlFor="sPay">기본 정산금(원)</label><input id="sPay" name="pay" inputMode="numeric" placeholder={`${gradePay(sgGrade, bName(sbId)).toLocaleString("ko-KR")} (등급 기본)`} /></div>
                 <div className="field"><label htmlFor="sExtra">스페셜 차지(원)</label><input id="sExtra" name="extra" inputMode="numeric" placeholder="없으면 비워 두세요" /></div>
                 <button className="btn" type="submit">기록 추가</button>
               </form>

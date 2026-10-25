@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, type ReconcileResult } from "@/lib/finance";
 import { homepageUrl } from "@/lib/records";
-import { OWNER_SPLIT, gradePay, isButlerGrade, ownerPay } from "@/lib/financeCalc";
+import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 
 async function guard() {
   const session = await getServerSession(authOptions);
@@ -72,29 +72,13 @@ export async function addShift(input: { butlerId: string; date: string; reservat
   const grade = input.grade === undefined ? butler.grade : input.grade;
   if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
   if (!reservation) throw new Error("예약을 찾을 수 없습니다.");
-  // 오너 등급 참석은 두 대표가 함께 하므로 이강(147,000)·최소연(153,000) 기록을 한 번에 만든다 (이미 있는 사람은 건너뜀)
-  if (grade === "owner" && input.pay == null) {
-    const owners = await prisma.butler.findMany({ where: { name: { in: Object.keys(OWNER_SPLIT) } } });
-    if (owners.length) {
-      const have = new Set((await prisma.butlerShift.findMany({ where: { reservationId: reservation.id, grade: "owner" }, select: { butlerId: true } })).map((s) => s.butlerId));
-      const extraTo = owners.some((o) => o.id === butler.id) ? butler.id : owners[0].id;
-      await prisma.butlerShift.createMany({
-        data: owners.filter((o) => !have.has(o.id)).map((o) => ({
-          butlerId: o.id, date: input.date, reservationId: reservation.id, grade,
-          pay: ownerPay(o.name as keyof typeof OWNER_SPLIT), extra: o.id === extraTo && input.extra ? money(input.extra) : 0,
-        })),
-      });
-      done();
-      return;
-    }
-  }
   await prisma.butlerShift.create({
     data: {
       butlerId: butler.id,
       date: input.date,
       reservationId: reservation.id,
       grade,
-      pay: input.pay == null ? gradePay(grade) : money(input.pay),
+      pay: input.pay == null ? gradePay(grade, butler.name) : money(input.pay),
       extra: input.extra ? money(input.extra) : 0,
     },
   });
@@ -111,7 +95,9 @@ export async function updateShiftPay(id: string, pay: number) {
 export async function updateShiftGrade(id: string, grade: string) {
   await guard();
   if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
-  await prisma.butlerShift.updateMany({ where: { id }, data: { grade, pay: gradePay(grade) } });
+  const shift = await prisma.butlerShift.findUnique({ where: { id }, include: { butler: { select: { name: true } } } });
+  if (!shift) return;
+  await prisma.butlerShift.update({ where: { id }, data: { grade, pay: gradePay(grade, shift.butler.name) } });
   done();
 }
 
