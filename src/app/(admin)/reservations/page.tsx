@@ -59,7 +59,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
 }
 
 function recordStatusOf(status: string | undefined): DetailReservation["recordStatus"] {
-  return status === "draft" || status === "published" || status === "revoked" ? status : "none";
+  return status === "draft" || status === "live" || status === "published" || status === "revoked" ? status : "none";
 }
 
 async function loadReservation(id: string) {

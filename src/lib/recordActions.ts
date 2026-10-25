@@ -91,8 +91,8 @@ export async function saveRecord(reservationId: string, input: RecordSaveInput):
     const link = existing
       ? await tx.recordLink.update({
           where: { id: existing.id },
-          // 게시 중인 기록을 고치면 고객 화면의 버전이 올라간다
-          data: { ...data, ...(existing.status === "published" ? { version: { increment: 1 } } : {}) },
+          // 게시 중이거나 실시간 공유 중인 기록을 고치면 고객 화면의 버전이 올라간다
+          data: { ...data, ...(existing.status === "published" || existing.status === "live" ? { version: { increment: 1 } } : {}) },
         })
       : await tx.recordLink.create({ data: { ...data, reservationId, token: newToken() } });
     await tx.recordEntry.deleteMany({ where: { recordLinkId: link.id } });
@@ -104,7 +104,7 @@ export async function saveRecord(reservationId: string, input: RecordSaveInput):
   revalidateRecord(reservationId);
   return {
     ok: true,
-    message: existing?.status === "published" ? "저장했어요. 고객 화면에도 바로 반영돼요." : "저장했어요.",
+    message: existing?.status === "published" || existing?.status === "live" ? "저장했어요. 고객 화면에도 바로 반영돼요." : "저장했어요.",
   };
 }
 
@@ -127,6 +127,30 @@ export async function publishRecord(reservationId: string): Promise<{ ok: boolea
   });
   revalidateRecord(reservationId);
   return { ok: true, message: "게시했어요. 고객에게 링크를 보내 주세요." };
+}
+
+/** 게시하지 않고 고객이 지금 바로 볼 수 있게 한다(실시간 공유). 저장할 때마다 고객 화면이 자동으로 갱신된다. */
+export async function startLiveRecord(reservationId: string): Promise<{ ok: boolean; message: string }> {
+  await requireSession();
+  const link = await prisma.recordLink.findUnique({ where: { reservationId } });
+  if (!link) return { ok: false, message: "먼저 기록을 저장해 주세요." };
+  if (link.status === "published") return { ok: true, message: "이미 게시된 기록이에요." };
+  await prisma.recordLink.update({
+    where: { id: link.id },
+    data: { status: "live", expiresAt: link.expiresAt ?? addDays(new Date(), RETENTION_DAYS), version: Math.max(1, link.version) },
+  });
+  revalidateRecord(reservationId);
+  return { ok: true, message: "실시간 공유를 시작했어요. 고객에게 링크를 보내 주세요. 저장하면 고객 화면이 곧 갱신돼요." };
+}
+
+/** 실시간 공유를 멈추고 작성 중 상태로 되돌린다. 보낸 주소는 다시 열리지 않는다. */
+export async function stopLiveRecord(reservationId: string): Promise<{ ok: boolean; message: string }> {
+  await requireSession();
+  const link = await prisma.recordLink.findUnique({ where: { reservationId } });
+  if (!link || link.status !== "live") return { ok: false, message: "실시간 공유 중이 아니에요." };
+  await prisma.recordLink.update({ where: { id: link.id }, data: { status: "draft" } });
+  revalidateRecord(reservationId);
+  return { ok: true, message: "실시간 공유를 멈췄어요. 다시 시작하면 같은 주소로 열려요." };
 }
 
 export async function revokeRecord(reservationId: string): Promise<{ ok: boolean; message: string }> {

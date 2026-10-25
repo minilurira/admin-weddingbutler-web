@@ -10,7 +10,8 @@ export async function loadOpenRecord(token: string, viewer: "customer" | "admin"
   const link = await prisma.recordLink.findUnique({ where: { token }, include: { reservation: true } });
   if (!link) return { error: NextResponse.json({ state: "not_found" }, { status: 404 }) } as const;
   if (viewer === "customer") {
-    if (link.status !== "published") return { error: NextResponse.json({ state: "not_found" }, { status: 404 }) } as const;
+    // 게시된 기록과, 게시 전이라도 실시간 공유를 켠 기록(live)은 고객이 열 수 있다
+    if (link.status !== "published" && link.status !== "live") return { error: NextResponse.json({ state: "not_found" }, { status: 404 }) } as const;
     if (isExpired(link)) {
       return { error: NextResponse.json({ state: "expired", expiresAt: link.expiresAt?.toISOString() }, { status: 410 }) } as const;
     }

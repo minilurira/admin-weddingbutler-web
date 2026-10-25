@@ -9,7 +9,8 @@ export const OTP_TTL_MS = 5 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_MAX_SENDS_PER_HOUR = 5;
 
-export type RecordStatus = "draft" | "published" | "revoked";
+/** draft 작성 중 · live 게시 전 실시간 공유 중 · published 게시됨 · revoked 회수됨 */
+export type RecordStatus = "draft" | "live" | "published" | "revoked";
 export type RecordMode = "opened" | "sealed";
 export type Side = "신랑측" | "신부측";
 
@@ -107,6 +108,8 @@ export function buildRecordPayload(link: RecordLink & { reservation: Reservation
       venueName: r.confirmVenue,
       plan: planCode(r.confirmPlan),
       recordMode: sealed ? "sealed" : "opened",
+      // 실시간 공유 중에는 게시·인계 정보가 아직 없다 (홈페이지가 "실시간 집계 중"으로 표시)
+      ...(link.status === "live" ? { live: true } : {}),
       publishedAt: publishedAt.toISOString(),
       handoverAt: (link.handoverAt ?? publishedAt).toISOString(),
       handoverEnvelopeCount: link.handoverEnvelopeCount,

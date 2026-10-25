@@ -5,7 +5,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
-import { publishRecord, revokeRecord, saveRecord } from "@/lib/recordActions";
+import { publishRecord, revokeRecord, saveRecord, startLiveRecord, stopLiveRecord } from "@/lib/recordActions";
 import { TEMPLATE_HEADER, readSheet, toGuests } from "@/lib/sheet";
 
 type Side = "신랑측" | "신부측";
@@ -47,6 +47,7 @@ export interface RecordEditorProps {
 const RELATIONS = ["친척", "친구", "직장", "지인"];
 const STATUS_LABEL: Record<string, { text: string; bg: string; color: string }> = {
   draft: { text: "작성 중", bg: "#F6F3F5", color: "#6E646A" },
+  live: { text: "실시간 공유 중", bg: "#F7EDF2", color: "#A8416C" },
   published: { text: "게시됨", bg: "#E6F2EC", color: "#2F6B4F" },
   revoked: { text: "회수됨", bg: "#FBF0DC", color: "#8A5A00" },
 };
@@ -84,6 +85,8 @@ export default function RecordEditor({ reservation, link, initial, retentionDays
   const sealed = mode === "sealed";
   const status = STATUS_LABEL[link?.status ?? "draft"] ?? STATUS_LABEL.draft;
   const isPublished = link?.status === "published";
+  const isLive = link?.status === "live";
+  const shared = isPublished || isLive; // 고객이 지금 열 수 있는 상태
 
   const summary = useMemo(() => {
     const filled = rows.filter((r) => r.name.trim());
@@ -184,6 +187,19 @@ export default function RecordEditor({ reservation, link, initial, retentionDays
     onSave(() => publishRecord(reservation.id));
   }
 
+  function onStartLive() {
+    onSave(() => startLiveRecord(reservation.id));
+  }
+
+  function onStopLive() {
+    if (!window.confirm("실시간 공유를 멈출까요? 고객이 이 주소로 더 이상 볼 수 없어요.")) return;
+    startTransition(async () => {
+      const res = await stopLiveRecord(reservation.id);
+      showToast(res.message);
+      router.refresh();
+    });
+  }
+
   function onRevoke() {
     if (!window.confirm("링크를 회수하면 고객에게 보낸 주소가 바로 막혀요. 회수할까요?")) return;
     startTransition(async () => {
@@ -225,24 +241,26 @@ export default function RecordEditor({ reservation, link, initial, retentionDays
 
       <section style={{ background: "#F8F6F7", borderRadius: 18, padding: 22, marginBottom: 20 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>고객용 링크</h2>
-        {!link && <p style={{ margin: 0, fontSize: 13, color: "#8C8188" }}>명단을 저장하면 링크가 만들어지고, 게시하면 고객이 열 수 있어요. 게시일로부터 {retentionDays}일 동안 열람할 수 있어요.</p>}
+        {!link && <p style={{ margin: 0, fontSize: 13, color: "#8C8188" }}>명단을 저장하면 링크가 만들어지고, 게시하거나 실시간 공유를 시작하면 고객이 열 수 있어요. 게시일로부터 {retentionDays}일 동안 열람할 수 있어요.</p>}
         {link && (
           <>
             <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "#8C8188" }}>
               {isPublished
                 ? `고객은 예약 전화번호로 문자 인증을 한 뒤 볼 수 있어요.${link.expiresLabel ? ` ${link.expiresLabel}까지 열려요.` : ""}`
-                : link.status === "revoked"
-                  ? "회수된 링크예요. 다시 게시하면 새 주소가 만들어져요."
-                  : "아직 게시 전이라 고객은 열 수 없어요. 아래 \"고객 화면으로 보기\"로 미리 확인할 수 있어요."}
+                : isLive
+                  ? "게시 전이지만 실시간으로 공유 중이에요. 고객은 예약 전화번호로 문자 인증을 한 뒤 볼 수 있고, 저장하면 화면이 곧 자동으로 갱신돼요."
+                  : link.status === "revoked"
+                    ? "회수된 링크예요. 다시 게시하면 새 주소가 만들어져요."
+                    : "아직 게시 전이라 고객은 열 수 없어요. 게시 전에 고객이 보게 하려면 \"실시간 공유 시작\"을 누르세요. 아래 \"고객 화면으로 보기\"로 미리 확인할 수도 있어요."}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-              <code style={{ flex: "1 1 260px", minWidth: 0, padding: "11px 14px", borderRadius: 12, background: "#FFFFFF", fontSize: 13, color: isPublished ? "#1E1A1C" : "#A79BA1", overflowWrap: "anywhere" }}>{link.url}</code>
-              {isPublished && <button type="button" onClick={copyUrl} style={ghostBtn}>주소 복사</button>}
+              <code style={{ flex: "1 1 260px", minWidth: 0, padding: "11px 14px", borderRadius: 12, background: "#FFFFFF", fontSize: 13, color: shared ? "#1E1A1C" : "#A79BA1", overflowWrap: "anywhere" }}>{link.url}</code>
+              {shared && <button type="button" onClick={copyUrl} style={ghostBtn}>주소 복사</button>}
               {link.previewUrl && <a href={link.previewUrl} target="_blank" rel="noopener noreferrer" style={{ ...ghostBtn, display: "inline-flex", alignItems: "center" }}>고객 화면으로 보기</a>}
             </div>
-            {isPublished && (
+            {shared && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", marginTop: 12, fontSize: 12.5, color: "#6E646A" }}>
-                <span>게시 {link.publishedLabel}</span>
+                {isPublished && <span>게시 {link.publishedLabel}</span>}
                 <span>버전 {link.version}</span>
                 <span>{link.lastViewedLabel ? `고객 마지막 열람 ${link.lastViewedLabel}` : "고객이 아직 열어 보지 않았어요"}</span>
               </div>
@@ -345,9 +363,17 @@ export default function RecordEditor({ reservation, link, initial, retentionDays
         <button type="button" disabled={isPending} onClick={() => onSave()} style={{ ...primaryBtn, background: "#FFFFFF", color: "#8A3F61", border: "1px solid #D9A3BC" }}>
           저장
         </button>
+        {!shared && (
+          <button type="button" disabled={isPending} onClick={onStartLive} style={{ ...primaryBtn, background: "#FFFFFF", color: "#A8416C", border: "1px solid #A8416C" }}>
+            저장하고 실시간 공유 시작
+          </button>
+        )}
         <button type="button" disabled={isPending} onClick={onPublish} style={primaryBtn}>
           {isPublished ? "저장하고 고객 화면에 반영" : "저장하고 게시하기"}
         </button>
+        {isLive && (
+          <button type="button" disabled={isPending} onClick={onStopLive} style={{ ...ghostBtn, height: 48 }}>공유 중지</button>
+        )}
         {link && link.status === "published" && (
           <button type="button" disabled={isPending} onClick={onRevoke} style={{ ...ghostBtn, height: 48, marginLeft: "auto", color: "#A8416C" }}>링크 회수</button>
         )}

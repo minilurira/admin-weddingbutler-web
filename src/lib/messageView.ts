@@ -23,7 +23,7 @@ interface Tpl {
   item?: { list: { title: string; description: string }[]; summary?: { title?: string | null; description?: string | null } } | null;
   content?: string;
   extra?: string | null;
-  buttons?: { buttonName?: string }[];
+  buttons?: { buttonName?: string; linkMo?: string | null; linkPc?: string | null; linkAnd?: string | null; linkIos?: string | null }[];
 }
 
 const cache = new Map<string, { at: number; tpl: Tpl | null }>();
@@ -60,8 +60,12 @@ export function renderTemplate(tpl: Tpl, vars: Record<string, string>): string {
   }
   if (tpl.content) parts.push(fill(tpl.content, vars));
   if (tpl.extra) parts.push(fill(tpl.extra, vars));
-  const buttons = (tpl.buttons ?? []).map((b) => b.buttonName).filter(Boolean);
-  if (buttons.length) parts.push(buttons.map((b) => `[ ${b} ]`).join("  "));
+  // 버튼은 이름과 함께 연결되는 주소도 보여 준다 (주소에 변수가 들어 있으면 채운다)
+  const buttons = (tpl.buttons ?? []).filter((b) => b.buttonName).map((b) => {
+    const link = b.linkMo || b.linkPc || b.linkAnd || b.linkIos || "";
+    return link ? `[ ${b.buttonName} ]\n${fill(link, vars)}` : `[ ${b.buttonName} ]`;
+  });
+  if (buttons.length) parts.push(buttons.join("\n"));
   return parts.join("\n\n");
 }
 

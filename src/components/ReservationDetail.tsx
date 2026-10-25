@@ -58,7 +58,7 @@ export interface DetailReservation {
   requestedExtraButlers: number;
   alimtalkLabel: string;
   cancel: { reason: string; atLabel: string; refundAmount: number } | null;
-  recordStatus: "none" | "draft" | "published" | "revoked";
+  recordStatus: "none" | "draft" | "live" | "published" | "revoked";
   paymentLinks: DetailPaymentLink[];
   notes: DetailNote[];
   confirm: {
@@ -77,6 +77,7 @@ export interface DetailReservation {
 const RECORD_STATUS_TEXT: Record<DetailReservation["recordStatus"], string> = {
   none: "예식이 끝나면 명단을 올려 고객용 링크를 만드세요.",
   draft: "작성 중 · 아직 고객에게 게시하지 않았어요.",
+  live: "실시간 공유 중 · 게시 전이지만 고객이 지금 볼 수 있어요.",
   published: "게시됨 · 고객이 링크로 볼 수 있어요.",
   revoked: "회수됨 · 고객 링크가 막혀 있어요.",
 };
