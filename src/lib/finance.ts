@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 /**
- * 지출관리·버틀러 관리 테이블 생성문. prisma/migrations/20261024090000_add_finance/migration.sql 과 같은 내용이다.
+ * 손익관리·버틀러 관리 테이블 생성문. prisma/migrations/20261024090000_add_finance/migration.sql 과 같은 내용이다.
  * 운영 DB에는 마이그레이션이 자동 적용되지 않으므로(README 참고), /finance 가 처음 열릴 때 한 번 실행해 둔다.
  * 모두 IF NOT EXISTS 라서 이미 테이블이 있거나 나중에 migrate deploy 를 돌려도 안전하다.
  */
@@ -43,6 +43,7 @@ const DDL = [
   `ALTER TABLE "Butler" ADD COLUMN IF NOT EXISTS "grade" TEXT NOT NULL DEFAULT 'staff'`,
   `ALTER TABLE "ButlerShift" ADD COLUMN IF NOT EXISTS "extra" INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE "ButlerShift" ADD COLUMN IF NOT EXISTS "grade" TEXT NOT NULL DEFAULT 'staff'`,
+  `ALTER TABLE "ButlerShift" ADD COLUMN IF NOT EXISTS "paidDate" TEXT NOT NULL DEFAULT ''`,
   `CREATE TABLE IF NOT EXISTS "FinanceSetting" (
       "key" TEXT NOT NULL,
       "value" TEXT NOT NULL,

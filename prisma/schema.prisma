@@ -197,6 +197,8 @@ model ButlerShift {
   // 스페셜 차지: 오너가 기본 정산금 외에 추가로 지급하는 돈
   extra         Int      @default(0)
   paid          Boolean  @default(false)
+  // 실제로 버틀러에게 입금한 날짜 ("YYYY-MM-DD"). 입금 전에는 빈 문자열.
+  paidDate      String   @default("")
   createdAt     DateTime @default(now())
 
   @@index([date])

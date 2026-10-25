@@ -7,7 +7,7 @@ import {
   addButler, addCost, addShift, deleteButler, deleteCost, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
-import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, gradePay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
@@ -15,7 +15,7 @@ export interface FinanceData {
   reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string }[];
   butlers: { id: string; name: string; grade: string }[];
-  shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean }[];
+  shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
 }
 
 type Tab = "income" | "cost" | "butler" | "bank" | "recon";
@@ -131,7 +131,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
       <style>{CSS}</style>
 
       <div className="top">
-        <h1>{butlerView ? "버틀러 관리" : "지출관리"}</h1>
+        <h1>{butlerView ? "버틀러 관리" : "손익관리"}</h1>
         <div className="month" role="group" aria-label="월 선택">
           <button type="button" onClick={() => shiftMonth(-1)} aria-label="이전 달">‹</button>
           <b className="num">{yy}년 {Number(mm)}월</b>
@@ -319,7 +319,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                     <tr><td><b>최소연</b> <small className="sub">{OWNER_SPLIT.최소연}%</small></td><td className="r num"><b>{won(m.최소연)}</b></td><td className="r num"><b>{won(t.최소연)}</b></td></tr>
                   </tbody>
                 </table></div>
-                <p className="note">오너 등급 참석이 있는 예약마다 기본 정산금(1인 {won(BUTLER_GRADES.owner.pay)} × {OWNER_HEADCOUNT}명 = 건당 {won(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)}) 을 더해 두 분이 {OWNER_SPLIT.이강}:{OWNER_SPLIT.최소연}로 나눈 금액입니다. 실제로 누가 참석했는지와 관계없이 계산하고, 스페셜 차지(오너가 추가로 지급하는 돈)는 포함하지 않습니다. 위의 버틀러 리스트와 비용 합계는 기록한 그대로이며 이 배분으로 바뀌지 않습니다.</p>
+                <p className="note">오너 등급 참석이 있는 예약마다 기본 정산금(1인 {won(BUTLER_GRADES.owner.pay)} × {OWNER_HEADCOUNT}명 = 건당 {won(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)}) 을 더해 두 분이 {OWNER_SPLIT.이강}:{OWNER_SPLIT.최소연}로 나눈 금액입니다. 오너 등급으로 참석을 기록하면 이강 {won(ownerPay("이강"))}, 최소연 {won(ownerPay("최소연"))} 두 줄이 한 번에 만들어집니다. 실제로 누가 참석했는지와 관계없이 계산하고, 스페셜 차지(오너가 추가로 지급하는 돈)는 포함하지 않습니다. 위의 버틀러 리스트와 비용 합계는 기록한 그대로이며 이 배분으로 바뀌지 않습니다.</p>
               </div>
             );
           })()}
@@ -347,9 +347,9 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
           </div>
           <div className="box"><h2>참석·정산 내역 <small className="sub">{yy}년 {Number(mm)}월</small></h2>
             <div className="scroll"><table>
-              <thead><tr><th>참석일</th><th>버틀러</th><th>예약</th><th>등급</th><th className="r">기본 정산금</th><th className="r">스페셜 차지</th><th className="r">합계</th><th>지급</th><th /></tr></thead>
+              <thead><tr><th>참석일</th><th>버틀러</th><th>예약</th><th>등급</th><th className="r">기본 정산금</th><th className="r">스페셜 차지</th><th className="r">합계</th><th>지급</th><th>실제 입금일</th><th /></tr></thead>
               <tbody>
-                {ms.length === 0 && <tr><td colSpan={9} className="empty">이 달 기록이 없습니다.</td></tr>}
+                {ms.length === 0 && <tr><td colSpan={10} className="empty">이 달 기록이 없습니다.</td></tr>}
                 {ms.map((s) => {
                   const r = reservations.find((x) => x.id === s.rid);
                   return (
@@ -368,15 +368,17 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                       <td className="r"><input className="cell num" key={`${s.id}:x${s.extra}`} inputMode="numeric" defaultValue={s.extra || ""} placeholder="0" aria-label="스페셜 차지"
                         onBlur={(e) => { const v = toInt(e.target.value); if (v !== s.extra) run(() => updateShiftExtra(s.id, v)); }} /></td>
                       <td className="r num"><b>{won(shiftTotal(s))}</b></td>
-                      <td><button type="button" className={`pill ${s.paid ? "good" : "warn"}`} onClick={() => run(() => setShiftPaid(s.id, !s.paid))}>{s.paid ? "지급 완료" : "미지급"}</button></td>
+                      <td><button type="button" className={`pill ${s.paid ? "good" : "warn"}`} onClick={() => run(() => setShiftPaid(s.id, !s.paid), s.paid ? undefined : "입금 완료로 처리하고 오늘 날짜를 기록했습니다.")}>{s.paid ? "입금 완료" : "미지급"}</button></td>
+                      <td>{s.paid ? <input className="cell" type="date" key={`${s.id}:${s.paidDate}`} defaultValue={s.paidDate} aria-label="실제 입금일" style={{ width: "auto" }}
+                        onBlur={(e) => { if (e.target.value && e.target.value !== s.paidDate) run(() => setShiftPaid(s.id, true, e.target.value), "입금일을 저장했습니다."); }} /> : <small className="sub">-</small>}</td>
                       <td className="r"><button type="button" className="del" onClick={() => run(() => deleteShift(s.id), "삭제했습니다.")}>삭제</button></td>
                     </tr>
                   );
                 })}
               </tbody>
-              <tfoot><tr><td colSpan={4}>합계</td><td className="r num">{won(ms.reduce((a, s) => a + s.pay, 0))}</td><td className="r num">{won(ms.reduce((a, s) => a + s.extra, 0))}</td><td className="r num">{won(pay)}</td><td colSpan={2} /></tr></tfoot>
+              <tfoot><tr><td colSpan={4}>합계</td><td className="r num">{won(ms.reduce((a, s) => a + s.pay, 0))}</td><td className="r num">{won(ms.reduce((a, s) => a + s.extra, 0))}</td><td className="r num">{won(pay)}</td><td colSpan={3} /></tr></tfoot>
             </table></div>
-            <p className="note">&quot;미지급&quot;을 누르면 &quot;지급 완료&quot;로 바뀝니다. 등급을 바꾸면 기본 정산금이 그 등급 금액으로 다시 맞춰지고, 기본 정산금이나 스페셜 차지를 고치면 합계가 바로 갱신됩니다.</p>
+            <p className="note">버틀러에게 실제로 입금한 뒤 &quot;미지급&quot;을 누르면 &quot;입금 완료&quot;로 바뀌고 오늘 날짜가 기록됩니다. 다른 날 입금했다면 실제 입금일 칸에서 날짜를 고치세요. 등급을 바꾸면 기본 정산금이 그 등급 금액으로 다시 맞춰지고, 기본 정산금이나 스페셜 차지를 고치면 합계가 바로 갱신됩니다.</p>
           </div>
         </section>
       )}

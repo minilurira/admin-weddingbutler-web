@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { addBusinessDays, cardFee, gradePay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
+import { addBusinessDays, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -20,4 +20,7 @@ const both = [{ rid: "r1", grade: "owner", pay: 150000 }, { rid: "r1", grade: "o
 assert.deepEqual(ownerPool(both), { count: 1, pool: 300000 });            // 두 대표를 각각 배정해도 한 건 = 300,000
 assert.deepEqual(ownerPool([{ rid: "r2", grade: "owner", pay: 150000 }]), { count: 1, pool: 300000 }); // 한 분만 배정돼도 건당 300,000
 assert.deepEqual(ownerPool([...both, { rid: "r2", grade: "owner", pay: 150000 }, { rid: "r3", grade: "staff", pay: 75000 }]), { count: 2, pool: 600000 });
+assert.deepEqual(ownerPool([{ rid: "r1", grade: "owner", pay: 147000 }, { rid: "r1", grade: "owner", pay: 153000 }]), { count: 1, pool: 300000 }); // 49:51 두 줄도 한 건 = 300,000
+assert.equal(ownerPay("이강"), 147000);
+assert.equal(ownerPay("최소연"), 153000);
 console.log("financeCalc: all checks passed");

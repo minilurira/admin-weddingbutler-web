@@ -10,7 +10,7 @@ export default async function FinancePage() {
     data = await loadFinanceData();
   } catch (e) {
     console.error("[finance] load failed", e);
-    error = "지출관리 데이터를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.";
+    error = "손익관리 데이터를 불러오지 못했습니다. 잠시 후 다시 열어 주세요.";
   }
 
   return (

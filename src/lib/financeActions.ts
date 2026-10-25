@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, type ReconcileResult } from "@/lib/finance";
 import { homepageUrl } from "@/lib/records";
-import { gradePay, isButlerGrade } from "@/lib/financeCalc";
+import { OWNER_SPLIT, gradePay, isButlerGrade, ownerPay } from "@/lib/financeCalc";
 
 async function guard() {
   const session = await getServerSession(authOptions);
@@ -72,6 +72,22 @@ export async function addShift(input: { butlerId: string; date: string; reservat
   const grade = input.grade === undefined ? butler.grade : input.grade;
   if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
   if (!reservation) throw new Error("예약을 찾을 수 없습니다.");
+  // 오너 등급 참석은 두 대표가 함께 하므로 이강(147,000)·최소연(153,000) 기록을 한 번에 만든다 (이미 있는 사람은 건너뜀)
+  if (grade === "owner" && input.pay == null) {
+    const owners = await prisma.butler.findMany({ where: { name: { in: Object.keys(OWNER_SPLIT) } } });
+    if (owners.length) {
+      const have = new Set((await prisma.butlerShift.findMany({ where: { reservationId: reservation.id, grade: "owner" }, select: { butlerId: true } })).map((s) => s.butlerId));
+      const extraTo = owners.some((o) => o.id === butler.id) ? butler.id : owners[0].id;
+      await prisma.butlerShift.createMany({
+        data: owners.filter((o) => !have.has(o.id)).map((o) => ({
+          butlerId: o.id, date: input.date, reservationId: reservation.id, grade,
+          pay: ownerPay(o.name as keyof typeof OWNER_SPLIT), extra: o.id === extraTo && input.extra ? money(input.extra) : 0,
+        })),
+      });
+      done();
+      return;
+    }
+  }
   await prisma.butlerShift.create({
     data: {
       butlerId: butler.id,
@@ -105,9 +121,12 @@ export async function updateShiftExtra(id: string, extra: number) {
   done();
 }
 
-export async function setShiftPaid(id: string, paid: boolean) {
+/** 입금 완료로 처리하고 실제 입금일을 기록한다. 날짜를 안 주면 오늘(한국시간). paid=false면 날짜도 지운다. */
+export async function setShiftPaid(id: string, paid: boolean, date?: string) {
   await guard();
-  await prisma.butlerShift.updateMany({ where: { id }, data: { paid: Boolean(paid) } });
+  if (date !== undefined && !isDate(date)) throw new Error("입금일을 확인해 주세요.");
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  await prisma.butlerShift.updateMany({ where: { id }, data: { paid: Boolean(paid), paidDate: paid ? date ?? today : "" } });
   done();
 }
 

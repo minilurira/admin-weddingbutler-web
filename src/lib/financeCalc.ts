@@ -42,9 +42,9 @@ export const gradePay = (grade: string): number => BUTLER_GRADES[isButlerGrade(g
 /** 한 건의 정산 합계 = 기본 정산금 + 스페셜 차지(오너가 추가로 지급하는 돈) */
 export const shiftTotal = (s: { pay: number; extra: number }): number => s.pay + s.extra;
 
-/** 오너 버틀러 정산금을 두 대표가 나누는 비율 (%). 합이 100이어야 한다. */
-/** 오너 등급 한 건은 두 대표가 함께 하는 것으로 보아, 건당 정산금 × 2명이 배분 대상이다. */
+/** 오너 등급 한 건은 두 대표가 함께 하므로 건당 정산금 × 2명이 배분 대상이다. */
 export const OWNER_HEADCOUNT = 2;
+/** 오너 버틀러 정산금을 두 대표가 나누는 비율 (%). 합이 100이어야 한다. */
 export const OWNER_SPLIT = { 이강: 49, 최소연: 51 } as const;
 
 /** 오너 정산금 합계를 이강:최소연 = 49:51로 나눈다. 이강 몫을 원 단위로 반올림하고 나머지를 최소연 몫으로 해서 합이 항상 정확히 맞는다. */
@@ -58,9 +58,10 @@ export function splitOwnerPay(pool: number): { 이강: number; 최소연: number
  * 두 대표를 한 예약에 각각 배정해 오너 기록이 2개여도 그 예약은 한 번만 들어간다.
  */
 export function ownerPool(shifts: readonly { rid: string; grade: string; pay: number }[]): { count: number; pool: number } {
-  const per = new Map<string, number>();
-  for (const s of shifts) if (s.grade === "owner") per.set(s.rid, Math.max(per.get(s.rid) ?? 0, s.pay));
-  let pool = 0;
-  per.forEach((pay) => { pool += pay * OWNER_HEADCOUNT; });
-  return { count: per.size, pool };
+  const rids = new Set<string>();
+  for (const s of shifts) if (s.grade === "owner") rids.add(s.rid);
+  return { count: rids.size, pool: rids.size * BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT };
 }
+
+/** 오너 등급 한 건에서 대표 한 명의 기본 정산금: 두 대표 합 300,000원을 49:51로 → 이강 147,000 / 최소연 153,000 */
+export const ownerPay = (name: keyof typeof OWNER_SPLIT): number => splitOwnerPay(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)[name];

@@ -66,7 +66,7 @@ const navItems = [
   },
   {
     href: "/finance",
-    label: "지출관리",
+    label: "손익관리",
     icon: (
       <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
         <rect x="2.6" y="3.4" width="14.8" height="13.2" rx="3.4" stroke="currentColor" strokeWidth="1.7" />
