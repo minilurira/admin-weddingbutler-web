@@ -59,6 +59,8 @@ export interface DetailReservation {
   alimtalkLabel: string;
   cancel: { reason: string; atLabel: string; refundAmount: number } | null;
   recordStatus: "none" | "draft" | "live" | "published" | "revoked";
+  /** 관리자 전용 서명이 붙은 고객 화면 주소 (기록이 없으면 null) */
+  recordPreviewUrl: string | null;
   paymentLinks: DetailPaymentLink[];
   notes: DetailNote[];
   confirm: {
@@ -569,6 +571,9 @@ export default function ReservationDetail({
               <div style={{ fontSize: 14.5, fontWeight: 800, color: "#413A3E" }}>축의 기록</div>
               <span style={{ color: "#8C8188" }}>{RECORD_STATUS_TEXT[reservation.recordStatus]}</span>
             </div>
+            {reservation.recordPreviewUrl && (
+              <a href={reservation.recordPreviewUrl} target="_blank" rel="noopener noreferrer" style={{ ...outlineBtn, display: "inline-flex", alignItems: "center", background: "#F9EFF4" }}>고객 화면 보기</a>
+            )}
             <Link href={`/reservations/${reservation.id}/record`} target="_blank" rel="noopener" style={{ ...outlineBtn, display: "inline-flex", alignItems: "center" }}>
               {reservation.recordStatus === "none" ? "기록 만들기" : "기록 관리"}
             </Link>

@@ -1,3 +1,4 @@
+import { adminPreviewUrl } from "@/lib/records";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { toRow } from "@/lib/view";
@@ -32,6 +33,8 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
       ? { reason: r.cancelReason, atLabel: r.cancelledAt ? formatStamp(r.cancelledAt) : "", refundAmount: r.refundAmount }
       : null,
     recordStatus: recordStatusOf(r.recordLink?.status),
+    // 관리자 전용 서명 주소: 고객 화면을 인증 없이, 게시 전이어도 그대로 볼 수 있다
+    recordPreviewUrl: r.recordLink ? adminPreviewUrl(r.recordLink.token) : null,
     paymentLinks: r.paymentLinks.map((l) => ({
       id: l.id,
       amount: l.amount,
@@ -67,7 +70,7 @@ async function loadReservation(id: string) {
     where: { id },
     include: {
       notes: { orderBy: { createdAt: "asc" } },
-      recordLink: { select: { status: true } },
+      recordLink: { select: { status: true, token: true } },
       paymentLinks: { orderBy: { createdAt: "desc" } },
     },
   });
