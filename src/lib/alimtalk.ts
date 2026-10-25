@@ -196,6 +196,8 @@ export async function sendReminderAlimtalk(kind: ReminderKind, payload: Alimtalk
     ...buildVariables(payload),
     "#{paidAmount}": `${payload.paidAmount.toLocaleString("ko-KR")}원`,
     "#{balanceAmount}": onsiteAmountText(payload.balanceAmount),
+    // 당일 안내의 축의 기록 링크(report.weddingbutler.co.kr/#{recordCode}). 코드는 예약번호라 기록을 언제 만들어도 같은 주소가 열린다.
+    ...(kind === "day" ? { "#{recordCode}": payload.reservationId } : {}),
   };
   try {
     const result = await svc.send({ to: digitsOnly(payload.phone), from, kakaoOptions: { pfId, templateId, variables } });

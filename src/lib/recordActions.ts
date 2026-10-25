@@ -157,8 +157,8 @@ export async function revokeRecord(reservationId: string): Promise<{ ok: boolean
   await requireSession();
   const link = await prisma.recordLink.findUnique({ where: { reservationId } });
   if (!link) return { ok: false, message: "게시된 기록이 없어요." };
-  // 토큰을 바꿔서 이미 보낸 주소는 바로 막는다. 다시 게시하면 새 주소가 생긴다.
-  await prisma.recordLink.update({ where: { id: link.id }, data: { status: "revoked", token: newToken() } });
+  // 상태만 회수로 바꿔 접속을 막는다. 주소(예약번호)는 그대로라 알림톡으로 나간 링크도 다시 게시하면 살아난다.
+  await prisma.recordLink.update({ where: { id: link.id }, data: { status: "revoked" } });
   revalidateRecord(reservationId);
-  return { ok: true, message: "링크를 회수했어요. 기존 주소는 더 이상 열리지 않아요." };
+  return { ok: true, message: "링크를 회수했어요. 다시 게시하거나 실시간 공유를 시작하기 전까지 주소가 열리지 않아요." };
 }

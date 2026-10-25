@@ -12,14 +12,15 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
 
   const found = await loadOpenRecord(params.token, viewerOf(req.url));
   if ("error" in found) return found.error;
-  const { link } = found;
+  const { link, byReservation } = found;
 
   return NextResponse.json({
     state: "ok",
     status: link.status,
     plan: planCode(link.reservation.confirmPlan),
-    coupleName: link.reservation.couple,
-    phoneMasked: maskPhone(link.reservation.phone),
+    // 예약번호는 추측하기 쉬워서, 문자 인증 전에는 예약자 정보를 보여 주지 않는다
+    coupleName: byReservation ? "" : link.reservation.couple,
+    phoneMasked: byReservation ? "" : maskPhone(link.reservation.phone),
     expiresAt: link.expiresAt?.toISOString() ?? null,
   });
 }

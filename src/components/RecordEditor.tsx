@@ -32,6 +32,8 @@ export interface RecordEditorProps {
     expiresLabel: string;
     lastViewedLabel: string;
   } | null;
+  /** 예약번호로 정해진 고객용 주소 (기록을 만들기 전에도 같다) */
+  codeUrl: string;
   initial: {
     recordMode: "opened" | "sealed";
     handoverAt: string;
@@ -65,7 +67,7 @@ const toRow = (e: RecordEditorProps["initial"]["entries"][number]): Row => ({
 });
 const num = (v: string) => Number(String(v).replace(/[^0-9]/g, "")) || 0;
 
-export default function RecordEditor({ reservation, link, initial, retentionDays }: RecordEditorProps) {
+export default function RecordEditor({ reservation, link, codeUrl, initial, retentionDays }: RecordEditorProps) {
   const router = useRouter();
   const showToast = useToast();
   const [isPending, startTransition] = useTransition();
@@ -241,7 +243,14 @@ export default function RecordEditor({ reservation, link, initial, retentionDays
 
       <section style={{ background: "#F8F6F7", borderRadius: 18, padding: 22, marginBottom: 20 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>고객용 링크</h2>
-        {!link && <p style={{ margin: 0, fontSize: 13, color: "#8C8188" }}>명단을 저장하면 링크가 만들어지고, 게시하거나 실시간 공유를 시작하면 고객이 열 수 있어요. 게시일로부터 {retentionDays}일 동안 열람할 수 있어요.</p>}
+        {!link && (
+          <>
+            <p style={{ margin: "0 0 10px", fontSize: 13, color: "#8C8188", lineHeight: 1.6 }}>
+              고객용 주소는 예약번호로 정해져 있어서, 명단을 만들기 전에도 같은 주소예요. 당일 알림톡에도 이 주소가 나가요. 명단을 저장하고 &quot;실시간 공유 시작&quot;이나 &quot;게시&quot;를 하면 이 주소로 열려요. 그 전에는 고객에게 &quot;준비 중&quot;으로 보여요. 게시일로부터 {retentionDays}일 동안 열려 있어요.
+            </p>
+            <code style={{ display: "block", padding: "11px 14px", borderRadius: 12, background: "#FFFFFF", fontSize: 13, color: "#1E1A1C", overflowWrap: "anywhere" }}>{codeUrl}</code>
+          </>
+        )}
         {link && (
           <>
             <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "#8C8188" }}>
@@ -250,7 +259,7 @@ export default function RecordEditor({ reservation, link, initial, retentionDays
                 : isLive
                   ? "게시 전이지만 실시간으로 공유 중이에요. 고객은 예약 전화번호로 문자 인증을 한 뒤 볼 수 있고, 저장하면 화면이 곧 자동으로 갱신돼요."
                   : link.status === "revoked"
-                    ? "회수된 링크예요. 다시 게시하면 새 주소가 만들어져요."
+                    ? "회수된 링크예요. 다시 게시하거나 실시간 공유를 시작하면 같은 주소로 다시 열려요."
                     : "아직 게시 전이라 고객은 열 수 없어요. 게시 전에 고객이 보게 하려면 \"실시간 공유 시작\"을 누르세요. 아래 \"고객 화면으로 보기\"로 미리 확인할 수도 있어요."}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>

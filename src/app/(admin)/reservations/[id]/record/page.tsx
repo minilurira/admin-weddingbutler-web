@@ -40,10 +40,11 @@ export default async function RecordPage({ params }: { params: { id: string } })
       venue: r.confirmVenue,
       butlers: r.confirmButlers,
     },
+    codeUrl: customerUrl(r.id),
     link: link
       ? {
           status: link.status,
-          url: customerUrl(link.token),
+          url: customerUrl(r.id),
           previewUrl: adminPreviewUrl(link.token),
           version: link.version,
           publishedLabel: link.publishedAt ? kstStamp(link.publishedAt) : "",
