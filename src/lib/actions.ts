@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcConfirm, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
-import { formatWishDateLabel } from "@/lib/format";
+import { formatWishDateLabel, isWeddingPast } from "@/lib/format";
 import { getInquiry, updateInquiries } from "@/lib/inquiries";
 import { sendConfirmAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
@@ -17,6 +17,18 @@ async function requireSession() {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("로그인이 필요합니다.");
   return session;
+}
+
+const PAST_MESSAGE = "예식 일시가 지난 예약은 변경·취소할 수 없습니다.";
+
+/** 예식 일시가 지난(취소되지 않은) 예약인지. 상세 화면 버튼 잠금과 같은 기준 */
+function isPast(r: { status: string; confirmDate: string; confirmTime: string }) {
+  return r.status !== "취소" && isWeddingPast(r.confirmDate, r.confirmTime);
+}
+
+async function assertNotPast(id: string) {
+  const r = await prisma.reservation.findUniqueOrThrow({ where: { id }, select: { status: true, confirmDate: true, confirmTime: true } });
+  if (isPast(r)) throw new Error(PAST_MESSAGE);
 }
 
 function revalidateAll() {
@@ -40,6 +52,7 @@ export interface ConfirmFieldsInput {
 
 export async function saveConfirmFields(id: string, fields: ConfirmFieldsInput) {
   await requireSession();
+  await assertNotPast(id);
   // 확정된 예약은 재협의로 되돌린 뒤에만 고칠 수 있다
   await prisma.reservation.updateMany({
     where: { id, status: { not: "확정" } },
@@ -62,6 +75,7 @@ export async function saveConfirmFields(id: string, fields: ConfirmFieldsInput) 
 export async function confirmReservation(id: string, fields: ConfirmFieldsInput) {
   await requireSession();
   const existing = await prisma.reservation.findUniqueOrThrow({ where: { id } });
+  if (isPast(existing)) return { message: PAST_MESSAGE, alimtalk: null };
   const wasConfirmed = existing.status === "확정";
 
   const updated = await prisma.reservation.update({
@@ -123,6 +137,7 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
 /** 확정된 예약을 협의중으로 되돌려 확정 내용을 다시 고칠 수 있게 한다 */
 export async function reopenReservation(id: string) {
   await requireSession();
+  await assertNotPast(id);
   const { count } = await prisma.reservation.updateMany({ where: { id, status: "확정" }, data: { status: "협의중" } });
   revalidateAll();
   return { message: count ? "재협의 상태로 바꿨습니다. 내용을 고친 뒤 다시 확정해 주세요." : "확정된 예약이 아닙니다." };
@@ -130,6 +145,7 @@ export async function reopenReservation(id: string) {
 
 export async function holdReservation(id: string) {
   await requireSession();
+  await assertNotPast(id);
   const updated = await prisma.reservation.update({ where: { id }, data: { status: "협의중" } });
   revalidateAll();
   return { message: "협의 중 상태로 변경했습니다.", id: updated.id };
@@ -150,6 +166,7 @@ export async function cancelReservation(id: string, reason: string, skipPayment 
 
   const existing = await prisma.reservation.findUniqueOrThrow({ where: { id } });
   if (existing.status === "취소") return { ok: false, needsNoPaymentConfirm: false, message: "이미 취소된 예약입니다." };
+  if (isPast(existing)) return { ok: false, needsNoPaymentConfirm: false, message: PAST_MESSAGE };
 
   const wanted = refundAmount === undefined ? existing.paidAmount : Math.max(0, Math.floor(refundAmount));
   if (!(await claimCancel(id))) return { ok: false, needsNoPaymentConfirm: false, message: "이 예약의 취소가 이미 진행 중입니다. 잠시 후 새로고침해 주세요." };
@@ -277,6 +294,7 @@ export async function bookedTimes(date: string): Promise<string[]> {
 export async function sendPaymentLink(id: string, opts: SendLinkOptions) {
   await requireSession();
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
+  if (isPast(r)) return { ok: false, message: "예식 일시가 지난 예약에는 결제 링크를 보낼 수 없습니다." };
   const res = await sendPaymentLinkFor(r, opts);
   revalidateAll();
   return res;
@@ -284,6 +302,8 @@ export async function sendPaymentLink(id: string, opts: SendLinkOptions) {
 
 export async function cancelPaymentLink(linkId: string) {
   await requireSession();
+  const link = await prisma.paymentLink.findUnique({ where: { id: linkId }, select: { reservation: { select: { status: true, confirmDate: true, confirmTime: true } } } });
+  if (link && isPast(link.reservation)) return { ok: false, message: "예식 일시가 지난 예약의 결제 링크는 바꿀 수 없습니다." };
   const res = await cancelPaymentLinkById(linkId);
   revalidateAll();
   return res;
@@ -292,6 +312,7 @@ export async function cancelPaymentLink(linkId: string) {
 export async function resendAlimtalk(id: string) {
   await requireSession();
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
+  if (isPast(r)) return { message: PAST_MESSAGE };
   const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
   const result = await sendConfirmAlimtalk({
     reservationId: r.id,

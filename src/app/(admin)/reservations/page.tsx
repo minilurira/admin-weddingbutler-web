@@ -3,7 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { toRow } from "@/lib/view";
 import { CARD } from "@/lib/badge";
-import { formatStamp } from "@/lib/format";
+import { formatStamp, isWeddingPast } from "@/lib/format";
 import ReservationListControls from "@/components/ReservationListControls";
 import ReservationDetail, { type DetailReservation } from "@/components/ReservationDetail";
 
@@ -23,6 +23,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     memo: r.memo,
     customerMemo: r.customerMemo,
     status: r.status,
+    weddingPast: r.status !== "취소" && isWeddingPast(r.confirmDate, r.confirmTime),
     requestedPlan: r.requestedPlan,
     paidAmount: r.paidAmount,
     paymentType: r.paymentType,
@@ -123,13 +124,14 @@ export default async function ReservationsPage({
             const row = toRow(it);
             const card = CARD[it.status] ?? CARD["신규요청"];
             const isSelected = it.id === selectedId;
+            const weddingPast = it.status !== "취소" && isWeddingPast(it.confirmDate, it.confirmTime);
             const rowParams = new URLSearchParams(listParams);
             rowParams.set("id", it.id);
             return (
               <Link
                 key={it.id}
                 href={`/reservations?${rowParams.toString()}`}
-                aria-label={`${row.customer} 님 · ${row.status}`}
+                aria-label={`${row.customer} 님 · ${row.status}${weddingPast ? " · 예식 종료" : ""}`}
                 style={{
                   display: "flex", flexDirection: "column", gap: 8, padding: "16px 18px 16px 20px", borderRadius: 16,
                   background: isSelected ? "#F9EFF4" : card.bg,
@@ -148,6 +150,9 @@ export default async function ReservationsPage({
                     <span style={{ flex: "0 0 auto", padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "#FFFFFF", color: "#A9647E", boxShadow: "inset 0 0 0 1px #E7C9D5" }}>메모</span>
                   )}
                   <span style={{ flex: "0 0 auto", padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800, background: row.badgeBg, color: row.badgeColor }}>{row.status === "신규요청" ? "신규요청 · 확정 필요" : row.status}</span>
+                  {weddingPast && (
+                    <span style={{ flex: "0 0 auto", padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 800, background: "#5E575B", color: "#FFFFFF" }}>예식 종료</span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, color: "#6E646A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.venueLine}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 12.5, color: "#8C8188" }}>
