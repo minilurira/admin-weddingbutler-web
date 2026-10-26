@@ -12,6 +12,8 @@ model AdminUser {
   name         String
   username     String   @unique
   passwordHash String
+  // 비밀번호 찾기 인증번호를 받을 휴대폰(숫자만). 비어 있으면 비밀번호 찾기를 쓸 수 없다.
+  phone        String   @default("")
   createdAt    DateTime @default(now())
 }
 
