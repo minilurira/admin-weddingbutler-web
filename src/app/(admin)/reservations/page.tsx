@@ -80,13 +80,18 @@ async function loadReservation(id: string) {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: { filter?: string; q?: string; id?: string };
+  searchParams: { filter?: string; q?: string; id?: string; cancelled?: string };
 }) {
   const filter = searchParams.filter && ["신규요청", "협의중", "확정", "취소"].includes(searchParams.filter) ? searchParams.filter : "전체";
   const q = (searchParams.q ?? "").trim();
 
   const all = await prisma.reservation.findMany({ orderBy: { requestedAt: "desc" } });
+  // "전체" 목록에서는 취소 건을 기본으로 가린다. 취소 탭을 보거나 검색 중이거나 "취소 보기"를 눌렀을 때만 보인다.
+  const showCancelled = searchParams.cancelled === "show";
+  const cancelledCount = all.filter((r) => r.status === "취소").length;
+  const hideCancelled = filter === "전체" && !q && !showCancelled;
   const filtered = all.filter((it) => {
+    if (hideCancelled && it.status === "취소") return false;
     const matchesFilter = filter === "전체" || it.status === filter;
     const matchesQuery = !q || `${it.customer}${it.confirmVenue}${it.id}`.toLowerCase().includes(q.toLowerCase());
     return matchesFilter && matchesQuery;
@@ -99,6 +104,10 @@ export default async function ReservationsPage({
   const listParams = new URLSearchParams();
   if (filter !== "전체") listParams.set("filter", filter);
   if (q) listParams.set("q", q);
+  if (showCancelled) listParams.set("cancelled", "show");
+  const toggleParams = new URLSearchParams(listParams);
+  if (showCancelled) toggleParams.delete("cancelled");
+  else toggleParams.set("cancelled", "show");
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", flex: 1, minWidth: 0 }}>
@@ -117,6 +126,15 @@ export default async function ReservationsPage({
             ...Object.fromEntries(["신규요청", "협의중", "확정", "취소"].map((st) => [st, all.filter((r) => r.status === st).length])),
           }}
         />
+
+        {filter === "전체" && !q && cancelledCount > 0 && (
+          <Link
+            href={`/reservations${toggleParams.toString() ? `?${toggleParams.toString()}` : ""}`}
+            style={{ display: "inline-flex", alignItems: "center", minHeight: 36, margin: "0 0 12px", padding: "0 14px", borderRadius: 10, background: "#F6F3F5", color: "#6E646A", fontSize: 13, fontWeight: 700 }}
+          >
+            {showCancelled ? `취소 ${cancelledCount}건 가리기` : `취소 ${cancelledCount}건 가려짐 · 보기`}
+          </Link>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.length === 0 && <div style={{ fontSize: 13.5, color: "#8C8188", padding: "24px 4px" }}>조건에 맞는 예약이 없습니다.</div>}
