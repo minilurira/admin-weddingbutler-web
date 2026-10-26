@@ -30,6 +30,16 @@ const navItems = [
     ),
   },
   {
+    href: "/invitation-orders",
+    label: "청첩장 결제",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <rect x="3.2" y="3" width="13.6" height="14" rx="3" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M6.6 8h6.8M6.6 11.4h4.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/inquiries",
     label: "문의 목록",
     icon: (
@@ -61,16 +71,6 @@ const navItems = [
         <path d="M2.4 16.4c.4-2.9 2.6-4.6 5.2-4.6s4.8 1.7 5.2 4.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         <circle cx="14.2" cy="7.6" r="2.3" fill="currentColor" />
         <path d="M13.6 12.2c2.2.1 3.6 1.5 4 3.9h-3.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/invitation-orders",
-    label: "청첩장 결제",
-    icon: (
-      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
-        <rect x="3.2" y="3" width="13.6" height="14" rx="3" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M6.6 8h6.8M6.6 11.4h4.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
       </svg>
     ),
   },
