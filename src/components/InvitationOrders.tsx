@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { cancelInvitationOrder } from "@/lib/invitationOrderActions";
 import { TEMPLATE_NAME, type InvitationOrder } from "@/lib/invitationOrders";
-import { formatStamp } from "@/lib/format";
+import { formatPhone, formatStamp } from "@/lib/format";
 import { won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
 
@@ -26,7 +26,7 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
   const toast = useToast();
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [filter, setFilter] = useState<"all" | "paid" | "cancelled" | "pending">("all");
+  const [tab, setTab] = useState<"pay" | "unpaid" | null>(null);
   const [target, setTarget] = useState<InvitationOrder | null>(null);
   const [reason, setReason] = useState("");
   const [after, setAfter] = useState<"free" | "hide">("free");
@@ -34,15 +34,41 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
 
   const paid = orders.filter((o) => o.status === "paid");
   const cancelled = orders.filter((o) => o.status === "cancelled");
-  const pending = orders.filter((o) => o.status === "pending" || o.status === "failed");
   const paidSum = paid.reduce((a, o) => a + o.amount, 0);
   const cancelSum = cancelled.reduce((a, o) => a + (o.cancelledAmount ?? o.amount), 0);
-  const shown = orders
-    .filter((o) => filter === "all" || (filter === "pending" ? o.status === "pending" || o.status === "failed" : o.status === filter))
-    .sort((a, b) => (STATUS[a.status]?.order ?? 9) - (STATUS[b.status]?.order ?? 9) || b.createdAt.localeCompare(a.createdAt));
+  const payRows = [...paid, ...cancelled].sort((a, b) => (STATUS[a.status]?.order ?? 9) - (STATUS[b.status]?.order ?? 9) || (b.paidAt ?? b.createdAt).localeCompare(a.paidAt ?? a.createdAt));
+
+  // 미결제: 결제창만 열고 끝낸 시도(여러 번 눌러도 한 사람 한 줄). 이미 결제한 청첩장은 뺀다.
+  const doneIds = new Set([...paid, ...cancelled].map((o) => o.invitationId).filter(Boolean));
+  const groups = new Map<string, InvitationOrder[]>();
+  for (const o of orders) {
+    if (o.status !== "pending" && o.status !== "failed") continue;
+    if (o.invitationId && doneIds.has(o.invitationId)) continue;
+    const key = o.invitationId ?? `${o.phone}|${o.groom}|${o.bride}`;
+    groups.set(key, [...(groups.get(key) ?? []), o]);
+  }
+  const unpaid = Array.from(groups.values())
+    .map((list) => {
+      const sorted = [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return { last: sorted[0], first: sorted[sorted.length - 1], count: list.length };
+    })
+    .sort((a, b) => b.last.createdAt.localeCompare(a.last.createdAt));
+  const unpaidAttempts = unpaid.reduce((n, g) => n + g.count, 0);
+  const view = tab ?? (payRows.length === 0 && unpaid.length > 0 ? "unpaid" : "pay");
 
   const chip = (active: boolean): React.CSSProperties => ({ height: 36, padding: "0 14px", border: 0, borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", background: active ? "#F9EFF4" : "#F6F3F5", color: active ? "#B0567E" : "#6E646A" });
   const tile: React.CSSProperties = { background: "#F8F6F7", borderRadius: 16, padding: "16px 18px", flex: "1 1 170px" };
+
+  function inviteCell(o: InvitationOrder) {
+    if (o.invitationId === null) return <small style={{ color: "#8C8188" }}>삭제됨</small>;
+    return (
+      <>
+        {o.invitationStatus === "published" ? "공개 중" : o.invitationStatus === "hidden" ? "비공개" : "작성 중"}
+        {o.invitationTemplate && o.invitationTemplate !== o.template ? <small style={{ color: "#8C8188" }}> · {TEMPLATE_NAME[o.invitationTemplate] ?? o.invitationTemplate}</small> : null}
+        {o.url && o.invitationStatus === "published" && <><br /><a href={o.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700 }}>하객 화면 ↗</a></>}
+      </>
+    );
+  }
 
   async function copy(text: string) {
     try { await navigator.clipboard.writeText(text); toast("복사했습니다."); } catch { window.prompt("복사하세요.", text); }
@@ -91,58 +117,86 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
         <div style={tile}><div style={{ fontSize: 12.5, color: "#6E646A" }}>결제 완료</div><div style={{ fontSize: 24, fontWeight: 800 }}>{paid.length}건</div><div style={{ fontSize: 13, color: "#2F7A4C", fontWeight: 700 }}>{won(paidSum)}</div></div>
         <div style={tile}><div style={{ fontSize: 12.5, color: "#6E646A" }}>취소(환불)</div><div style={{ fontSize: 24, fontWeight: 800 }}>{cancelled.length}건</div><div style={{ fontSize: 13, color: "#6E646A", fontWeight: 700 }}>{won(cancelSum)}</div></div>
         <div style={tile}><div style={{ fontSize: 12.5, color: "#6E646A" }}>이번 달 순매출</div><div style={{ fontSize: 24, fontWeight: 800 }}>{won(paidSum)}</div><div style={{ fontSize: 12, color: "#8C8188" }}>결제 완료 합계 (취소는 이미 제외)</div></div>
-        <div style={tile}><div style={{ fontSize: 12.5, color: "#6E646A" }}>결제 시도(미완료)</div><div style={{ fontSize: 24, fontWeight: 800 }}>{pending.length}건</div><div style={{ fontSize: 12, color: "#8C8188" }}>결제창을 열었지만 끝내지 않음</div></div>
+        <button type="button" onClick={() => setTab("unpaid")} style={{ ...tile, border: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit", color: "inherit" }}><div style={{ fontSize: 12.5, color: "#6E646A" }}>미결제</div><div style={{ fontSize: 24, fontWeight: 800 }}>{unpaid.length}명</div><div style={{ fontSize: 12, color: "#8C8188" }}>결제창을 열고 끝내지 않은 사람 · 눌러서 보기</div></button>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" style={chip(filter === "all")} onClick={() => setFilter("all")}>전체 {orders.length}</button>
-        <button type="button" style={chip(filter === "paid")} onClick={() => setFilter("paid")}>결제 완료 {paid.length}</button>
-        <button type="button" style={chip(filter === "cancelled")} onClick={() => setFilter("cancelled")}>취소 {cancelled.length}</button>
-        <button type="button" style={chip(filter === "pending")} onClick={() => setFilter("pending")}>미완료 {pending.length}</button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="tablist">
+        <button type="button" role="tab" aria-selected={view === "pay"} style={chip(view === "pay")} onClick={() => setTab("pay")}>결제 내역 {payRows.length}</button>
+        <button type="button" role="tab" aria-selected={view === "unpaid"} style={chip(view === "unpaid")} onClick={() => setTab("unpaid")}>미결제 {unpaid.length}</button>
       </div>
+
+      {view === "unpaid" && (
+        <p style={{ margin: 0, fontSize: 13, color: "#6E646A", lineHeight: 1.7 }}>
+          프리미엄 결제창을 열었지만 결제를 끝내지 않은 사람입니다. 같은 청첩장으로 여러 번 시도해도 한 줄로 묶었고, 이미 결제한 청첩장은 빠집니다. 번호를 누르면 복사돼요.
+        </p>
+      )}
 
       <div style={{ overflowX: "auto", background: "#F8F6F7", borderRadius: 18, padding: "8px 16px 12px" }}>
-        <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 13.5 }}>
-          <thead>
-            <tr style={{ textAlign: "left", color: "#8C8188", fontSize: 12.5 }}>
-              {["결제 시각", "만든 사람", "템플릿 · 금액", "상태", "청첩장", ""].map((h, i) => <th key={i} style={{ padding: "10px 10px", fontWeight: 600, borderBottom: "1px solid #ECE7E9", whiteSpace: "nowrap" }}>{h}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {shown.length === 0 && <tr><td colSpan={6} style={{ padding: "22px 10px", color: "#8C8188" }}>이 달의 결제내역이 없습니다.</td></tr>}
-            {shown.map((o) => {
-              const st = STATUS[o.status] ?? { label: o.status, bg: "#EEECED", color: "#6E646A", order: 9 };
-              return (
-                <tr key={o.paymentId} style={{ borderBottom: "1px solid #ECE7E9", verticalAlign: "top" }}>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
-                    {formatStamp(new Date(o.paidAt ?? o.createdAt))}<br />
-                    <small style={{ color: "#8C8188" }}>{o.paidAt ? "결제" : "시도"}{o.cancelledAt ? ` · 취소 ${formatStamp(new Date(o.cancelledAt))}` : ""}</small>
-                  </td>
+        {view === "pay" ? (
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 13.5 }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "#8C8188", fontSize: 12.5 }}>
+                {["결제 시각", "만든 사람", "템플릿 · 금액", "상태", "청첩장", ""].map((h, i) => <th key={i} style={{ padding: "10px 10px", fontWeight: 600, borderBottom: "1px solid #ECE7E9", whiteSpace: "nowrap" }}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {payRows.length === 0 && <tr><td colSpan={6} style={{ padding: "22px 10px", color: "#8C8188" }}>이 달의 결제 내역이 없습니다.</td></tr>}
+              {payRows.map((o) => {
+                const st = STATUS[o.status] ?? { label: o.status, bg: "#EEECED", color: "#6E646A", order: 9 };
+                return (
+                  <tr key={o.paymentId} style={{ borderBottom: "1px solid #ECE7E9", verticalAlign: "top" }}>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                      {formatStamp(new Date(o.paidAt ?? o.createdAt))}
+                      {o.cancelledAt && <><br /><small style={{ color: "#8C8188" }}>취소 {formatStamp(new Date(o.cancelledAt))}</small></>}
+                    </td>
+                    <td style={{ padding: "12px 10px" }}>
+                      <b>{[o.groom, o.bride].filter(Boolean).join(" · ") || "이름 없음"}</b><br />
+                      {o.phone ? <button type="button" onClick={() => copy(o.phone)} title="누르면 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#B0567E", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>{formatPhone(o.phone)}</button> : <small style={{ color: "#8C8188" }}>연락처 없음</small>}
+                    </td>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                      {TEMPLATE_NAME[o.template] ?? o.template}<br /><b>{won(o.amount)}</b>
+                    </td>
+                    <td style={{ padding: "12px 10px", minWidth: 150 }}>
+                      <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: st.bg, color: st.color }}>{st.label}</span>
+                      {o.status === "cancelled" && o.cancelReason && <div style={{ marginTop: 6, fontSize: 12.5, color: "#6E646A", lineHeight: 1.5 }}>사유: {o.cancelReason}</div>}
+                      <div style={{ marginTop: 4 }}><button type="button" onClick={() => copy(o.paymentId)} title="결제번호 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#8C8188", fontSize: 11, cursor: "pointer" }}>{o.paymentId.slice(0, 22)}…</button></div>
+                    </td>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>{inviteCell(o)}</td>
+                    <td style={{ padding: "12px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {o.status === "paid" && <button type="button" onClick={() => openCancel(o)} style={{ height: 36, padding: "0 14px", border: "1px solid #E5C9D6", borderRadius: 10, background: "#FFFFFF", color: "#A8416C", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>결제 취소</button>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse", fontSize: 13.5 }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "#8C8188", fontSize: 12.5 }}>
+                {["마지막 시도", "만든 사람", "고른 템플릿 · 금액", "시도", "청첩장"].map((h, i) => <th key={i} style={{ padding: "10px 10px", fontWeight: 600, borderBottom: "1px solid #ECE7E9", whiteSpace: "nowrap" }}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {unpaid.length === 0 && <tr><td colSpan={5} style={{ padding: "22px 10px", color: "#8C8188" }}>미결제 내역이 없습니다.</td></tr>}
+              {unpaid.map(({ last, first, count }) => (
+                <tr key={last.paymentId} style={{ borderBottom: "1px solid #ECE7E9", verticalAlign: "top" }}>
+                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{formatStamp(new Date(last.createdAt))}</td>
                   <td style={{ padding: "12px 10px" }}>
-                    <b>{[o.groom, o.bride].filter(Boolean).join(" · ") || "이름 없음"}</b><br />
-                    {o.phone ? <button type="button" onClick={() => copy(o.phone)} title="누르면 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#B0567E", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>{o.phone}</button> : <small style={{ color: "#8C8188" }}>연락처 없음</small>}
+                    <b>{[last.groom, last.bride].filter(Boolean).join(" · ") || "이름 없음"}</b><br />
+                    {last.phone ? <button type="button" onClick={() => copy(last.phone)} title="누르면 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#B0567E", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>{formatPhone(last.phone)}</button> : <small style={{ color: "#8C8188" }}>연락처 없음</small>}
                   </td>
+                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{TEMPLATE_NAME[last.template] ?? last.template}<br /><b>{won(last.amount)}</b></td>
                   <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
-                    {TEMPLATE_NAME[o.template] ?? o.template}<br /><b>{won(o.amount)}</b>
+                    <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: "#FBEFD9", color: "#8A5A00" }}>{count}회</span>
+                    {count > 1 && <><br /><small style={{ color: "#8C8188" }}>처음 {formatStamp(new Date(first.createdAt))}</small></>}
                   </td>
-                  <td style={{ padding: "12px 10px", minWidth: 150 }}>
-                    <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: st.bg, color: st.color }}>{st.label}</span>
-                    {o.status === "cancelled" && o.cancelReason && <div style={{ marginTop: 6, fontSize: 12.5, color: "#6E646A", lineHeight: 1.5 }}>사유: {o.cancelReason}</div>}
-                    <div style={{ marginTop: 4 }}><button type="button" onClick={() => copy(o.paymentId)} title="결제번호 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#8C8188", fontSize: 11, cursor: "pointer" }}>{o.paymentId.slice(0, 22)}…</button></div>
-                  </td>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>
-                    {o.invitationId === null
-                      ? <small style={{ color: "#8C8188" }}>삭제됨</small>
-                      : <>{o.invitationStatus === "published" ? "공개 중" : o.invitationStatus === "hidden" ? "비공개" : "작성 중"}{o.invitationTemplate && o.invitationTemplate !== o.template ? <small style={{ color: "#8C8188" }}> · {TEMPLATE_NAME[o.invitationTemplate] ?? o.invitationTemplate}</small> : null}<br />{o.url && o.invitationStatus === "published" && <a href={o.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700 }}>하객 화면 ↗</a>}</>}
-                  </td>
-                  <td style={{ padding: "12px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
-                    {o.status === "paid" && <button type="button" onClick={() => openCancel(o)} style={{ height: 36, padding: "0 14px", border: "1px solid #E5C9D6", borderRadius: 10, background: "#FFFFFF", color: "#A8416C", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>결제 취소</button>}
-                  </td>
+                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>{inviteCell(last)}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {target && (
