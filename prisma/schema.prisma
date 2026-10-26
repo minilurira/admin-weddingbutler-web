@@ -253,3 +253,14 @@ model MessageLog {
 
   @@index([reservationId, createdAt])
 }
+
+// 캘린더에서 막아 둔 날짜·시간. 홈페이지 예약 화면에서 이 시간은 고를 수 없다.
+// startTime/endTime이 비어 있으면 그날 종일. 있으면 그 시각 이상 ~ 종료 시각 이하의 예식 시간(TIME_SLOTS)을 막는다.
+model CalendarBlock {
+  id        String   @id @default(cuid())
+  date      String
+  startTime String   @default("")
+  endTime   String   @default("")
+  reason    String   @default("")
+  createdAt DateTime @default(now())
+}

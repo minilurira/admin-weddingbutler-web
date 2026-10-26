@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { slotsBlockedBy } from "@/lib/calendarBlocks";
 
 export const dynamic = "force-dynamic";
 
@@ -28,5 +29,11 @@ export async function GET(req: NextRequest) {
   });
   const times = Array.from(new Set(rows.map((r) => r.confirmTime).filter((t) => /^\d{2}:\d{2}$/.test(t)))).sort();
 
-  return NextResponse.json({ times });
+  // 어드민 캘린더에서 막아 둔 시간(고를 수 없는 TIME_SLOTS 그대로)
+  // 테이블이 아직 없거나 조회가 실패해도 예약 화면이 멈추지 않게, 막은 시간만 빼고 돌려준다.
+  const blocks = await prisma.calendarBlock.findMany({ where: { date }, select: { startTime: true, endTime: true } }).catch((err) => {
+    console.error("[api/public/availability] calendarBlock lookup failed", err);
+    return [];
+  });
+  return NextResponse.json({ times, blocked: slotsBlockedBy(blocks) });
 }

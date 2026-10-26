@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { toCalendarEvent } from "@/lib/view";
 import FullCalendar from "@/components/FullCalendar";
+import { blocksByDate } from "@/lib/blockData";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
-  const confirmed = await prisma.reservation.findMany({ where: { status: "확정" } });
+  const [confirmed, blocks] = await Promise.all([prisma.reservation.findMany({ where: { status: "확정" } }), blocksByDate()]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -18,5 +19,5 @@ export default async function CalendarPage() {
     eventsByDate[it.confirmDate].push(toCalendarEvent(it));
   }
 
-  return <FullCalendar initialYear={year} initialMonth={month} eventsByDate={eventsByDate} today={today} />;
+  return <FullCalendar initialYear={year} initialMonth={month} eventsByDate={eventsByDate} blocksByDate={blocks} today={today} />;
 }

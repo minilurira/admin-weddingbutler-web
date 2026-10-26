@@ -1,0 +1,2 @@
+-- 캘린더 날짜·시간 막기
+CREATE TABLE IF NOT EXISTS "CalendarBlock" ("id" TEXT NOT NULL, "date" TEXT NOT NULL, "startTime" TEXT NOT NULL DEFAULT '', "endTime" TEXT NOT NULL DEFAULT '', "reason" TEXT NOT NULL DEFAULT '', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "CalendarBlock_pkey" PRIMARY KEY ("id"));

@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { won } from "@/lib/pricing";
 import { toCalendarEvent } from "@/lib/view";
 import { monthPaidConfirmed } from "@/lib/monthStats";
-import MiniCalendar from "@/components/MiniCalendar";
+import FullCalendar from "@/components/FullCalendar";
+import { blocksByDate } from "@/lib/blockData";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [items, monthPaid] = await Promise.all([prisma.reservation.findMany({ orderBy: { requestedAt: "desc" } }), monthPaidConfirmed()]);
+  const [items, monthPaid, blocks] = await Promise.all([prisma.reservation.findMany({ orderBy: { requestedAt: "desc" } }), monthPaidConfirmed(), blocksByDate()]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -52,27 +53,25 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start" }}>
-        <MiniCalendar initialYear={year} initialMonth={month} eventsByDate={eventsByDate} today={today} />
+      <FullCalendar embedded initialYear={year} initialMonth={month} eventsByDate={eventsByDate} blocksByDate={blocks} today={today} />
 
-        <div style={{ flex: "1 1 300px", minWidth: 260, borderRadius: 18, background: "#F6F3F5", padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>다가오는 확정 일정</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {upcoming.length === 0 && (
-              <div style={{ fontSize: 13, color: "#8C8188" }}>확정된 일정이 없습니다.</div>
-            )}
-            {upcoming.map((it) => (
-              <Link key={it.id} href={`/reservations?id=${it.id}`} style={{ display: "flex", gap: 12 }}>
-                <div style={{ width: 3, borderRadius: 2, background: "#B0567E", flex: "0 0 3px" }} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1E1A1C" }}>{it.confirmDate.slice(5).replace("-", ".")} {it.confirmTime}</div>
-                  <div style={{ fontSize: 12.5, color: "#8C8188", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {it.customer} 님 · {it.confirmVenue}
-                  </div>
+      <div style={{ marginTop: 18, borderRadius: 18, background: "#F6F3F5", padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>다가오는 확정 일정</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+          {upcoming.length === 0 && (
+            <div style={{ fontSize: 13, color: "#8C8188" }}>확정된 일정이 없습니다.</div>
+          )}
+          {upcoming.map((it) => (
+            <Link key={it.id} href={`/reservations?id=${it.id}`} style={{ display: "flex", gap: 12 }}>
+              <div style={{ width: 3, borderRadius: 2, background: "#B0567E", flex: "0 0 3px" }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1E1A1C" }}>{it.confirmDate.slice(5).replace("-", ".")} {it.confirmTime}</div>
+                <div style={{ fontSize: 12.5, color: "#8C8188", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {it.customer} 님 · {it.confirmVenue}
                 </div>
-              </Link>
-            ))}
-          </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </main>
