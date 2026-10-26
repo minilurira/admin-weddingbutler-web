@@ -75,6 +75,16 @@ const navItems = [
     ),
   },
   {
+    href: "/admins",
+    label: "관리자 관리",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="7" r="3.2" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M3.8 16.4c.8-3 3.2-4.4 6.2-4.4s5.4 1.4 6.2 4.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/finance",
     label: "손익관리",
     icon: (
