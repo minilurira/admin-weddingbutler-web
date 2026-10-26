@@ -52,12 +52,17 @@ export async function fetchInvitationOrders(from: string, until: string): Promis
   return { ok: true, orders };
 }
 
-export type CancelResult = { ok: true; message: string } | { ok: false; message: string };
+export type CancelResult =
+  | { ok: true; message: string; notify: { phone: string; groom: string; bride: string; amount: number } | null }
+  | { ok: false; message: string };
 
 export async function cancelInvitationPayment(paymentId: string, reason: string, after: "free" | "hide"): Promise<CancelResult> {
   const r = await call("/api/admin/invitation-orders/cancel", { method: "POST", body: JSON.stringify({ paymentId, reason, after }) });
   if ("error" in r) return { ok: false, message: r.error };
   if (r.status === 404) return { ok: false, message: String(r.data.message ?? "홈페이지에 취소 기능이 아직 배포되지 않았거나 결제 기록이 없습니다.") };
   if (r.status !== 200 || r.data.code !== "ok") return { ok: false, message: String(r.data.message ?? `취소하지 못했습니다 (${r.status}).`) };
-  return { ok: true, message: r.data.alreadyCancelled ? "이미 취소된 결제입니다. 기록을 맞췄습니다." : `${Number(r.data.refunded ?? 0).toLocaleString("ko-KR")}원 결제를 취소(환불)했습니다.` };
+  // 이번에 새로 취소된 건만 고객에게 안내한다(이미 취소된 건은 안내를 다시 보내지 않는다)
+  const n = r.data.notify as { phone?: string; groom?: string; bride?: string } | undefined;
+  const notify = !r.data.alreadyCancelled && n?.phone ? { phone: n.phone, groom: n.groom ?? "", bride: n.bride ?? "", amount: Number(r.data.refunded ?? 0) } : null;
+  return { ok: true, notify, message: r.data.alreadyCancelled ? "이미 취소된 결제입니다. 기록을 맞췄습니다." : `${Number(r.data.refunded ?? 0).toLocaleString("ko-KR")}원 결제를 취소(환불)했습니다.` };
 }
