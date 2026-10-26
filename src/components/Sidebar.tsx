@@ -65,6 +65,16 @@ const navItems = [
     ),
   },
   {
+    href: "/invitation-orders",
+    label: "청첩장 결제",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <rect x="3.2" y="3" width="13.6" height="14" rx="3" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M6.6 8h6.8M6.6 11.4h4.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/finance",
     label: "손익관리",
     icon: (
