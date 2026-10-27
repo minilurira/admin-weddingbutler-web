@@ -1,9 +1,10 @@
 import { SolapiMessageService } from "solapi";
 import { maskPhone, recordMessage, type MessageKind } from "@/lib/messageLog";
 
+import { logError } from "@/lib/errorLog";
 function logSendResult(reservationId: string, result: { failedMessageList: readonly unknown[]; groupInfo: { count: Record<string, number> } }) {
   if (result.failedMessageList.length > 0) {
-    console.error(`[alimtalk] Solapi rejected send for ${reservationId}:`, JSON.stringify(result.failedMessageList));
+    logError(`[alimtalk] Solapi rejected send for ${reservationId}:`, JSON.stringify(result.failedMessageList));
   } else {
     console.log(`[alimtalk] Solapi accepted send for ${reservationId}:`, JSON.stringify(result.groupInfo.count));
   }
@@ -106,7 +107,7 @@ export async function sendConfirmAlimtalk(payload: AlimtalkFields): Promise<{ se
     }
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
-    console.error(`[alimtalk] Solapi confirm send failed for ${payload.reservationId}`, err);
+    logError(`[alimtalk] Solapi confirm send failed for ${payload.reservationId}`, err);
     await logKakao(payload.reservationId, "예약 확정", payload.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
     return { sent: false, detail: "전송 실패" };
   }
@@ -173,7 +174,7 @@ export async function sendNewReservationAlimtalk(payload: AlimtalkFields): Promi
     logSendResult(payload.reservationId, result);
     await logAll((phone) => { const r = failureFor(result, phone); return r ? { status: "failed", detail: r } : { status: "sent" }; });
   } catch (err) {
-    console.error(`[alimtalk] Solapi new-reservation send failed for ${payload.reservationId}`, err);
+    logError(`[alimtalk] Solapi new-reservation send failed for ${payload.reservationId}`, err);
     await logAll(() => ({ status: "failed", detail: err instanceof Error ? err.message : "전송 실패" }));
   }
 }
@@ -207,7 +208,7 @@ export async function sendReminderAlimtalk(kind: ReminderKind, payload: Alimtalk
     if (result.failedMessageList.length > 0) return { sent: false, detail: "전송 실패" };
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
-    console.error(`[alimtalk] Solapi ${kind} reminder failed for ${payload.reservationId}`, err);
+    logError(`[alimtalk] Solapi ${kind} reminder failed for ${payload.reservationId}`, err);
     await logKakao(payload.reservationId, reminderKind, payload.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
     return { sent: false, detail: "전송 실패" };
   }
@@ -244,7 +245,7 @@ export async function sendCancelAlimtalk(
     if (result.failedMessageList.length > 0) return { sent: false, detail: "전송 실패" };
     return { sent: true, detail: "전송 완료" };
   } catch (err) {
-    console.error(`[alimtalk] Solapi cancel send failed for ${payload.reservationId}`, err);
+    logError(`[alimtalk] Solapi cancel send failed for ${payload.reservationId}`, err);
     await logKakao(payload.reservationId, "예약 취소", payload.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
     return { sent: false, detail: "전송 실패" };
   }
@@ -267,7 +268,7 @@ export async function sendLookupOtpAlimtalk(phone: string, code: string): Promis
     logSendResult(tag, result);
     return result.failedMessageList.length === 0;
   } catch (err) {
-    console.error(`[alimtalk] Solapi lookup OTP send failed for ${tag}`, err);
+    logError(`[alimtalk] Solapi lookup OTP send failed for ${tag}`, err);
     return false;
   }
 }
@@ -289,7 +290,7 @@ export async function sendInvitationOtpAlimtalk(phone: string, code: string): Pr
     logSendResult(tag, result);
     return result.failedMessageList.length === 0;
   } catch (err) {
-    console.error(`[alimtalk] Solapi invitation OTP send failed for ${tag}`, err);
+    logError(`[alimtalk] Solapi invitation OTP send failed for ${tag}`, err);
     return false;
   }
 }
@@ -320,7 +321,7 @@ export async function sendInquiryReplyAlimtalk(phone: string, fields: { name: st
     logSendResult(tag, result);
     return result.failedMessageList.length === 0;
   } catch (err) {
-    console.error(`[alimtalk] Solapi inquiry reply send failed for ${tag}`, err);
+    logError(`[alimtalk] Solapi inquiry reply send failed for ${tag}`, err);
     return false;
   }
 }
@@ -341,7 +342,7 @@ export async function sendPaymentLinkAlimtalk(phone: string, variables: Record<s
     logSendResult(tag, result);
     return result.failedMessageList.length === 0;
   } catch (err) {
-    console.error(`[alimtalk] Solapi payment link send failed for ${tag}`, err);
+    logError(`[alimtalk] Solapi payment link send failed for ${tag}`, err);
     return false;
   }
 }

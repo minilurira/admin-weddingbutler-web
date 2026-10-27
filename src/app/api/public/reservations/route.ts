@@ -6,6 +6,7 @@ import { formatWishDateLabel } from "@/lib/format";
 import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 
+import { logError } from "@/lib/errorLog";
 export const dynamic = "force-dynamic";
 
 interface IncomingBody {
@@ -46,7 +47,7 @@ function generateId() {
 export async function POST(req: NextRequest) {
   const apiKey = process.env.RESERVATION_API_KEY;
   if (!apiKey) {
-    console.error("[api/public/reservations] RESERVATION_API_KEY is not set on the server — refusing all requests.");
+    logError("[api/public/reservations] RESERVATION_API_KEY is not set on the server — refusing all requests.");
     return NextResponse.json({ error: "server not configured" }, { status: 500 });
   }
 

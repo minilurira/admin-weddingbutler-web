@@ -9,6 +9,7 @@ import { sendSms } from "@/lib/sms";
 import { INQUIRY_REPLY_MAX, charCount, inquiryReplyText } from "@/lib/inquiryReply";
 import { appendReply } from "@/lib/inquiryReplyLog";
 
+import { logError } from "@/lib/errorLog";
 async function requireSession() {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("로그인이 필요합니다.");
@@ -62,7 +63,7 @@ export async function sendInquiryReply(id: string, text: string): Promise<ReplyR
       ...(inquiry.handled_at ? {} : { handled_at: now }),
     });
   } catch (err) {
-    console.error(`[inquiries] reply sent but not saved for ${id}`, err);
+    logError(`[inquiries] reply sent but not saved for ${id}`, err);
     saved = false;
   }
   revalidatePath("/inquiries");
@@ -89,7 +90,7 @@ export async function listOpenInquiries(): Promise<{ ok: true; items: OpenInquir
       items: rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone, ceremonyDate: r.ceremony_date ?? "", topic: r.topic, createdAt: r.created_at, handled: Boolean(r.handled_at) })),
     };
   } catch (err) {
-    console.error("[listOpenInquiries] failed", err);
+    logError("[listOpenInquiries] failed", err);
     return { ok: false, message: "문의 목록을 불러오지 못했습니다." };
   }
 }

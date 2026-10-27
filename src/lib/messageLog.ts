@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
+import { logError } from "@/lib/errorLog";
 // 예약별 알림톡/문자 발송 기록. 발송 함수(alimtalk.ts, paymentLink.ts)가 결과를 남기고, 예약 상세가 읽어 보여 준다.
 // 기록은 어디까지나 보조 정보라서, 저장에 실패해도 발송 흐름은 절대 막지 않는다(recordMessage는 throw 하지 않는다).
 
@@ -71,7 +72,7 @@ export async function recordMessage(e: MessageEntry): Promise<void> {
       },
     });
   } catch (err) {
-    console.error(`[messageLog] could not record ${e.kind} for ${e.reservationId}`, err);
+    logError(`[messageLog] could not record ${e.kind} for ${e.reservationId}`, err);
   }
 }
 

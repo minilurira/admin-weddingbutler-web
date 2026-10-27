@@ -1,6 +1,7 @@
 import { homepageUrl } from "@/lib/records";
 import { hasLinkPayments, refundLinkPayments } from "@/lib/paymentLink";
 
+import { logError } from "@/lib/errorLog";
 // 결제는 홈페이지(포트원 → KG이니시스)에서 받았으므로, 결제취소도 홈페이지의
 // /api/reservations/cancel 에 맡긴다. 포트원 키는 홈페이지에만 있다.
 // 키는 예약 연동과 같은 값 (어드민 RESERVATION_API_KEY = 홈페이지 ADMIN_API_KEY).
@@ -29,7 +30,7 @@ export async function requestPaymentCancel(bookingNo: string, reason: string, op
 
   const rest = await requestHomepageCancel(bookingNo, reason, { ...opts, amount: link.remaining });
   if (rest.state === "cancelled") return { state: "cancelled", refundAmount: link.refunded + rest.refundAmount };
-  if (rest.state === "error") console.error(`[paymentCancel] homepage remainder cancel failed for ${bookingNo}: ${rest.message}`);
+  if (rest.state === "error") logError(`[paymentCancel] homepage remainder cancel failed for ${bookingNo}: ${rest.message}`);
   return { state: "cancelled", refundAmount: link.refunded };
 }
 
@@ -46,7 +47,7 @@ async function requestHomepageCancel(bookingNo: string, reason: string, opts: Pa
       cache: "no-store",
     });
   } catch (err) {
-    console.error(`[paymentCancel] failed to reach homepage for ${bookingNo}`, err);
+    logError(`[paymentCancel] failed to reach homepage for ${bookingNo}`, err);
     return { state: "error", message: "홈페이지에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." };
   }
 
@@ -57,7 +58,7 @@ async function requestHomepageCancel(bookingNo: string, reason: string, opts: Pa
   if (data.code === "not_found" || data.code === "not_paid") {
     return { state: "no_payment", message: data.message ?? "결제 완료된 기록이 없습니다." };
   }
-  console.error(`[paymentCancel] homepage responded ${res.status} for ${bookingNo}`, data);
+  logError(`[paymentCancel] homepage responded ${res.status} for ${bookingNo}`, data);
   if (res.status === 401) return { state: "error", message: "홈페이지 연동 키가 맞지 않습니다." };
   return { state: "error", message: data.message ?? `결제취소 요청이 실패했습니다 (${res.status}).` };
 }

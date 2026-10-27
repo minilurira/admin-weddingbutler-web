@@ -9,6 +9,7 @@ import { recordMessage } from "@/lib/messageLog";
 import { cancelPayment, createPaymentLink, deactivatePaymentLink, getPayment, PortOneV1Error } from "@/lib/portoneV1";
 import { expireLabel, expiryAfterDays, paymentLinkText, paymentLinkVariables, type PaymentLinkFields } from "@/lib/paymentLinkText";
 
+import { logError } from "@/lib/errorLog";
 // 어드민 → 고객 결제 링크(포트원 V1 링크페이). 링크 생성·발송, 웹훅 반영, 환불을 여기서 한다.
 
 export const PAYMENT_LINK_MIN_AMOUNT = 1000;
@@ -48,7 +49,7 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
     });
   } catch (err) {
     if (err instanceof PortOneV1Error) return { ok: false, message: err.message };
-    console.error(`[paymentLink] create failed for ${r.id}`, err);
+    logError(`[paymentLink] create failed for ${r.id}`, err);
     return { ok: false, message: "포트원에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." };
   }
 
@@ -129,7 +130,7 @@ export async function applyPaymentWebhook(impUid: string): Promise<WebhookOutcom
   const r = link.reservation;
 
   if (pay.amount !== link.amount) {
-    console.error(`[paymentLink] amount mismatch for ${link.merchantUid}: paid ${pay.amount}, expected ${link.amount}`);
+    logError(`[paymentLink] amount mismatch for ${link.merchantUid}: paid ${pay.amount}, expected ${link.amount}`);
     await prisma.note.create({ data: { reservationId: r.id, text: `결제 링크 금액 불일치 · 청구 ${won(link.amount)} / 결제 ${won(pay.amount)} · 확인 필요 (포트원 ${impUid})` } });
     await sendNewReservationKakaoWorkNotice(`결제 링크 금액 불일치 (${r.id})\n고객: ${r.customer} · ${r.phone}\n청구 ${won(link.amount)} / 결제 ${won(pay.amount)} · 포트원 콘솔에서 확인해 주세요.`);
     return "amount_mismatch";

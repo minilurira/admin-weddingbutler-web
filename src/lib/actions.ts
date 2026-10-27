@@ -13,6 +13,7 @@ import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
 import { cancelPaymentLinkById, sendPaymentLinkFor, type SendLinkOptions } from "@/lib/paymentLink";
 
+import { logError } from "@/lib/errorLog";
 async function requireSession() {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("로그인이 필요합니다.");
@@ -279,7 +280,7 @@ async function markInquiryBooked(inquiryId: string, reservationId: string) {
     await updateInquiries([inquiry.id], { admin_memo: memo, ...(inquiry.handled_at ? {} : { handled_at: new Date().toISOString() }) });
     revalidatePath("/inquiries");
   } catch (err) {
-    console.error(`[createReservation] failed to mark inquiry ${inquiryId} for ${reservationId}`, err);
+    logError(`[createReservation] failed to mark inquiry ${inquiryId} for ${reservationId}`, err);
   }
 }
 

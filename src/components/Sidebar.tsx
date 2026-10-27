@@ -95,6 +95,16 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/errors",
+    label: "오류 기록",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <path d="M10 3.2l7.2 12.6H2.8L10 3.2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M10 8.4v3.4M10 13.9v.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Sidebar({

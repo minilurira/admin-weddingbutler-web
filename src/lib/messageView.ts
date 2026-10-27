@@ -2,6 +2,7 @@ import { SolapiMessageService } from "solapi";
 import { ensureMessageLogTable } from "@/lib/messageLog";
 import { prisma } from "@/lib/prisma";
 
+import { logError } from "@/lib/errorLog";
 // 발송 내역 화면용: 저장된 변수를 솔라피 알림톡 템플릿 본문에 채워 고객이 받은 메시지 모양으로 만든다.
 
 export interface MessageView {
@@ -38,7 +39,7 @@ async function template(id: string): Promise<Tpl | null> {
     try {
       tpl = (await new SolapiMessageService(key, secret).getKakaoAlimtalkTemplate(id)) as unknown as Tpl;
     } catch (err) {
-      console.error(`[messageView] could not load template ${id}`, err);
+      logError(`[messageView] could not load template ${id}`, err);
     }
   }
   if (tpl) cache.set(id, { at: Date.now(), tpl });

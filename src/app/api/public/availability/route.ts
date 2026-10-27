@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { slotsBlockedBy } from "@/lib/calendarBlocks";
 
+import { logError } from "@/lib/errorLog";
 export const dynamic = "force-dynamic";
 
 // 홈페이지 예약 화면이 같은 날 이미 잡힌 예식 시각을 알아내는 용도.
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const apiKey = process.env.RESERVATION_API_KEY;
   if (!apiKey) {
-    console.error("[api/public/availability] RESERVATION_API_KEY is not set on the server — refusing all requests.");
+    logError("[api/public/availability] RESERVATION_API_KEY is not set on the server — refusing all requests.");
     return NextResponse.json({ error: "server not configured" }, { status: 500 });
   }
 
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
   // 어드민 캘린더에서 막아 둔 시간(고를 수 없는 TIME_SLOTS 그대로)
   // 테이블이 아직 없거나 조회가 실패해도 예약 화면이 멈추지 않게, 막은 시간만 빼고 돌려준다.
   const blocks = await prisma.calendarBlock.findMany({ where: { date }, select: { startTime: true, endTime: true } }).catch((err) => {
-    console.error("[api/public/availability] calendarBlock lookup failed", err);
+    logError("[api/public/availability] calendarBlock lookup failed", err);
     return [];
   });
   return NextResponse.json({ times, blocked: slotsBlockedBy(blocks) });

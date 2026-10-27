@@ -1,4 +1,5 @@
-export async function sendNewReservationKakaoWorkNotice(text: string): Promise<void> {
+
+import { logError } from "@/lib/errorLog";export async function sendNewReservationKakaoWorkNotice(text: string): Promise<void> {
   const appKey = process.env.KAKAOWORK_APP_KEY;
   const conversationId = process.env.KAKAOWORK_CONVERSATION_ID;
   if (!appKey || !conversationId) {
@@ -12,9 +13,9 @@ export async function sendNewReservationKakaoWorkNotice(text: string): Promise<v
       body: JSON.stringify({ conversation_id: conversationId, text }),
     });
     if (!res.ok) {
-      console.error(`[kakaowork] send failed: ${res.status}`, await res.text());
+      logError(`[kakaowork] send failed: ${res.status}`, await res.text());
     }
   } catch (err) {
-    console.error("[kakaowork] failed to reach API", err);
+    logError("[kakaowork] failed to reach API", err);
   }
 }

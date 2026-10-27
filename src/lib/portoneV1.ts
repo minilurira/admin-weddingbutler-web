@@ -1,4 +1,5 @@
-// 포트원 V1 API — 어드민에서 보내는 결제 링크(링크페이)와 그 결제의 조회·취소에만 쓴다.
+
+import { logError } from "@/lib/errorLog";// 포트원 V1 API — 어드민에서 보내는 결제 링크(링크페이)와 그 결제의 조회·취소에만 쓴다.
 // 홈페이지 예약 결제는 V2라서 홈페이지(/api/reservations/cancel)가 따로 처리한다.
 // 키: 포트원 콘솔 → 결제연동 → 연동 정보 → V1 API (PORTONE_V1_IMP_KEY / PORTONE_V1_IMP_SECRET).
 
@@ -76,7 +77,7 @@ export async function createPaymentLink(input: CreateLinkInput): Promise<string>
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const url = res.ok ? findUrl(data) : null;
   if (!url) {
-    console.error(`[portoneV1] link create failed for ${input.merchantUid} (${res.status})`, JSON.stringify(data));
+    logError(`[portoneV1] link create failed for ${input.merchantUid} (${res.status})`, JSON.stringify(data));
     throw new PortOneV1Error(`결제 링크를 만들지 못했습니다 (${String(data.message ?? res.status)}).`);
   }
   return url;
@@ -93,10 +94,10 @@ export async function deactivatePaymentLink(url: string): Promise<boolean> {
       headers: { Authorization: token },
       cache: "no-store",
     });
-    if (!res.ok) console.error(`[portoneV1] link deactivate failed (${res.status})`, await res.text().catch(() => ""));
+    if (!res.ok) logError(`[portoneV1] link deactivate failed (${res.status})`, await res.text().catch(() => ""));
     return res.ok;
   } catch (err) {
-    console.error("[portoneV1] link deactivate failed", err);
+    logError("[portoneV1] link deactivate failed", err);
     return false;
   }
 }
@@ -149,6 +150,6 @@ export async function cancelPayment(impUid: string, amount: number, reason: stri
   const data = (await res.json().catch(() => ({}))) as { code?: number; message?: string; response?: { cancel_amount?: number } | null };
   if (res.ok && data.code === 0 && data.response) return { ok: true, cancelledAmount: amount };
   if (/이미.*취소|already/i.test(data.message ?? "")) return { ok: true, cancelledAmount: 0 };
-  console.error(`[portoneV1] cancel failed for ${impUid} (${res.status})`, JSON.stringify(data));
+  logError(`[portoneV1] cancel failed for ${impUid} (${res.status})`, JSON.stringify(data));
   return { ok: false, message: data.message ?? `결제취소 실패 (${res.status})` };
 }

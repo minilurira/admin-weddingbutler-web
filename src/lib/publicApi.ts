@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordApiKey } from "@/lib/records";
 
+import { logError } from "@/lib/errorLog";
 /** 홈페이지 서버만 부르는 /api/public/records/* 인증. 통과하면 null. */
 export function requireRecordApiKey(req: NextRequest): NextResponse | null {
   const apiKey = recordApiKey();
   if (!apiKey) {
-    console.error("[api/public/records] RECORD_API_KEY / RESERVATION_API_KEY is not set — refusing all requests.");
+    logError("[api/public/records] RECORD_API_KEY / RESERVATION_API_KEY is not set — refusing all requests.");
     return NextResponse.json({ error: "server not configured" }, { status: 500 });
   }
   const auth = req.headers.get("authorization") ?? "";
