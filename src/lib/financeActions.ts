@@ -83,6 +83,18 @@ export async function addButler(name: string) {
   done();
 }
 
+/** 버틀러의 정산 입금 계좌를 저장한다. 비워서 저장하면 지워진다. */
+export async function saveButlerAccount(id: string, input: { bankName: string; accountNumber: string; accountHolder: string }) {
+  await guard();
+  const accountNumber = String(input.accountNumber ?? "").trim();
+  if (accountNumber && !/^[0-9-]{6,30}$/.test(accountNumber)) throw new Error("계좌번호는 숫자와 하이픈(-)만 6~30자로 입력해 주세요.");
+  await prisma.butler.update({
+    where: { id },
+    data: { bankName: String(input.bankName ?? "").trim().slice(0, 20), accountNumber, accountHolder: String(input.accountHolder ?? "").trim().slice(0, 30) },
+  });
+  done();
+}
+
 /** 버틀러를 삭제한다. 그 버틀러의 참석·정산 기록도 함께 지워진다(DB 관계 cascade). */
 export async function deleteButler(id: string) {
   await guard();

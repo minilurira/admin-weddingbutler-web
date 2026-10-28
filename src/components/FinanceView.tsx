@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
+  addButler, saveButlerAccount, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowByMonth, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
@@ -14,7 +14,7 @@ export interface FinanceData {
   settings: { feeRate: number; bankDate: string; bankBalance: number };
   reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string; payments: Record<string, string> }[];
-  butlers: { id: string; name: string; grade: string }[];
+  butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string }[];
   shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
 }
 
@@ -32,6 +32,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const [tab, setTab] = useState<Tab>(butlerView ? "butler" : "income");
   const [sRes, setSRes] = useState(data.reservations[0]?.id ?? "");
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
+  const [editAcct, setEditAcct] = useState(""); // 계좌 입력 중인 버틀러 id
   const [delButler, setDelButler] = useState(""); // 삭제 확인 중인 버틀러 id
   const [sButler, setSButler] = useState(""); // 기록 입력에서 고른 버틀러 id (비어 있으면 첫 번째)
   const [sGradePick, setSGrade] = useState(""); // 이번 참석 등급 (비어 있으면 그 버틀러의 기본 등급)
@@ -297,9 +298,9 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         <section className="panel">
           <div className="box"><h2>버틀러 리스트 <small className="sub">총 수입은 전체 기간 정산 합계</small></h2>
             <div className="scroll"><table style={{ minWidth: 700 }}>
-              <thead><tr><th>이름</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
+              <thead><tr><th>이름</th><th>입금 계좌</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
               <tbody>
-                {butlers.length === 0 && <tr><td colSpan={7} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
+                {butlers.length === 0 && <tr><td colSpan={8} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
                 {butlers.map((b) => {
                   const all = shifts.filter((s) => s.butlerId === b.id);
                   const total = all.reduce((a, s) => a + shiftTotal(s), 0);
@@ -309,6 +310,22 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                   return (
                     <tr key={b.id}>
                       <td><b>{b.name}</b></td>
+                      <td>
+                        {editAcct === b.id ? (
+                          <form style={{ display: "flex", gap: 6, flexWrap: "wrap" }} onSubmit={(e) => { const f = form(e); setEditAcct(""); run(() => saveButlerAccount(b.id, { bankName: String(f.get("bank")), accountNumber: String(f.get("acct")), accountHolder: String(f.get("holder")) }), "계좌를 저장했습니다."); }}>
+                            <input name="bank" defaultValue={b.bankName} placeholder="은행" aria-label="은행" style={{ width: 80 }} />
+                            <input name="acct" defaultValue={b.accountNumber} placeholder="계좌번호" aria-label="계좌번호" inputMode="numeric" style={{ width: 150 }} />
+                            <input name="holder" defaultValue={b.accountHolder} placeholder="예금주" aria-label="예금주" style={{ width: 80 }} />
+                            <button className="btn" type="submit">저장</button>
+                            <button type="button" className="del" onClick={() => setEditAcct("")}>취소</button>
+                          </form>
+                        ) : (
+                          <>
+                            {b.accountNumber ? <span className="num">{[b.bankName, b.accountNumber, b.accountHolder].filter(Boolean).join(" ")}</span> : <small className="sub">미등록</small>}{" "}
+                            <button type="button" className="del" onClick={() => setEditAcct(b.id)}>{b.accountNumber ? "수정" : "입력"}</button>
+                          </>
+                        )}
+                      </td>
                       <td className="r num">{all.length}회</td>
                       <td className="r num"><b>{won(total)}</b></td>
                       <td className="r num">{won(paidSum)}</td>
@@ -327,7 +344,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                   );
                 })}
               </tbody>
-              <tfoot><tr><td>버틀러 총 수입</td><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
+              <tfoot><tr><td>버틀러 총 수입</td><td /><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
             </table></div>
             <form className="form" key={butlers.length} style={{ marginTop: 14, gridTemplateColumns: "minmax(0,1fr) auto" }}
               onSubmit={(e) => { const f = form(e); run(() => addButler(String(f.get("name"))), "버틀러를 추가했습니다."); }}>

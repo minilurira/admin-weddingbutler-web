@@ -38,7 +38,7 @@ export async function loadFinanceData(): Promise<FinanceData> {
       cash: cashMap.get(r.id) ?? null,
     })),
     costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo, payments: parsePayments(c.payments) })),
-    butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade })),
+    butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, bankName: b.bankName, accountNumber: b.accountNumber, accountHolder: b.accountHolder })),
     shifts: shifts.map((s) => ({ id: s.id, butlerId: s.butlerId, date: s.date, rid: s.reservationId, grade: s.grade, pay: s.pay, extra: s.extra, paid: s.paid, paidDate: s.paidDate })),
   };
 }

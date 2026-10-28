@@ -184,6 +184,10 @@ model Butler {
   name      String
   // 새 참석 기록을 입력할 때 처음 보여 줄 등급(기본값). 실제 등급은 참석 기록(ButlerShift.grade)마다 정한다.
   grade     String        @default("staff")
+  // 정산금을 입금할 계좌 (관리자 화면에서만 보이고 수정한다)
+  bankName      String        @default("")
+  accountNumber String        @default("")
+  accountHolder String        @default("")
   createdAt DateTime      @default(now())
   shifts    ButlerShift[]
 }
