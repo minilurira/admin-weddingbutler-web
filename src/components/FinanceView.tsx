@@ -233,6 +233,20 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               <button className="btn" type="submit">추가</button>
             </form>
           </div>
+          {(() => {
+            // 이번 달 미지급 비용 + 버틀러 정산을 한 번에 지급 완료로 기록한다 (지급일은 아래 "실제 지급일"과 같은 값, 기본 오늘)
+            const openAll = costs.filter((x) => !x.payments[month] && (x.kind === "monthly" ? x.date.slice(0, 7) <= month : inMonth(x.date)));
+            const total = openAll.reduce((a, x) => a + x.amount, 0) + unpaid.reduce((a, x) => a + shiftTotal(x), 0), n = openAll.length + unpaid.length;
+            return (
+              <div className="box"><h2>한 번에 지급 완료 처리 <small className="sub">{yy}년 {Number(mm)}월 미지급 {n}건 · {won(total)}</small></h2>
+                <div className="inline">
+                  <div className="field"><label htmlFor="payDateAll">실제 지급일</label><input id="payDateAll" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></div>
+                  <button type="button" className="btn" disabled={!n || !payDate}
+                    onClick={() => { if (window.confirm(`${Number(mm)}월 미지급 ${n}건(비용 ${openAll.length}건, 버틀러 정산 ${unpaid.length}건), 총 ${won(total)}을 ${payDate}에 모두 지급한 것으로 기록할까요?`)) { run(async () => { if (openAll.length) await setCostsPaid(openAll.map((x) => x.id), month, payDate); if (unpaid.length) await setShiftsPaid(unpaid.map((x) => x.id), payDate); }, "모두 지급 완료로 기록했습니다. 통장 잔액 예상에도 반영됩니다."); setSelCost([]); setSelShift([]); } }}>미지급 전체 지급 완료 처리</button>
+                </div>
+              </div>
+            );
+          })()}
           <div className="row2">
             {(["monthly", "once"] as const).map((kind) => {
               const items = costs.filter((x) => x.kind === kind && (kind === "monthly" ? x.date.slice(0, 7) <= month : inMonth(x.date)));
