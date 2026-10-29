@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, saveButlerAccount, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
+  addButler, saveButlerAccount, setShiftsPaid, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowByMonth, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
@@ -40,6 +40,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const [reconMonth, setReconMonth] = useState("");
   const [reconBusy, setReconBusy] = useState(false);
   const [selCost, setSelCost] = useState<string[]>([]); // 합계로 지급할 비용 id
+  const [selShift, setSelShift] = useState<string[]>([]); // 합계로 지급할 버틀러 정산(참석 기록) id
   const [payDate, setPayDate] = useState(data.today);
   const [hideTest, setHideTest] = useState(true); // 테스트 거래([TEST]·1,000원 이하)는 기본으로 숨긴다
 
@@ -266,20 +267,46 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               );
             })}
           </div>
+          <div className="box"><h2>버틀러 정산 <small className="sub">{yy}년 {Number(mm)}월 · 지급 {won(ms.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))} · 미지급 {won(unpaid.reduce((a, s) => a + shiftTotal(s), 0))}</small></h2>
+            <div className="scroll"><table style={{ minWidth: 520 }}>
+              <thead><tr><th>버틀러</th><th>참석일</th><th className="r">정산금</th><th>{Number(mm)}월 지급</th></tr></thead>
+              <tbody>
+                {ms.length === 0 && <tr><td colSpan={4} className="empty">이 달 참석 기록이 없습니다.</td></tr>}
+                {ms.map((s) => (
+                  <tr key={s.id}>
+                    <td>{bName(s.butlerId)}</td>
+                    <td className="num">{md(s.date)}</td>
+                    <td className="r num">{won(shiftTotal(s))}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {s.paid
+                        ? <><span className="pill good">지급 완료</span>{" "}
+                            <input className="cell" type="date" key={`${s.id}:${s.paidDate}`} defaultValue={s.paidDate} aria-label="실제 지급일" style={{ width: "auto" }}
+                              onBlur={(e) => { if (e.target.value && e.target.value !== s.paidDate) run(() => setShiftPaid(s.id, true, e.target.value), "지급일을 저장했습니다."); }} />{" "}
+                            <button type="button" className="del" onClick={() => run(() => setShiftPaid(s.id, false), "지급 완료를 취소했습니다.")}>취소</button></>
+                        : <><input type="checkbox" aria-label={`${bName(s.butlerId)} ${md(s.date)} 선택`} checked={selShift.includes(s.id)} onChange={(e) => setSelShift((p) => (e.target.checked ? [...p, s.id] : p.filter((i) => i !== s.id)))} />{" "}<span className="pill warn">미지급</span>{" "}
+                            <button type="button" className="btn" style={{ padding: "5px 10px", fontSize: 12.5 }} onClick={() => run(() => setShiftPaid(s.id, true), "지급 완료로 처리하고 오늘 날짜를 기록했습니다.")}>지급 완료 처리</button></>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+          </div>
           {(() => {
             const open = costs.filter((x) => !x.payments[month] && (x.kind === "monthly" ? x.date.slice(0, 7) <= month : inMonth(x.date)));
             const ids = open.map((x) => x.id), picked = open.filter((x) => selCost.includes(x.id));
-            const sum = picked.reduce((a, x) => a + x.amount, 0);
+            const pickedShifts = unpaid.filter((s) => selShift.includes(s.id));
+            const sum = picked.reduce((a, x) => a + x.amount, 0) + pickedShifts.reduce((a, s) => a + shiftTotal(s), 0);
+            const nPick = picked.length + pickedShifts.length, nAll = open.length + unpaid.length;
             return (
-              <div className="box"><h2>합계로 지급 <small className="sub">{yy}년 {Number(mm)}월 미지급 {won(open.reduce((a, x) => a + x.amount, 0))} ({open.length}건)</small></h2>
+              <div className="box"><h2>합계로 지급 <small className="sub">{yy}년 {Number(mm)}월 미지급 {won(open.reduce((a, x) => a + x.amount, 0) + unpaid.reduce((a, s) => a + shiftTotal(s), 0))} ({nAll}건, 버틀러 정산 포함)</small></h2>
                 <div className="inline">
-                  <button type="button" className="btn" disabled={!open.length} onClick={() => setSelCost(picked.length === open.length ? [] : ids)}>{picked.length === open.length && open.length ? "선택 해제" : "미지급 전체 선택"}</button>
+                  <button type="button" className="btn" disabled={!nAll} onClick={() => { const all = nPick === nAll; setSelCost(all ? [] : ids); setSelShift(all ? [] : unpaid.map((s) => s.id)); }}>{nPick === nAll && nAll ? "선택 해제" : "미지급 전체 선택"}</button>
                   <div className="field"><label htmlFor="payDate">실제 지급일</label><input id="payDate" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></div>
-                  <div style={{ flex: 1, minWidth: 180 }}><small className="sub">선택 {picked.length}건 총액</small><br /><b className="num" style={{ fontSize: 20 }}>{won(sum)}</b></div>
-                  <button type="button" className="btn" disabled={!picked.length || !payDate}
-                    onClick={() => { if (window.confirm(`선택한 ${picked.length}건, 총 ${won(sum)}을 ${payDate}에 지급한 것으로 기록할까요?`)) { run(() => setCostsPaid(picked.map((x) => x.id), month, payDate), "지급 완료로 기록했습니다."); setSelCost([]); } }}>선택 항목 지급 완료 처리</button>
+                  <div style={{ flex: 1, minWidth: 180 }}><small className="sub">선택 {nPick}건 총액</small><br /><b className="num" style={{ fontSize: 20 }}>{won(sum)}</b></div>
+                  <button type="button" className="btn" disabled={!nPick || !payDate}
+                    onClick={() => { if (window.confirm(`선택한 ${nPick}건, 총 ${won(sum)}을 ${payDate}에 지급한 것으로 기록할까요?`)) { run(async () => { if (picked.length) await setCostsPaid(picked.map((x) => x.id), month, payDate); if (pickedShifts.length) await setShiftsPaid(pickedShifts.map((s) => s.id), payDate); }, "지급 완료로 기록했습니다. 통장 잔액 예상에도 반영됩니다."); setSelCost([]); setSelShift([]); } }}>선택 항목 지급 완료 처리</button>
                 </div>
-                <p className="note">위 표에서 지급할 비용의 체크박스를 고르거나 &quot;미지급 전체 선택&quot;을 누르면 총액이 계산됩니다. 한 번에 입금한 날짜를 정해 &quot;지급 완료 처리&quot;하면 선택한 비용에 같은 지급일이 기록됩니다.</p>
+                <p className="note">위 표에서 지급할 비용의 체크박스를 고르거나 &quot;미지급 전체 선택&quot;을 누르면 총액이 계산됩니다. 한 번에 입금한 날짜를 정해 &quot;지급 완료 처리&quot;하면 선택한 비용과 버틀러 정산에 같은 지급일이 기록되고, 통장 잔액 예상에 그 지급일 기준으로 반영됩니다.</p>
               </div>
             );
           })()}

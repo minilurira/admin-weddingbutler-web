@@ -159,6 +159,15 @@ export async function setShiftPaid(id: string, paid: boolean, date?: string) {
   done();
 }
 
+/** 여러 참석 기록을 한 번에 지급 완료로 기록한다 (비용 탭의 합계로 지급). */
+export async function setShiftsPaid(ids: string[], date: string) {
+  await guard();
+  if (!isDate(date)) throw new Error("지급일을 확인해 주세요.");
+  if (!ids.length || ids.length > 500) throw new Error("지급할 정산을 선택해 주세요.");
+  await prisma.butlerShift.updateMany({ where: { id: { in: ids } }, data: { paid: true, paidDate: date } });
+  done();
+}
+
 export async function deleteShift(id: string) {
   await guard();
   await prisma.butlerShift.deleteMany({ where: { id } });
