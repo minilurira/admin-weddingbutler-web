@@ -19,6 +19,18 @@ const navItems = [
     ),
   },
   {
+    href: "/analytics",
+    label: "유입·검색",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <path d="M3 16.6h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <rect x="4.2" y="10" width="2.6" height="5" rx="1.1" fill="currentColor" />
+        <rect x="8.7" y="6.6" width="2.6" height="8.4" rx="1.1" fill="currentColor" />
+        <rect x="13.2" y="3.4" width="2.6" height="11.6" rx="1.1" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/reservations",
     label: "예약 리스트",
     icon: (
