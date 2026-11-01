@@ -144,6 +144,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
             <Card title="기기">
               <RankList rows={g.devices} format={(name) => DEVICE_KO[name] ?? name} />
             </Card>
+            <Card title="유입 지역 · 시·도" sub="세션 기준, 접속 IP로 추정">
+              <RankList rows={g.regions} />
+            </Card>
+            <Card title="유입 지역 · 시·군 상위 10" sub="서울은 구 단위 구분 없음">
+              <RankList rows={g.cities} />
+            </Card>
           </div>
         )}
 

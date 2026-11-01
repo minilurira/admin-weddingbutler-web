@@ -1,4 +1,5 @@
 import { createSign } from "crypto";
+import { regionKo, cityKo } from "@/lib/koreaRegions";
 
 // GA4 Data API(v1beta)를 서비스 계정으로 호출한다. 구글 SDK 대신 Node 내장 crypto로 JWT를 서명해
 // 액세스 토큰을 받는다(새 패키지 없음).
@@ -126,6 +127,8 @@ export interface Ga4Summary {
   sourceMedium: NamedCount[];
   landingPages: NamedCount[];
   devices: NamedCount[];
+  regions: NamedCount[]; // 시·도 (해외·확인 불가 포함)
+  cities: NamedCount[]; // 시·군 상위 10
   organic: { naver: number; google: number; naverPrev: number; googlePrev: number };
 }
 
@@ -169,6 +172,8 @@ export async function ga4Summary(current: DateRange, previous: DateRange): Promi
         dimensionFilter: { filter: { fieldName: "sessionMedium", stringFilter: { matchType: "EXACT", value: "organic" } } },
         limit: 50,
       },
+      // 2: 지역(국가·시도·시군)
+      { dateRanges: [current], dimensions: [{ name: "country" }, { name: "region" }, { name: "city" }], metrics: [{ name: "sessions" }], orderBys: desc, limit: 500 },
     ]),
   ]);
 
@@ -194,6 +199,31 @@ export async function ga4Summary(current: DateRange, previous: DateRange): Promi
     else if (source.includes("google")) prev ? (organic.googlePrev += v) : (organic.google += v);
   }
 
+  const regionMap = new Map<string, number>();
+  const cityMap = new Map<string, number>();
+  const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v);
+  for (const r of second[2]?.rows ?? []) {
+    const [country, region, city] = (r.dimensionValues ?? []).map((d) => d.value);
+    const v = num(r.metricValues?.[0]?.value);
+    if (country === "(not set)" || !country) {
+      add(regionMap, "확인 불가", v);
+    } else if (country !== "South Korea") {
+      add(regionMap, "해외", v);
+    } else if (!region || region === "(not set)") {
+      add(regionMap, "확인 불가", v);
+    } else {
+      const regionName = regionKo(region);
+      add(regionMap, regionName, v);
+      if (city && city !== "(not set)") {
+        const cityName = cityKo(city);
+        add(cityMap, cityName === regionName ? cityName : `${cityName} · ${regionName}`, v);
+      } else {
+        add(cityMap, `${regionName} (시·군 확인 불가)`, v);
+      }
+    }
+  }
+  const sorted = (m: Map<string, number>) => Array.from(m, ([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+
   const data: Ga4Summary = {
     ...totals,
     daily,
@@ -201,6 +231,8 @@ export async function ga4Summary(current: DateRange, previous: DateRange): Promi
     sourceMedium: toNamed(first[3]),
     landingPages: toNamed(first[4]),
     devices: toNamed(second[0]),
+    regions: sorted(regionMap),
+    cities: sorted(cityMap).slice(0, 10),
     organic,
   };
   cache.set(key, { at: Date.now(), data });
