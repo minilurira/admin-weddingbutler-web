@@ -6,7 +6,7 @@ import MessageHistory from "./MessageHistory";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { calcConfirm, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentLinkDefaultAmount, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
+import { calcConfirm, eventDiscount, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentLinkDefaultAmount, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
 import { BADGE } from "@/lib/badge";
 import { formatWishDateLabel, toNum } from "@/lib/format";
 import { refundQuote } from "@/lib/refundPolicy";
@@ -278,7 +278,7 @@ export default function ReservationDetail({
   }
 
   function openLink() {
-    setLinkAmount(String(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType)));
+    setLinkAmount(String(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType, fields.date)));
     setLinkDays("3");
     setLinkOpen(true);
   }
@@ -458,7 +458,17 @@ export default function ReservationDetail({
             <div style={row}><span>기본 요금</span><span style={amt}>{won(money.meta.base)}</span></div>
             <div style={row}><span>추가 하객 {parsedFields.extraGuests}명</span><span style={amt}>{money.guestFee ? won(money.guestFee) : "-"}</span></div>
             <div style={row}><span>버틀러 추가 {money.extraButlers}명</span><span style={amt}>{money.butlerFee ? won(money.butlerFee) : "-"}</span></div>
-            {money.discount > 0 && <div style={row}><span>할인 금액</span><span style={{ ...amt, color: "#A8416C" }}>-{won(money.discount)}</span></div>}
+            {money.discount > 0 && (
+              <div style={row}>
+                <span>
+                  할인 금액
+                  {eventDiscount(reservation.confirm.plan, fields.date) > 0 && money.discount >= eventDiscount(reservation.confirm.plan, fields.date) && (
+                    <span style={{ fontSize: 11.5, color: "#A8416C", marginLeft: 6 }}>연말 이벤트 {won(eventDiscount(reservation.confirm.plan, fields.date))} 포함</span>
+                  )}
+                </span>
+                <span style={{ ...amt, color: "#A8416C" }}>-{won(money.discount)}</span>
+              </div>
+            )}
             <div style={{ ...row, paddingTop: 10, borderTop: "1px solid #ECE7E9" }}><span>총 금액 (부가세 포함)</span><span style={{ fontWeight: 700, color: "#413A3E" }}>{won(money.total)}</span></div>
           </div>
 

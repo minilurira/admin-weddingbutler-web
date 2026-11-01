@@ -16,6 +16,8 @@ export type Side = "신랑측" | "신부측";
 
 const PLAN_CODE: Record<string, "small" | "standard" | "premium"> = {
   스몰케어: "small",
+  // 스몰양가는 스몰케어처럼 엑셀 파일로 제공한다(양가 통합 기록)
+  스몰양가: "small",
   스탠다드: "standard",
   프리미엄: "premium",
 };

@@ -18,7 +18,7 @@ model AdminUser {
 }
 
 // Status values: "신규요청" | "협의중" | "확정" | "취소"
-// Plan keys: "스몰케어" | "스탠다드" | "프리미엄"
+// Plan keys: "스몰케어" | "스몰양가" | "스탠다드" | "프리미엄" | "스페셜"
 model Reservation {
   id             String   @id
   customer       String

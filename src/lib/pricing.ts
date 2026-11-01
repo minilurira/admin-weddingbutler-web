@@ -1,4 +1,4 @@
-export type PlanKey = "스몰케어" | "스탠다드" | "프리미엄" | "스페셜";
+export type PlanKey = "스몰케어" | "스몰양가" | "스탠다드" | "프리미엄" | "스페셜";
 
 /** 스페셜: 요금표 없이 예약마다 금액을 정하는 요금제. 금액은 예약의 requestedTotal(홈페이지가 보낸 총액)에 담긴다. */
 export const SPECIAL_PLAN = "스페셜";
@@ -13,12 +13,14 @@ export interface PlanMeta {
 
 export const PLANS: PlanMeta[] = [
   { key: "스몰케어", desc: "하객 100명 이하 · 웨딩버틀러 2명", butlers: 2, base: 390000, guestLimit: 100 },
+  // 스몰양가: 양가 각 60명 이하, 양가 통합 축의대 1곳 (2026-11-01 추가)
+  { key: "스몰양가", desc: "양가 각 60명 이하 · 통합 축의대 · 웨딩버틀러 2명", butlers: 2, base: 400000, guestLimit: 120 },
   { key: "스탠다드", desc: "하객 101~200명 · 웨딩버틀러 2명", butlers: 2, base: 450000, guestLimit: 200 },
   { key: "프리미엄", desc: "양가 각 200명 기준 · 웨딩버틀러 4명", butlers: 4, base: 800000, guestLimit: 400 },
   { key: "스페셜", desc: "맞춤 금액 · 웨딩버틀러 2명", butlers: 2, base: 0, guestLimit: 9999 },
 ];
 
-// 축의대 구분. 스몰케어·스탠다드는 한쪽(신랑측/신부측), 프리미엄은 양가.
+// 축의대 구분. 스몰케어·스탠다드는 한쪽(신랑측/신부측), 스몰양가·프리미엄은 양가.
 export const SIDES = ["신랑측", "신부측", "양가"] as const;
 export type Side = (typeof SIDES)[number];
 
@@ -38,8 +40,30 @@ export function sideFromHomepage(v: unknown): Side | "" {
 export const EXTRA_BUTLER_FEE = 100000;
 export const EXTRA_GUEST_FEE = 2000;
 
+/** 새 예약의 기본 요금제 */
+export const DEFAULT_PLAN: PlanKey = "스탠다드";
+
 export function planMeta(key: string): PlanMeta {
-  return PLANS.find((p) => p.key === key) ?? PLANS[1];
+  return PLANS.find((p) => p.key === key) ?? PLANS.find((p) => p.key === DEFAULT_PLAN)!;
+}
+
+/**
+ * 연말 이벤트 (홈페이지 src/lib/plans.ts의 EVENT와 같은 값 — 함께 고친다).
+ * 예식일이 기간 안이면 기본 요금을 이벤트가로 받는다. 어드민은 정가에서 뺀 차액을 할인 금액(confirmDiscount)으로 둔다.
+ */
+export const EVENT = {
+  name: "연말 이벤트",
+  from: "2026-11-01",
+  to: "2026-12-31",
+  prices: { 스몰케어: 350000, 스몰양가: 350000, 스탠다드: 400000, 프리미엄: 750000 } as Partial<Record<PlanKey, number>>,
+};
+
+/** 예식일(YYYY-MM-DD) 기준 이벤트 할인 금액. 대상이 아니면 0. */
+export function eventDiscount(planKey: string, date: string | null | undefined): number {
+  if (!date || date < EVENT.from || date > EVENT.to) return 0;
+  const meta = planMeta(planKey);
+  const price = EVENT.prices[meta.key];
+  return price === undefined ? 0 : Math.max(0, meta.base - price);
 }
 
 /** 2026-10-25 약관 개정 전 예약의 기준 하객(스몰케어 200명, 스탠다드 300명). 종전 약관이 적용된다. */
@@ -106,9 +130,9 @@ export const PAYMENT_TYPES: Record<PaymentType, { name: string; short: string }>
 /** 홈페이지 예약금(예약금 결제 후 현장결제) 금액 */
 export const DEPOSIT_AMOUNT = 100000;
 
-/** 결제 링크 기본 청구 금액: 전액결제면 요금제 기본가, 아니면 예약금 */
-export function paymentLinkDefaultAmount(planKey: string, paymentType: string): number {
-  return paymentType === "full" ? planMeta(planKey).base : DEPOSIT_AMOUNT;
+/** 결제 링크 기본 청구 금액: 전액결제면 요금제 기본가(이벤트 기간 예식은 이벤트가), 아니면 예약금 */
+export function paymentLinkDefaultAmount(planKey: string, paymentType: string, date?: string): number {
+  return paymentType === "full" ? planMeta(planKey).base - eventDiscount(planKey, date) : DEPOSIT_AMOUNT;
 }
 
 export function isPaymentType(v: unknown): v is PaymentType {

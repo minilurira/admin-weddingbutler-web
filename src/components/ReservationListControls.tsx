@@ -4,7 +4,7 @@ import { useState } from "react";
 import SpecialLinkPanel from "./SpecialLinkPanel";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PAYMENT_TYPES, PLANS, SIDES, SPECIAL_PLAN, paymentLinkDefaultAmount, won, type PaymentType } from "@/lib/pricing";
+import { DEFAULT_PLAN, PAYMENT_TYPES, PLANS, SIDES, SPECIAL_PLAN, eventDiscount, paymentLinkDefaultAmount, won, type PaymentType } from "@/lib/pricing";
 import { bookedTimes, createReservation } from "@/lib/actions";
 import { listOpenInquiries, type OpenInquiry } from "@/lib/inquiryActions";
 import { formatPhone, formatStamp, parseLooseDate, TIME_SLOTS, toNum } from "@/lib/format";
@@ -14,7 +14,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 const FILTERS = ["전체", "신규요청", "협의중", "확정", "취소"];
 
 const EMPTY_FORM = {
-  customer: "", couple: "", side: "", phone: "", date: "", time: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: PLANS[1].key, paymentType: "",
+  customer: "", couple: "", side: "", phone: "", date: "", time: "", venueLabel: "", guestsLabel: "", memo: "", requestedPlan: DEFAULT_PLAN, paymentType: "",
 };
 
 export default function ReservationListControls({ currentFilter, counts }: { currentFilter: string; counts: Record<string, number> }) {
@@ -92,7 +92,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
       showToast("예식 날짜를 골라 주세요.");
       return;
     }
-    const amount = linkAmount ? toNum(linkAmount) : paymentLinkDefaultAmount(form.requestedPlan, form.paymentType);
+    const amount = linkAmount ? toNum(linkAmount) : paymentLinkDefaultAmount(form.requestedPlan, form.paymentType, form.date);
     if (sendLink && !window.confirm(`등록하고 ${form.customer.trim()} 님(${form.phone.trim()})에게 ${won(amount)} 결제 링크를 보낼까요?`)) return;
     setSaving(true);
     const res = await createReservation({
@@ -246,7 +246,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
                         inputMode="numeric"
                         value={linkAmount}
                         onChange={(e) => setLinkAmount(e.target.value.replace(/[^0-9]/g, ""))}
-                        placeholder={String(paymentLinkDefaultAmount(form.requestedPlan, form.paymentType))}
+                        placeholder={String(paymentLinkDefaultAmount(form.requestedPlan, form.paymentType, form.date))}
                       />
                     </label>
                     <label style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: "#6E646A", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -259,7 +259,7 @@ export default function ReservationListControls({ currentFilter, counts }: { cur
                 )}
                 {sendLink && (
                   <div style={{ fontSize: 12, color: "#8C8188", lineHeight: 1.5 }}>
-                    비워 두면 {won(paymentLinkDefaultAmount(form.requestedPlan, form.paymentType))} ({form.paymentType === "full" ? "전액결제" : "예약금"}). 고객이 결제하면 결제한 금액에 자동으로 더해집니다.
+                    비워 두면 {won(paymentLinkDefaultAmount(form.requestedPlan, form.paymentType, form.date))} ({form.paymentType === "full" ? "전액결제" : "예약금"}). 고객이 결제하면 결제한 금액에 자동으로 더해집니다.
                   </div>
                 )}
               </div>
