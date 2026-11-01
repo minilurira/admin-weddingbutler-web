@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcConfirm, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
+import { calcConfirm, eventDiscount, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
 import { formatWishDateLabel, isWeddingPast } from "@/lib/format";
 import { getInquiry, updateInquiries } from "@/lib/inquiries";
 import { sendConfirmAlimtalk } from "@/lib/alimtalk";
@@ -256,7 +256,8 @@ export async function createReservation(input: NewReservationInput) {
       confirmVenue: input.venueLabel,
       confirmButlers: 2,
       confirmExtraGuests: 0,
-      confirmDiscount: 0,
+      // 연말 이벤트 기간 예식은 정가와 이벤트가의 차액을 할인으로 넣어 둔다.
+      confirmDiscount: eventDiscount(input.requestedPlan, input.date),
       confirmHours: "",
       confirmNote: "",
       paidAmount: 0,

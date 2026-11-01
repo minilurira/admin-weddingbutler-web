@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
-import { PAYMENT_TYPES, PLANS, SPECIAL_PLAN, calcConfirm, isPaymentType, onsiteAmount, planMeta, sideFromHomepage, won } from "@/lib/pricing";
+import { PAYMENT_TYPES, PLANS, SPECIAL_PLAN, calcConfirm, eventDiscount, isPaymentType, onsiteAmount, planMeta, sideFromHomepage, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
@@ -104,7 +104,13 @@ export async function POST(req: NextRequest) {
       ? sentOnsite
       : onsiteAmount(total, resolvedPaidAmount);
   const resolvedCustomerMemo = typeof customerMemo === "string" ? customerMemo.trim().slice(0, 500) : "";
-  const memoParts = [memo?.trim() ?? "", resolvedExtraButlers ? `버틀러 추가 ${resolvedExtraButlers}명` : ""].filter(Boolean);
+  // 연말 이벤트 기간 예식은 홈페이지가 이벤트가로 받으므로, 정가와의 차액이 할인 금액으로 들어온다.
+  const evDiscount = useHomepageAmounts ? eventDiscount(plan, weddingDate) : 0;
+  const memoParts = [
+    memo?.trim() ?? "",
+    resolvedExtraButlers ? `버틀러 추가 ${resolvedExtraButlers}명` : "",
+    evDiscount > 0 && discount >= evDiscount ? `연말 이벤트가 적용 (−${won(evDiscount)})` : "",
+  ].filter(Boolean);
 
   const created = await prisma.reservation.create({
     data: {
