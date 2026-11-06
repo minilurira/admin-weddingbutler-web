@@ -40,7 +40,8 @@ export default function UnpaidList({ rows, failed, days, dayOptions }: { rows: U
   const testCount = rows.length - base.length;
   const counts = base.reduce<Record<string, number>>((m, r) => ((m[r.stage] = (m[r.stage] ?? 0) + 1), m), {});
   const shown = base.filter((r) => stage === "all" || r.stage === stage)
-    .sort((a, b) => STAGE[a.stage].order - STAGE[b.stage].order || b.createdAt.localeCompare(a.createdAt));
+    // 확정 누락(결제됐는데 예약이 안 잡힌 건)만 맨 위, 나머지는 접수 최신순
+    .sort((a, b) => Number(b.stage === "paid_unconfirmed") - Number(a.stage === "paid_unconfirmed") || b.createdAt.localeCompare(a.createdAt));
   const urgent = counts.paid_unconfirmed ?? 0;
 
   async function copy(text: string) {
