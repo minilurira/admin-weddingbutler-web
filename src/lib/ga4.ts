@@ -119,6 +119,27 @@ export interface NamedCount {
   value: number;
 }
 
+// 홈페이지 예약 퍼널 이벤트(홈페이지 src/lib/analytics.ts의 FUNNEL_EVENTS와 이름이 같아야 한다)
+export const FUNNEL_STEPS = [
+  { event: "reservation_open", label: "예약 창 열기" },
+  { event: "reservation_date_select", label: "날짜·시간 선택" },
+  { event: "reservation_info_start", label: "정보 입력 시작" },
+  { event: "reservation_submit_click", label: "결제하기 클릭" },
+  { event: "reservation_pay_window", label: "결제창 열림" },
+  { event: "purchase", label: "결제 완료" },
+] as const;
+export const FUNNEL_SIDE = [
+  { event: "reservation_form_blocked", label: "결제하기 눌렀지만 빈칸·미동의로 막힘" },
+  { event: "reservation_pay_fail", label: "결제창 닫음 · 결제 실패" },
+  { event: "reservation_close", label: "결제 전에 예약 창 닫음" },
+] as const;
+
+export interface FunnelCount {
+  event: string;
+  device: string; // mobile | desktop | tablet
+  count: number;
+}
+
 export interface Ga4Summary {
   current: { users: number; sessions: number; pageViews: number };
   previous: { users: number; sessions: number; pageViews: number };
@@ -130,6 +151,7 @@ export interface Ga4Summary {
   regions: NamedCount[]; // 시·도 (해외·확인 불가 포함)
   cities: NamedCount[]; // 시·군 상위 10
   organic: { naver: number; google: number; naverPrev: number; googlePrev: number };
+  funnel: FunnelCount[];
 }
 
 const num = (v: string | undefined) => Number(v ?? 0) || 0;
@@ -174,6 +196,14 @@ export async function ga4Summary(current: DateRange, previous: DateRange): Promi
       },
       // 2: 지역(국가·시도·시군)
       { dateRanges: [current], dimensions: [{ name: "country" }, { name: "region" }, { name: "city" }], metrics: [{ name: "sessions" }], orderBys: desc, limit: 500 },
+      // 3: 예약 퍼널 이벤트 수(기기별)
+      {
+        dateRanges: [current],
+        dimensions: [{ name: "eventName" }, { name: "deviceCategory" }],
+        metrics: [{ name: "eventCount" }],
+        dimensionFilter: { filter: { fieldName: "eventName", inListFilter: { values: [...FUNNEL_STEPS, ...FUNNEL_SIDE].map((x) => x.event) } } },
+        limit: 200,
+      },
     ]),
   ]);
 
@@ -234,6 +264,11 @@ export async function ga4Summary(current: DateRange, previous: DateRange): Promi
     regions: sorted(regionMap),
     cities: sorted(cityMap).slice(0, 10),
     organic,
+    funnel: (second[3]?.rows ?? []).map((r) => ({
+      event: r.dimensionValues?.[0]?.value ?? "",
+      device: r.dimensionValues?.[1]?.value ?? "",
+      count: num(r.metricValues?.[0]?.value),
+    })),
   };
   cache.set(key, { at: Date.now(), data });
   return data;

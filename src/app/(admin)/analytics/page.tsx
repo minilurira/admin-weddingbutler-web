@@ -4,6 +4,7 @@ import { RANGE_OPTIONS, resolvePeriod, businessStats } from "@/lib/analyticsData
 import { ga4Configured, ga4ConfigProblem, ga4Summary, type Ga4Summary } from "@/lib/ga4";
 import { searchAdConfigured, keywordVolumes, trackedKeywords, type KeywordVolume } from "@/lib/naverSearchAd";
 import { Card, Notice, StatTile, DailyBars, RankList } from "@/components/AnalyticsCharts";
+import { FunnelChart } from "@/components/FunnelChart";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
         <Card title="일별 예약 신청" sub={`합계 ${n(biz.requested)}건`}>
           <DailyBars days={period.days} values={biz.dailyRequested} unit="예약 신청" color="#7E3855" />
         </Card>
+
+        {g && (
+          <Card title="예약 퍼널" sub={`${period.label} · 예약 창을 연 뒤 어디서 빠지는지`}>
+            <FunnelChart rows={g.funnel} />
+          </Card>
+        )}
 
         {g && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
