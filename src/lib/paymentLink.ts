@@ -19,6 +19,8 @@ export interface SendLinkOptions {
   amount: number;
   paymentType: string;
   days: number;
+  /** 어드민이 정한 할인율(%) — 금액에는 이미 반영돼 있고 기록용으로만 쓴다 */
+  discountRate?: number;
   /** true면 예식 후 추가 하객 차액 청구 링크 (주문번호 끝이 -X, 결제창 이름에 "추가 하객 차액") */
   extraGuests?: boolean;
 }
@@ -99,7 +101,7 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   });
   const via = sentVia === "alimtalk" ? "알림톡" : sentVia === "sms" ? "문자" : "발송 실패";
   await prisma.note.create({
-    data: { reservationId: r.id, text: `결제 링크 발송 · ${won(amount)} · ${expireLabel(expiresAt)} · ${via}${previous.length ? " · 이전 링크 취소" : ""}` },
+    data: { reservationId: r.id, text: `결제 링크 발송 · ${won(amount)}${opts.discountRate ? ` (${opts.discountRate}% 할인)` : ""} · ${expireLabel(expiresAt)} · ${via}${previous.length ? " · 이전 링크 취소" : ""}` },
   });
 
   return sentVia

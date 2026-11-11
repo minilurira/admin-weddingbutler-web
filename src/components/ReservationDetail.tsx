@@ -108,6 +108,7 @@ export default function ReservationDetail({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkAmount, setLinkAmount] = useState("");
   const [linkDays, setLinkDays] = useState("3");
+  const [linkRate, setLinkRate] = useState("");
 
   const [fields, setFields] = useState({
     date: reservation.confirm.date,
@@ -280,14 +281,23 @@ export default function ReservationDetail({
   function openLink() {
     setLinkAmount(String(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType, fields.date)));
     setLinkDays("3");
+    setLinkRate("");
     setLinkOpen(true);
+  }
+
+  // 할인율(%)을 넣으면 기본 금액에서 깎은 값이 청구 금액이 된다. 금액은 그대로 직접 고칠 수도 있다.
+  function onLinkRate(v: string) {
+    const rate = Math.min(100, Number(v.replace(/[^0-9]/g, "")) || 0);
+    setLinkRate(rate ? String(rate) : "");
+    setLinkAmount(String(Math.round(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType) * (100 - rate) / 100)));
   }
 
   function onSendLink() {
     const amount = toNum(linkAmount);
-    if (!window.confirm(`${reservation.customer} 님(${reservation.phone})에게 ${won(amount)} 결제 링크를 보낼까요?${hasOpenLink ? " 결제 대기 중인 이전 링크는 취소됩니다." : ""}`)) return;
+    const discountRate = toNum(linkRate);
+    if (!window.confirm(`${reservation.customer} 님(${reservation.phone})에게 ${won(amount)}${discountRate ? `(${discountRate}% 할인)` : ""} 결제 링크를 보낼까요?${hasOpenLink ? " 결제 대기 중인 이전 링크는 취소됩니다." : ""}`)) return;
     startTransition(async () => {
-      const res = await sendPaymentLink(reservation.id, { amount, days: toNum(linkDays) || 3, paymentType: fields.paymentType });
+      const res = await sendPaymentLink(reservation.id, { amount, days: toNum(linkDays) || 3, paymentType: fields.paymentType, discountRate });
       if (res.ok) setLinkOpen(false);
       showToast(res.message);
     });
@@ -524,6 +534,9 @@ export default function ReservationDetail({
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                   <label style={{ ...labelStyle, flex: "2 1 160px" }}>청구 금액 (원)
                     <input inputMode="numeric" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ ...editInput, background: "#FFFFFF" }} />
+                  </label>
+                  <label style={{ ...labelStyle, flex: "1 1 90px" }}>할인율 (%)
+                    <input inputMode="numeric" placeholder="0" value={linkRate} onChange={(e) => onLinkRate(e.target.value)} style={{ ...editInput, background: "#FFFFFF" }} />
                   </label>
                   <label style={{ ...labelStyle, flex: "1 1 100px" }}>유효기간
                     <select value={linkDays} onChange={(e) => setLinkDays(e.target.value)} style={{ ...editInput, background: "#FFFFFF" }}>

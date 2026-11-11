@@ -47,7 +47,7 @@ function daysBetween(start: string, end: string) {
 }
 
 export function resolvePeriod(raw: string | undefined, now = new Date()): Period {
-  const key: RangeKey = (RANGE_OPTIONS.find((o) => o.key === raw)?.key ?? "28d") as RangeKey;
+  const key: RangeKey = (RANGE_OPTIONS.find((o) => o.key === raw)?.key ?? "7d") as RangeKey;
   const label = RANGE_OPTIONS.find((o) => o.key === key)!.label;
   const today = kstToday(now);
   const [y, m] = today.split("-").map(Number);

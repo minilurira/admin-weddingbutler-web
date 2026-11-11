@@ -7,7 +7,7 @@ const DAYS = [7, 30, 60, 93];
 
 export default async function UnpaidPage({ searchParams }: { searchParams: { days?: string } }) {
   const requested = Number(searchParams.days);
-  const days = DAYS.includes(requested) ? requested : 30;
+  const days = DAYS.includes(requested) ? requested : 7;
   const result = await fetchUnpaid(days);
 
   return (
