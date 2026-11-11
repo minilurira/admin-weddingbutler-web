@@ -54,6 +54,8 @@ model Reservation {
   requestedExtraButlers  Int @default(0)
 
   alimtalkAt     DateTime?
+  // 확정 시 만든 구글 캘린더 일정 id (src/lib/googleCalendar.ts). 없으면 ""
+  googleEventId  String    @default("")
 
   cancelReason   String    @default("")
   cancelledAt    DateTime?
