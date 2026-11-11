@@ -6,6 +6,7 @@ import { inquiriesConfigured, listInquiries } from "@/lib/inquiries";
 // 날짜는 모두 한국 시간 기준 YYYY-MM-DD 문자열로 다룬다. 서버는 UTC로 돈다.
 
 export const RANGE_OPTIONS = [
+  { key: "1d", label: "최근 1일" },
   { key: "7d", label: "최근 7일" },
   { key: "28d", label: "최근 28일" },
   { key: "90d", label: "최근 90일" },
@@ -68,7 +69,7 @@ export function resolvePeriod(raw: string | undefined, now = new Date()): Period
     prevStart = ymd(new Date(Date.UTC(y, m - 3, 1)));
     prevEnd = ymd(new Date(Date.UTC(y, m - 2, 0)));
   } else {
-    const n = key === "7d" ? 7 : key === "28d" ? 28 : 90;
+    const n = key === "1d" ? 1 : key === "7d" ? 7 : key === "28d" ? 28 : 90;
     end = today;
     start = addDays(today, -(n - 1));
     prevEnd = addDays(start, -1);
