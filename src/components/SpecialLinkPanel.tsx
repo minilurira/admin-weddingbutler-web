@@ -64,7 +64,7 @@ export default function SpecialLinkPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontSize: 12.5, color: "#8C8188", lineHeight: 1.6 }}>
-        금액만 정해 링크를 만들어 고객에게 보내세요. 고객이 링크에서 예식 날짜·시간·예식장을 고르고 정해 둔 금액을 카드로 전액 결제하면, 예약이 자동으로 들어옵니다.
+        금액만 정해 링크를 만들어 고객에게 보내세요. 고객이 링크에서 예식 날짜·시간·예식장을 고르고 정해 둔 금액을 카드로 전액 결제하거나 예약금(10만원)만 결제하면(나머지는 현장 현금), 예약이 자동으로 들어옵니다.
       </div>
       <label style={labelStyle}>
         스페셜 금액 (원)
