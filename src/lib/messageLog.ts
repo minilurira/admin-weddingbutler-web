@@ -36,7 +36,7 @@ export function ensureMessageLogTable(): Promise<void> {
   return ready;
 }
 
-export type MessageKind = "신규 예약 접수" | "직원 알림" | "예약 확정" | "7일 전 안내" | "당일 안내" | "예약 취소" | "결제 링크";
+export type MessageKind = "신규 예약 접수" | "직원 알림" | "예약 확정" | "7일 전 안내" | "당일 안내" | "예약 취소" | "결제 링크" | "버틀러 배정";
 export type MessageStatus = "sent" | "failed" | "skipped";
 
 export interface MessageEntry {
