@@ -146,11 +146,11 @@ export async function syncGoogleCalendarNow() {
   await requireSession();
   const missing = missingCalendarEnv();
   if (missing.length) return { ok: false, message: `환경변수 없음: ${missing.join(", ")}` };
-  const r = await backfillConfirmedEvents();
+  const r = await backfillConfirmedEvents(true);
   revalidatePath("/calendar");
-  if (!r.created && !r.failed) return { ok: true, message: "등록할 예약이 없습니다 (모두 등록됨)." };
-  if (!r.failed) return { ok: true, message: `${r.created}건 등록했습니다.` };
-  return { ok: false, message: `${r.created}건 등록, ${r.failed}건 실패 — ${r.firstError}` };
+  if (!r.created && !r.failed) return { ok: true, message: "예식 전 확정 예약이 없습니다." };
+  if (!r.failed) return { ok: true, message: `${r.created}건 등록·갱신했습니다.` };
+  return { ok: false, message: `${r.created}건 등록·갱신, ${r.failed}건 실패 — ${r.firstError}` };
 }
 
 /** 확정된 예약을 협의중으로 되돌려 확정 내용을 다시 고칠 수 있게 한다 */

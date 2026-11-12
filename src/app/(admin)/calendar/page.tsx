@@ -23,7 +23,7 @@ export default async function CalendarPage() {
 
   return (
     <>
-      <GoogleCalendarStatus missing={gcal.missing} pending={gcal.pending} registered={gcal.registered} />
+      <GoogleCalendarStatus missing={gcal.missing} pending={gcal.pending} registered={gcal.registered} calendars={gcal.calendars} />
       <FullCalendar initialYear={year} initialMonth={month} eventsByDate={eventsByDate} blocksByDate={blocks} today={today} />
     </>
   );
