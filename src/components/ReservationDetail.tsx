@@ -1,5 +1,6 @@
 "use client";
 
+import ManualAlimtalk from "./ManualAlimtalk";
 import ButlerAssign from "./ButlerAssign";
 import ExtraGuestClaim from "./ExtraGuestClaim";
 import MessageHistory from "./MessageHistory";
@@ -510,6 +511,9 @@ export default function ReservationDetail({
 
         {/* 예식 후 추가 하객 차액 청구 */}
         {!isCancelled && <ExtraGuestClaim reservationId={reservation.id} card={card} />}
+
+        {/* 알림톡 수동 발송: 양식 선택 */}
+        {!isCancelled && <ManualAlimtalk reservationId={reservation.id} customer={reservation.customer} card={card} />}
 
         {/* 알림톡 발송 내역과 내용 */}
         <MessageHistory reservationId={reservation.id} card={card} legacyLabel={reservation.alimtalkLabel} />

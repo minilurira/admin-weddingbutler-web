@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { calcConfirm, eventDiscount, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
 import { formatWishDateLabel, isWeddingPast } from "@/lib/format";
 import { getInquiry, updateInquiries } from "@/lib/inquiries";
-import { sendConfirmAlimtalk } from "@/lib/alimtalk";
+import { sendButlerAssignedAlimtalk, sendConfirmAlimtalk, sendReminderAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
@@ -351,4 +351,42 @@ export async function resendAlimtalk(id: string) {
   await prisma.reservation.update({ where: { id }, data: { alimtalkAt: new Date() } });
   revalidateAll();
   return { message: result.sent ? "확정 알림톡을 재발송했습니다." : `확정 알림톡 재발송 요청을 기록했습니다 (${result.detail}).` };
+}
+
+/** 수동 발송 양식. 결제 링크·취소는 금액이 따로 정해지므로 각자의 화면에서 보낸다. */
+type ManualAlimtalkKey = "confirm" | "remind7d" | "remindDay" | "assigned";
+
+/** 고른 양식의 알림톡을 이 예약의 고객에게 지금 보낸다(발송 이력과 상관없이). 결과는 예약 상세의 발송 내역에 남는다. */
+export async function sendAlimtalkManually(id: string, key: ManualAlimtalkKey): Promise<{ message: string }> {
+  await requireSession();
+  const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
+  if (r.status === "취소") return { message: "취소된 예약에는 보낼 수 없습니다." };
+  if (isPast(r)) return { message: PAST_MESSAGE };
+  if (key === "confirm") return resendAlimtalk(id);
+
+  if (key === "assigned") {
+    const shifts = await prisma.butlerShift.findMany({ where: { reservationId: id }, include: { butler: true }, orderBy: { createdAt: "asc" } });
+    if (!shifts.length) return { message: "배정된 버틀러가 없습니다. 먼저 버틀러를 배정해 주세요." };
+    const res = await sendButlerAssignedAlimtalk({ id, customer: r.customer, phone: r.phone, wishDateLabel: formatWishDateLabel(r.confirmDate, r.confirmTime), venueLabel: r.confirmVenue }, shifts.map((s) => s.butler.name));
+    revalidateAll();
+    return { message: res.sent ? "배정 알림톡을 보냈습니다." : `배정 알림톡을 보내지 못했습니다 (${res.detail}).` };
+  }
+
+  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
+  const res = await sendReminderAlimtalk(key === "remind7d" ? "7d" : "day", {
+    reservationId: r.id,
+    customer: r.customer,
+    couple: r.couple,
+    phone: r.phone,
+    wishDateLabel: formatWishDateLabel(r.confirmDate, r.confirmTime),
+    venueLabel: r.confirmVenue,
+    guestsLabel: r.guestsLabel,
+    requestedPlan: r.confirmPlan,
+    planAmount: planBaseOf(r),
+    paidAmount: r.paidAmount,
+    confirmAmount: price.total,
+    balanceAmount: Math.max(0, price.total - r.paidAmount),
+  });
+  revalidateAll();
+  return { message: res.sent ? "알림톡을 보냈습니다." : `알림톡을 보내지 못했습니다 (${res.detail}).` };
 }
