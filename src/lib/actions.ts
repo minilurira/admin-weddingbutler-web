@@ -13,7 +13,7 @@ import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
 import { cancelPaymentLinkById, sendPaymentLinkFor, type SendLinkOptions } from "@/lib/paymentLink";
 
-import { backfillConfirmedEvents, syncReservationEvent } from "@/lib/googleCalendar";
+import { syncReservationEvent } from "@/lib/googleCalendar";
 import { logError } from "@/lib/errorLog";
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -139,15 +139,6 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
       : `${updated.customer} 님 예약이 확정되어 캘린더에 등록되었습니다.${calendarNote}`,
     alimtalk: result,
   };
-}
-
-/** 예식이 지나지 않은 기존 확정 예약 중 구글 캘린더 일정이 없는 것을 모두 등록한다 */
-export async function syncGoogleCalendar() {
-  await requireSession();
-  const r = await backfillConfirmedEvents();
-  if (!r.configured) return { message: "구글 캘린더 설정(환경변수)이 없어 등록하지 못했습니다." };
-  if (!r.created && !r.failed) return { message: "새로 등록할 확정 예약이 없습니다." };
-  return { message: `구글 캘린더에 ${r.created}건 등록했습니다.${r.failed ? ` ${r.failed}건은 실패했습니다(오류 로그 확인).` : ""}` };
 }
 
 /** 확정된 예약을 협의중으로 되돌려 확정 내용을 다시 고칠 수 있게 한다 */
