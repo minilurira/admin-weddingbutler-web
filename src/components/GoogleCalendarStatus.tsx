@@ -8,10 +8,11 @@ interface Props {
   missing: string[];
   pending: number;
   registered: number;
+  calendars: number;
 }
 
 /** 캘린더 화면 위 구글 캘린더 연결 상태 한 줄 + [지금 다시 등록] */
-export default function GoogleCalendarStatus({ missing, pending, registered }: Props) {
+export default function GoogleCalendarStatus({ missing, pending, registered, calendars }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -35,7 +36,7 @@ export default function GoogleCalendarStatus({ missing, pending, registered }: P
 
   const configured = missing.length === 0;
   const summary = configured
-    ? `연결됨 · 등록 ${registered}건 · 등록 대기 ${pending}건`
+    ? `연결됨(캘린더 ${calendars}곳) · 등록 ${registered}건 · 등록 대기 ${pending}건`
     : `설정 없음 · 빠진 환경변수: ${missing.join(", ")}`;
 
   return (
