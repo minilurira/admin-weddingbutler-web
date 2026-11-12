@@ -326,31 +326,6 @@ export async function sendInquiryReplyAlimtalk(phone: string, fields: { name: st
   }
 }
 
-/** 담당 버틀러 배정 안내 알림톡(고객에게). 예약당 한 번만 보낸다(중복 방지는 호출부 assignActions.ts가 발송 내역으로 확인).
- * 템플릿 ID는 비밀이 아니라 기본값을 두었다(환경변수 SOLAPI_TEMPLATE_BUTLER_ASSIGNED로 바꿀 수 있다). */
-export async function sendButlerAssignedAlimtalk(r: { id: string; customer: string; phone: string; wishDateLabel: string; venueLabel: string }): Promise<{ sent: boolean; detail: string }> {
-  const svc = client();
-  const from = process.env.SOLAPI_SENDER_PHONE;
-  const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_ASSIGNED || "KA01TP261112042054733nox236J3Ykn";
-  if (!svc || !from || !pfId) {
-    await logKakao(r.id, "버틀러 배정", r.phone, templateId, {}, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
-    return { sent: false, detail: "미설정" };
-  }
-  const variables = { "#{customer}": r.customer, "#{wishDateLabel}": r.wishDateLabel, "#{venueLabel}": r.venueLabel };
-  try {
-    const result = await svc.send({ to: digitsOnly(r.phone), from, kakaoOptions: { pfId, templateId, variables } });
-    logSendResult(r.id, result);
-    const reason = failureFor(result, r.phone);
-    await logKakao(r.id, "버틀러 배정", r.phone, templateId, variables, reason ? { status: "failed", detail: reason } : { status: "sent" });
-    return reason ? { sent: false, detail: reason } : { sent: true, detail: "전송 완료" };
-  } catch (err) {
-    logError(`[alimtalk] Solapi butler-assigned send failed for ${r.id}`, err);
-    await logKakao(r.id, "버틀러 배정", r.phone, templateId, variables, { status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
-    return { sent: false, detail: "전송 실패" };
-  }
-}
-
 /** 결제 링크 알림톡(SOLAPI_TEMPLATE_PAYMENT_LINK). 변수와 본문은 src/lib/paymentLinkText.ts.
  * 템플릿 ID가 없거나 바로 거절되면 false — 호출부가 문자(LMS)로 대신 보낸다. */
 export async function sendPaymentLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string): Promise<boolean> {

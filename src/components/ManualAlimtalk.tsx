@@ -8,13 +8,12 @@ const FORMS = [
   { key: "confirm", label: "예약 확정 안내" },
   { key: "remind7d", label: "예식 7일 전 안내" },
   { key: "remindDay", label: "예식 당일 안내" },
-  { key: "assigned", label: "담당 버틀러 배정 안내" },
 ] as const;
 
 /** 예약 상세의 "알림톡 수동 발송": 양식을 골라 이 예약의 고객에게 지금 보낸다. 결과는 아래 발송 내역에 남는다. */
 export default function ManualAlimtalk({ reservationId, customer, card }: { reservationId: string; customer: string; card: React.CSSProperties }) {
   const toast = useToast();
-  const [key, setKey] = useState<(typeof FORMS)[number]["key"]>("assigned");
+  const [key, setKey] = useState<(typeof FORMS)[number]["key"]>("confirm");
   const [pending, start] = useTransition();
   const label = FORMS.find((f) => f.key === key)!.label;
 
