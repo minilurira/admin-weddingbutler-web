@@ -2,11 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { toCalendarEvent } from "@/lib/view";
 import FullCalendar from "@/components/FullCalendar";
 import { blocksByDate } from "@/lib/blockData";
+import { calendarStatus } from "@/lib/googleCalendar";
+import GoogleCalendarStatus from "@/components/GoogleCalendarStatus";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
-  const [confirmed, blocks] = await Promise.all([prisma.reservation.findMany({ where: { status: "확정" } }), blocksByDate()]);
+  const [confirmed, blocks, gcal] = await Promise.all([prisma.reservation.findMany({ where: { status: "확정" } }), blocksByDate(), calendarStatus()]);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -19,5 +21,10 @@ export default async function CalendarPage() {
     eventsByDate[it.confirmDate].push(toCalendarEvent(it));
   }
 
-  return <FullCalendar initialYear={year} initialMonth={month} eventsByDate={eventsByDate} blocksByDate={blocks} today={today} />;
+  return (
+    <>
+      <GoogleCalendarStatus missing={gcal.missing} pending={gcal.pending} registered={gcal.registered} />
+      <FullCalendar initialYear={year} initialMonth={month} eventsByDate={eventsByDate} blocksByDate={blocks} today={today} />
+    </>
+  );
 }

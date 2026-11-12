@@ -13,7 +13,7 @@ import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
 import { cancelPaymentLinkById, sendPaymentLinkFor, type SendLinkOptions } from "@/lib/paymentLink";
 
-import { syncReservationEvent } from "@/lib/googleCalendar";
+import { backfillConfirmedEvents, missingCalendarEnv, syncReservationEvent } from "@/lib/googleCalendar";
 import { logError } from "@/lib/errorLog";
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -139,6 +139,18 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
       : `${updated.customer} 님 예약이 확정되어 캘린더에 등록되었습니다.${calendarNote}`,
     alimtalk: result,
   };
+}
+
+/** 캘린더 화면 [지금 다시 등록]: 예식 전인데 구글 캘린더에 없는 확정 예약을 바로 등록하고 결과를 그대로 보여 준다 */
+export async function syncGoogleCalendarNow() {
+  await requireSession();
+  const missing = missingCalendarEnv();
+  if (missing.length) return { ok: false, message: `환경변수 없음: ${missing.join(", ")}` };
+  const r = await backfillConfirmedEvents();
+  revalidatePath("/calendar");
+  if (!r.created && !r.failed) return { ok: true, message: "등록할 예약이 없습니다 (모두 등록됨)." };
+  if (!r.failed) return { ok: true, message: `${r.created}건 등록했습니다.` };
+  return { ok: false, message: `${r.created}건 등록, ${r.failed}건 실패 — ${r.firstError}` };
 }
 
 /** 확정된 예약을 협의중으로 되돌려 확정 내용을 다시 고칠 수 있게 한다 */
