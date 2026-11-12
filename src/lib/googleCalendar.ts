@@ -21,12 +21,45 @@ export interface CalendarResult {
   detail: string;
 }
 
+const ENV_NAMES = ["GOOGLE_SERVICE_ACCOUNT_EMAIL", "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY", "GOOGLE_CALENDAR_ID"] as const;
+
+/** 붙여 넣은 키를 PEM으로 정리한다: 앞뒤 따옴표, \\n 글자, JSON 통째로 넣은 경우까지 */
+function readKeyAndEmail() {
+  let key = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? "").trim();
+  let email = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? "").trim().replace(/^"|"$/g, "");
+  if (key.startsWith("{")) {
+    try {
+      const json = JSON.parse(key) as { private_key?: string; client_email?: string };
+      key = json.private_key ?? "";
+      if (!email) email = json.client_email ?? "";
+    } catch {
+      // JSON이 아니면 아래에서 일반 키로 처리
+    }
+  }
+  key = key.replace(/^"|",?$/g, "").replace(/\\n/g, "\n");
+  return { key, email };
+}
+
+/** 빠진 환경변수 이름 목록 */
+export function missingCalendarEnv(): string[] {
+  const { key, email } = readKeyAndEmail();
+  const missing: string[] = [];
+  if (!email) missing.push(ENV_NAMES[0]);
+  if (!key) missing.push(ENV_NAMES[1]);
+  if (!(process.env.GOOGLE_CALENDAR_ID ?? "").trim()) missing.push(ENV_NAMES[2]);
+  return missing;
+}
+
 function config() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  const calendarId = process.env.GOOGLE_CALENDAR_ID;
+  const { key, email } = readKeyAndEmail();
+  const calendarId = (process.env.GOOGLE_CALENDAR_ID ?? "").trim().replace(/^"|"$/g, "");
   if (!email || !key || !calendarId) return null;
   return { email, key, calendarId };
+}
+
+function errorText(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.replace(/\s+/g, " ").slice(0, 300);
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
@@ -128,7 +161,7 @@ export async function syncReservationEvent(r: Reservation): Promise<CalendarResu
     return { ok: true, detail: "일정 등록" };
   } catch (err) {
     logError(`[google-calendar] sync failed (${r.id})`, err);
-    return { ok: false, detail: "실패" };
+    return { ok: false, detail: `실패: ${errorText(err)}` };
   }
 }
 
@@ -151,17 +184,35 @@ export async function deleteReservationEvent(r: Pick<Reservation, "id" | "google
 /** 예식이 아직 지나지 않은 확정 예약 중 일정이 없는 것을 모두 등록한다.
  * 방금(2분 안) 바뀐 예약은 확정 처리 중일 수 있어 건너뛴다 (중복 일정 방지) */
 export async function backfillConfirmedEvents() {
-  if (!config()) return { configured: false, created: 0, failed: 0 };
-  const rows = await prisma.reservation.findMany({ where: { status: "확정", googleEventId: "", updatedAt: { lt: new Date(Date.now() - 2 * 60 * 1000) } }, orderBy: { confirmDate: "asc" } });
+  if (!config()) return { configured: false, created: 0, failed: 0, firstError: "" };
+  const rows = await pendingRows();
   let created = 0;
   let failed = 0;
+  let firstError = "";
   for (const r of rows) {
-    if (isWeddingPast(r.confirmDate, r.confirmTime)) continue;
     const result = await syncReservationEvent(r);
     if (result.ok) created++;
-    else failed++;
+    else {
+      failed++;
+      if (!firstError) firstError = `${r.id} ${result.detail}`;
+    }
   }
-  return { configured: true, created, failed };
+  return { configured: true, created, failed, firstError };
+}
+
+/** 예식 전인데 아직 일정이 없는 확정 예약 */
+async function pendingRows() {
+  const rows = await prisma.reservation.findMany({ where: { status: "확정", googleEventId: "", updatedAt: { lt: new Date(Date.now() - 2 * 60 * 1000) } }, orderBy: { confirmDate: "asc" } });
+  return rows.filter((r) => !isWeddingPast(r.confirmDate, r.confirmTime));
+}
+
+/** 캘린더 화면에 보여 줄 연결 상태 */
+export async function calendarStatus() {
+  const [pending, registered] = await Promise.all([
+    pendingRows().then((r) => r.length),
+    prisma.reservation.count({ where: { status: "확정", googleEventId: { not: "" } } }),
+  ]);
+  return { missing: missingCalendarEnv(), pending, registered };
 }
 
 const AUTO_BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
