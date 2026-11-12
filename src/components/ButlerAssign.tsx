@@ -27,7 +27,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
 
   async function run(fn: () => Promise<unknown>, okMsg: string) {
     setBusy(true);
-    try { await fn(); toast(okMsg); load(); } catch (e) { toast(e instanceof Error ? e.message : "처리하지 못했습니다."); } finally { setBusy(false); }
+    try { const res = await fn(); toast(typeof res === "string" ? res : okMsg); load(); } catch (e) { toast(e instanceof Error ? e.message : "처리하지 못했습니다."); } finally { setBusy(false); }
   }
 
   const assigned = data?.assigned ?? [];
