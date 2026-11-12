@@ -148,10 +148,11 @@ export async function deleteReservationEvent(r: Pick<Reservation, "id" | "google
   }
 }
 
-/** 예식이 아직 지나지 않은 확정 예약 중 일정이 없는 것을 모두 등록한다 */
+/** 예식이 아직 지나지 않은 확정 예약 중 일정이 없는 것을 모두 등록한다.
+ * 방금(2분 안) 바뀐 예약은 확정 처리 중일 수 있어 건너뛴다 (중복 일정 방지) */
 export async function backfillConfirmedEvents() {
   if (!config()) return { configured: false, created: 0, failed: 0 };
-  const rows = await prisma.reservation.findMany({ where: { status: "확정", googleEventId: "" }, orderBy: { confirmDate: "asc" } });
+  const rows = await prisma.reservation.findMany({ where: { status: "확정", googleEventId: "", updatedAt: { lt: new Date(Date.now() - 2 * 60 * 1000) } }, orderBy: { confirmDate: "asc" } });
   let created = 0;
   let failed = 0;
   for (const r of rows) {
@@ -161,4 +162,21 @@ export async function backfillConfirmedEvents() {
     else failed++;
   }
   return { configured: true, created, failed };
+}
+
+const AUTO_BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
+let lastAutoBackfill = 0;
+
+/**
+ * 어드민 화면을 열 때 백그라운드로 부른다 (src/app/(admin)/layout.tsx, waitUntil).
+ * 서버 인스턴스마다 10분에 한 번만 돌고, 일정이 없는 예식 전 확정 예약(기존 예약·저장 실패 건)을 채운다.
+ */
+export async function autoBackfillConfirmedEvents() {
+  if (!config() || Date.now() - lastAutoBackfill < AUTO_BACKFILL_INTERVAL_MS) return;
+  lastAutoBackfill = Date.now();
+  try {
+    await backfillConfirmedEvents();
+  } catch (err) {
+    logError("[google-calendar] auto backfill failed", err);
+  }
 }
