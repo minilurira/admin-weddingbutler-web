@@ -4,6 +4,7 @@ import { planBaseOf, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendCancelAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
+import { deleteReservationEvent } from "@/lib/googleCalendar";
 
 export type CancelBy = "admin" | "customer";
 
@@ -45,6 +46,9 @@ export async function finishCancel(r: Reservation, input: FinishCancelInput): Pr
     where: { id: r.id },
     data: { status: "취소", cancelReason: input.reason, cancelledAt: new Date(), refundAmount: input.refundAmount },
   });
+
+  // 확정 때 만든 구글 캘린더 일정을 지운다. 실패해도 취소는 유지된다.
+  await deleteReservationEvent(r);
 
   const wishDateLabel = r.confirmDate ? formatWishDateLabel(r.confirmDate, r.confirmTime) : r.wishDateLabel;
   const alimtalk = await sendCancelAlimtalk({

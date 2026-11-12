@@ -13,6 +13,7 @@ import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
 import { cancelPaymentLinkById, sendPaymentLinkFor, type SendLinkOptions } from "@/lib/paymentLink";
 
+import { backfillConfirmedEvents, syncReservationEvent } from "@/lib/googleCalendar";
 import { logError } from "@/lib/errorLog";
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -113,6 +114,9 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
   });
   await prisma.reservation.update({ where: { id }, data: { alimtalkAt: new Date() } });
 
+  // 운영자 구글 캘린더에 예식 1시간 전 일정을 만들거나(재확정이면) 고친다. 실패해도 확정은 유지된다.
+  const calendar = await syncReservationEvent(updated);
+
   // 운영팀 카카오워크 알림방(신규 예약 알림과 같은 방)에도 확정 사실을 알린다. 실패해도 확정은 유지된다.
   const onsite = onsiteAmount(price.total, updated.paidAmount);
   await sendNewReservationKakaoWorkNotice(
@@ -123,16 +127,27 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
       `플랜: ${updated.confirmPlan} · 버틀러 ${updated.confirmButlers}명`,
       `결제: ${paymentTypeName(updated.paymentType, updated.paidAmount, price.total)} · 결제 ${won(updated.paidAmount)} · 현장(현금) ${won(onsite)}`,
       `고객 알림톡: ${result.detail}`,
+      `구글 캘린더: ${calendar.detail}`,
     ].join("\n")
   );
 
   revalidateAll();
+  const calendarNote = calendar.ok ? "" : ` (구글 캘린더 ${calendar.detail})`;
   return {
     message: wasConfirmed
-      ? "확정 내용이 저장되었습니다."
-      : `${updated.customer} 님 예약이 확정되어 캘린더에 등록되었습니다.`,
+      ? `확정 내용이 저장되었습니다.${calendarNote}`
+      : `${updated.customer} 님 예약이 확정되어 캘린더에 등록되었습니다.${calendarNote}`,
     alimtalk: result,
   };
+}
+
+/** 예식이 지나지 않은 기존 확정 예약 중 구글 캘린더 일정이 없는 것을 모두 등록한다 */
+export async function syncGoogleCalendar() {
+  await requireSession();
+  const r = await backfillConfirmedEvents();
+  if (!r.configured) return { message: "구글 캘린더 설정(환경변수)이 없어 등록하지 못했습니다." };
+  if (!r.created && !r.failed) return { message: "새로 등록할 확정 예약이 없습니다." };
+  return { message: `구글 캘린더에 ${r.created}건 등록했습니다.${r.failed ? ` ${r.failed}건은 실패했습니다(오류 로그 확인).` : ""}` };
 }
 
 /** 확정된 예약을 협의중으로 되돌려 확정 내용을 다시 고칠 수 있게 한다 */

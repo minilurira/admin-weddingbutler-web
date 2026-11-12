@@ -9,6 +9,7 @@ import { blockLabel } from "@/lib/calendarBlocks";
 import { createCalendarBlocks, deleteCalendarBlock } from "@/lib/blockActions";
 import { TIME_SLOTS } from "@/lib/format";
 import { useToast } from "./ToastContext";
+import GoogleCalendarSyncButton from "@/components/GoogleCalendarSyncButton";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const WD_KO = ["일", "월", "화", "수", "목", "금", "토"];
@@ -95,6 +96,7 @@ export default function FullCalendar({
           <button aria-label="다음 달" onClick={nextMonth} style={{ width: 36, height: 36, border: 0, background: "#F6F3F5", borderRadius: 12, color: "#6E646A", fontSize: 15, cursor: "pointer" }}>›</button>
         </div>
         <span style={{ fontSize: 13.5, color: "#8C8188" }}>확정된 축의대 대행 일정 {monthEventCount}건</span>
+        {!embedded && <GoogleCalendarSyncButton />}
       </div>
 
       <div style={{ borderRadius: 18, border: "1px solid #F0EDEF", overflow: "hidden" }}>

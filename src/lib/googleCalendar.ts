@@ -1,0 +1,164 @@
+import { createSign } from "crypto";
+import type { Reservation } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { calcConfirm, onsiteAmount, paymentTypeName, won } from "@/lib/pricing";
+import { isWeddingPast, pad2 } from "@/lib/format";
+import { logError } from "@/lib/errorLog";
+
+// 예약 확정 시 운영자 구글 캘린더에 일정을 만든다 (서비스 계정 + 캘린더 공유 방식).
+// 필요한 환경변수: GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY, GOOGLE_CALENDAR_ID
+// 캘린더(GOOGLE_CALENDAR_ID)는 서비스 계정 이메일에 "일정 변경" 권한으로 공유되어 있어야 한다.
+// 설정이 없거나 호출이 실패해도 예약 확정·취소는 그대로 진행된다.
+
+const SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const TIME_ZONE = "Asia/Seoul";
+/** 일정 시작 = 예식 시각보다 이만큼 앞 */
+const LEAD_MINUTES = 60;
+
+export interface CalendarResult {
+  ok: boolean;
+  detail: string;
+}
+
+function config() {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const calendarId = process.env.GOOGLE_CALENDAR_ID;
+  if (!email || !key || !calendarId) return null;
+  return { email, key, calendarId };
+}
+
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+function b64url(v: string | Buffer) {
+  return Buffer.from(v).toString("base64url");
+}
+
+async function accessToken(cfg: NonNullable<ReturnType<typeof config>>) {
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.token;
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = b64url(JSON.stringify({ iss: cfg.email, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 }));
+  const signer = createSign("RSA-SHA256");
+  signer.update(`${header}.${claims}`);
+  const jwt = `${header}.${claims}.${b64url(signer.sign(cfg.key))}`;
+
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
+  });
+  if (!res.ok) throw new Error(`token ${res.status}: ${await res.text()}`);
+  const data = (await res.json()) as { access_token: string; expires_in: number };
+  cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+  return data.access_token;
+}
+
+function addDays(date: string, days: number) {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+}
+
+function clock(minutes: number) {
+  return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}:00`;
+}
+
+/** 예식 1시간 전 ~ 예식 시각. 시간이 미정이면 그날 종일 일정 */
+function eventTimes(date: string, time: string) {
+  const tm = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!tm) return { start: { date }, end: { date: addDays(date, 1) } };
+  const at = Number(tm[1]) * 60 + Number(tm[2]);
+  const from = Math.max(0, at - LEAD_MINUTES);
+  return {
+    start: { dateTime: `${date}T${clock(from)}`, timeZone: TIME_ZONE },
+    end: { dateTime: `${date}T${clock(at)}`, timeZone: TIME_ZONE },
+  };
+}
+
+function eventBody(r: Reservation) {
+  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
+  const description = [
+    `예약번호: ${r.id}`,
+    `예식 시각: ${r.confirmTime || "미정"}`,
+    `고객: ${r.customer} · ${r.phone}`,
+    r.side ? `축의대: ${r.side}` : "",
+    `플랜: ${r.confirmPlan} · 버틀러 ${r.confirmButlers}명`,
+    r.guestsLabel ? `하객: ${r.guestsLabel}` : "",
+    r.confirmHours ? `근무 시간: ${r.confirmHours}` : "",
+    `결제: ${paymentTypeName(r.paymentType, r.paidAmount, price.total)} · 결제 ${won(r.paidAmount)} · 현장(현금) ${won(onsiteAmount(price.total, r.paidAmount))}`,
+    r.confirmNote ? `확정 메모: ${r.confirmNote}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    summary: `[웨딩버틀러] ${r.couple || r.customer}${r.confirmVenue ? ` · ${r.confirmVenue}` : ""}`,
+    location: r.confirmVenue,
+    description,
+    ...eventTimes(r.confirmDate, r.confirmTime),
+  };
+}
+
+async function calendarFetch(cfg: NonNullable<ReturnType<typeof config>>, path: string, init: RequestInit) {
+  const token = await accessToken(cfg);
+  return fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cfg.calendarId)}/events${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+}
+
+/** 확정 예약의 일정을 만들거나(처음) 고친다(이미 있으면). 일정 id는 Reservation.googleEventId에 저장 */
+export async function syncReservationEvent(r: Reservation): Promise<CalendarResult> {
+  const cfg = config();
+  if (!cfg) return { ok: false, detail: "설정 없음(건너뜀)" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(r.confirmDate)) return { ok: false, detail: "예식 날짜 없음(건너뜀)" };
+  try {
+    const body = JSON.stringify(eventBody(r));
+    if (r.googleEventId) {
+      const res = await calendarFetch(cfg, `/${encodeURIComponent(r.googleEventId)}`, { method: "PUT", body });
+      if (res.ok) return { ok: true, detail: "일정 수정" };
+      // 캘린더에서 직접 지운 일정이면 새로 만든다
+      if (res.status !== 404 && res.status !== 410) throw new Error(`update ${res.status}: ${await res.text()}`);
+    }
+    const res = await calendarFetch(cfg, "", { method: "POST", body });
+    if (!res.ok) throw new Error(`insert ${res.status}: ${await res.text()}`);
+    const created = (await res.json()) as { id: string };
+    await prisma.reservation.update({ where: { id: r.id }, data: { googleEventId: created.id } });
+    return { ok: true, detail: "일정 등록" };
+  } catch (err) {
+    logError(`[google-calendar] sync failed (${r.id})`, err);
+    return { ok: false, detail: "실패" };
+  }
+}
+
+/** 예약 취소 시 일정을 지운다 */
+export async function deleteReservationEvent(r: Pick<Reservation, "id" | "googleEventId">): Promise<CalendarResult> {
+  const cfg = config();
+  if (!r.googleEventId) return { ok: true, detail: "일정 없음" };
+  if (!cfg) return { ok: false, detail: "설정 없음(건너뜀)" };
+  try {
+    const res = await calendarFetch(cfg, `/${encodeURIComponent(r.googleEventId)}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 404 && res.status !== 410) throw new Error(`delete ${res.status}: ${await res.text()}`);
+    await prisma.reservation.update({ where: { id: r.id }, data: { googleEventId: "" } });
+    return { ok: true, detail: "일정 삭제" };
+  } catch (err) {
+    logError(`[google-calendar] delete failed (${r.id})`, err);
+    return { ok: false, detail: "삭제 실패" };
+  }
+}
+
+/** 예식이 아직 지나지 않은 확정 예약 중 일정이 없는 것을 모두 등록한다 */
+export async function backfillConfirmedEvents() {
+  if (!config()) return { configured: false, created: 0, failed: 0 };
+  const rows = await prisma.reservation.findMany({ where: { status: "확정", googleEventId: "" }, orderBy: { confirmDate: "asc" } });
+  let created = 0;
+  let failed = 0;
+  for (const r of rows) {
+    if (isWeddingPast(r.confirmDate, r.confirmTime)) continue;
+    const result = await syncReservationEvent(r);
+    if (result.ok) created++;
+    else failed++;
+  }
+  return { configured: true, created, failed };
+}
