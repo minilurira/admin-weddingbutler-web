@@ -326,7 +326,7 @@ export async function sendInquiryReplyAlimtalk(phone: string, fields: { name: st
   }
 }
 
-/** 담당 버틀러 배정 안내 알림톡(고객에게). 버틀러가 1명이라도 배정되면 보내고, 배정이 늘 때마다 전체 명단으로 다시 보낸다.
+/** 담당 버틀러 배정 안내 알림톡(고객에게). 최초 1명이 배정될 때 한 번 보낸다(호출부: assignActions.ts).
  * 템플릿 ID는 비밀이 아니라 기본값을 두었다(환경변수 SOLAPI_TEMPLATE_BUTLER_ASSIGNED로 바꿀 수 있다). */
 export async function sendButlerAssignedAlimtalk(r: { id: string; customer: string; phone: string; wishDateLabel: string; venueLabel: string }, butlerNames: string[]): Promise<{ sent: boolean; detail: string }> {
   const svc = client();
