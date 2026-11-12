@@ -190,6 +190,8 @@ model Butler {
   bankName      String        @default("")
   accountNumber String        @default("")
   accountHolder String        @default("")
+  // 업무 배정 알림톡을 받을 휴대폰 번호 (숫자만 저장, 없으면 "")
+  phone         String        @default("")
   createdAt DateTime      @default(now())
   shifts    ButlerShift[]
 }

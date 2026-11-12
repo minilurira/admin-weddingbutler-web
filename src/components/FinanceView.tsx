@@ -4,9 +4,10 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./ToastContext";
 import {
-  addButler, saveButlerAccount, setShiftsPaid, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
+  addButler, saveButlerAccount, saveButlerPhone, setShiftsPaid, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
+import { formatPhone } from "@/lib/format";
 import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowByMonth, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
 export interface FinanceData {
@@ -14,7 +15,7 @@ export interface FinanceData {
   settings: { feeRate: number; bankDate: string; bankBalance: number };
   reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string; payments: Record<string, string> }[];
-  butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string }[];
+  butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string; phone: string }[];
   shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
 }
 
@@ -33,6 +34,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const [sRes, setSRes] = useState(data.reservations[0]?.id ?? "");
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
   const [editAcct, setEditAcct] = useState(""); // 계좌 입력 중인 버틀러 id
+  const [editPhone, setEditPhone] = useState(""); // 휴대폰 번호 입력 중인 버틀러 id
   const [delButler, setDelButler] = useState(""); // 삭제 확인 중인 버틀러 id
   const [sButler, setSButler] = useState(""); // 기록 입력에서 고른 버틀러 id (비어 있으면 첫 번째)
   const [sGradePick, setSGrade] = useState(""); // 이번 참석 등급 (비어 있으면 그 버틀러의 기본 등급)
@@ -338,10 +340,10 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
       {tab === "butler" && (
         <section className="panel">
           <div className="box"><h2>버틀러 리스트 <small className="sub">총 수입은 전체 기간 정산 합계</small></h2>
-            <div className="scroll"><table style={{ minWidth: 700 }}>
-              <thead><tr><th>이름</th><th>입금 계좌</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
+            <div className="scroll"><table style={{ minWidth: 820 }}>
+              <thead><tr><th>이름</th><th>휴대폰</th><th>입금 계좌</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
               <tbody>
-                {butlers.length === 0 && <tr><td colSpan={8} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
+                {butlers.length === 0 && <tr><td colSpan={9} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
                 {butlers.map((b) => {
                   const all = shifts.filter((s) => s.butlerId === b.id);
                   const total = all.reduce((a, s) => a + shiftTotal(s), 0);
@@ -351,6 +353,20 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                   return (
                     <tr key={b.id}>
                       <td><b>{b.name}</b></td>
+                      <td>
+                        {editPhone === b.id ? (
+                          <form style={{ display: "flex", gap: 6, flexWrap: "wrap" }} onSubmit={(e) => { const f = form(e); setEditPhone(""); run(() => saveButlerPhone(b.id, String(f.get("phone"))), "휴대폰 번호를 저장했습니다."); }}>
+                            <input name="phone" type="tel" defaultValue={b.phone ? formatPhone(b.phone) : ""} placeholder="010-0000-0000" aria-label="휴대폰 번호" inputMode="tel" style={{ width: 130 }} />
+                            <button className="btn" type="submit">저장</button>
+                            <button type="button" className="del" onClick={() => setEditPhone("")}>취소</button>
+                          </form>
+                        ) : (
+                          <>
+                            {b.phone ? <span className="num">{formatPhone(b.phone)}</span> : <small className="sub">미등록</small>}{" "}
+                            <button type="button" className="del" onClick={() => setEditPhone(b.id)}>{b.phone ? "수정" : "입력"}</button>
+                          </>
+                        )}
+                      </td>
                       <td>
                         {editAcct === b.id ? (
                           <form style={{ display: "flex", gap: 6, flexWrap: "wrap" }} onSubmit={(e) => { const f = form(e); setEditAcct(""); run(() => saveButlerAccount(b.id, { bankName: String(f.get("bank")), accountNumber: String(f.get("acct")), accountHolder: String(f.get("holder")) }), "계좌를 저장했습니다."); }}>
