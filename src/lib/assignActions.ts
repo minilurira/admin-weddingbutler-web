@@ -30,14 +30,13 @@ export async function assignButler(reservationId: string, butlerId: string, grad
   await createAssignment(reservationId, butlerId, grade);
   done();
   const r = await prisma.reservation.findUnique({ where: { id: reservationId } });
-  const shifts = await prisma.butlerShift.findMany({ where: { reservationId }, include: { butler: true }, orderBy: { createdAt: "asc" } });
-  if (!r || r.status === "취소" || !shifts.length) return "배정했습니다.";
+  if (!r || r.status === "취소") return "배정했습니다.";
   // 배정 알림톡은 예약당 한 번만 보낸다. 발송 이력(발송 내역)에 성공 기록이 있으면 해제 후 재배정이나 추가 배정에도 다시 보내지 않는다.
   // 첫 발송이 실패했다면 성공 기록이 없으므로 다음 배정 때 다시 시도한다.
   await ensureMessageLogTable();
   const already = await prisma.messageLog.findFirst({ where: { reservationId, kind: "버틀러 배정", status: "sent" }, select: { id: true } });
   if (already) return "배정했습니다. (배정 알림톡은 이미 보냈습니다)";
-  const res = await sendButlerAssignedAlimtalk(r, shifts.map((s) => s.butler.name));
+  const res = await sendButlerAssignedAlimtalk(r);
   return res.sent ? "배정하고 고객에게 배정 알림톡을 보냈습니다." : `배정했지만 알림톡은 보내지 못했습니다 (${res.detail}).`;
 }
 

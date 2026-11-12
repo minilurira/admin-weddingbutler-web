@@ -328,16 +328,16 @@ export async function sendInquiryReplyAlimtalk(phone: string, fields: { name: st
 
 /** 담당 버틀러 배정 안내 알림톡(고객에게). 예약당 한 번만 보낸다(중복 방지는 호출부 assignActions.ts가 발송 내역으로 확인).
  * 템플릿 ID는 비밀이 아니라 기본값을 두었다(환경변수 SOLAPI_TEMPLATE_BUTLER_ASSIGNED로 바꿀 수 있다). */
-export async function sendButlerAssignedAlimtalk(r: { id: string; customer: string; phone: string; wishDateLabel: string; venueLabel: string }, butlerNames: string[]): Promise<{ sent: boolean; detail: string }> {
+export async function sendButlerAssignedAlimtalk(r: { id: string; customer: string; phone: string; wishDateLabel: string; venueLabel: string }): Promise<{ sent: boolean; detail: string }> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_ASSIGNED || "KA01TP261112001042765qWyiriE4ntb";
+  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_ASSIGNED || "KA01TP261112042054733nox236J3Ykn";
   if (!svc || !from || !pfId) {
     await logKakao(r.id, "버틀러 배정", r.phone, templateId, {}, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
     return { sent: false, detail: "미설정" };
   }
-  const variables = { "#{customer}": r.customer, "#{wishDateLabel}": r.wishDateLabel, "#{venueLabel}": r.venueLabel, "#{butlerNames}": butlerNames.join(", ") };
+  const variables = { "#{customer}": r.customer, "#{wishDateLabel}": r.wishDateLabel, "#{venueLabel}": r.venueLabel };
   try {
     const result = await svc.send({ to: digitsOnly(r.phone), from, kakaoOptions: { pfId, templateId, variables } });
     logSendResult(r.id, result);

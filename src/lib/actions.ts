@@ -365,9 +365,8 @@ export async function sendAlimtalkManually(id: string, key: ManualAlimtalkKey): 
   if (key === "confirm") return resendAlimtalk(id);
 
   if (key === "assigned") {
-    const shifts = await prisma.butlerShift.findMany({ where: { reservationId: id }, include: { butler: true }, orderBy: { createdAt: "asc" } });
-    if (!shifts.length) return { message: "배정된 버틀러가 없습니다. 먼저 버틀러를 배정해 주세요." };
-    const res = await sendButlerAssignedAlimtalk({ id, customer: r.customer, phone: r.phone, wishDateLabel: formatWishDateLabel(r.confirmDate, r.confirmTime), venueLabel: r.confirmVenue }, shifts.map((s) => s.butler.name));
+    if (!(await prisma.butlerShift.count({ where: { reservationId: id } }))) return { message: "배정된 버틀러가 없습니다. 먼저 버틀러를 배정해 주세요." };
+    const res = await sendButlerAssignedAlimtalk({ id, customer: r.customer, phone: r.phone, wishDateLabel: formatWishDateLabel(r.confirmDate, r.confirmTime), venueLabel: r.confirmVenue });
     revalidateAll();
     return { message: res.sent ? "배정 알림톡을 보냈습니다." : `배정 알림톡을 보내지 못했습니다 (${res.detail}).` };
   }
