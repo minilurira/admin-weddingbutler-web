@@ -30,6 +30,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const toast = useToast();
   const [, startTransition] = useTransition();
   const [month, setMonth] = useState(data.today.slice(0, 7));
+  const [range, setRange] = useState<"month" | "all">("month"); // 손익관리: 선택한 달 / 사업 시작부터 지금까지 누적
   const [tab, setTab] = useState<Tab>(butlerView ? "butler" : "income");
   const [sRes, setSRes] = useState(data.reservations[0]?.id ?? "");
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
@@ -132,6 +133,29 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const curProj = projection.find((p) => p.m === month);
   const lowest = projection.reduce((a, p) => (p.end < a.end ? p : a), projection[0]);
   const maxAbs = Math.max(...projection.map((p) => Math.abs(p.end)), 1);
+  /* 사업 기간 누적: 가장 이른 기록(결제일·비용 날짜·참석일)의 달부터 이번 달까지, 달마다 위 이번 달 집계와 같은 식으로 계산해 더한다. */
+  const endMonth = data.today.slice(0, 7);
+  const startMonth = [...reservations.map((r) => r.paidDate), ...costs.map((c) => c.date), ...shifts.map((x) => x.date)].filter(Boolean).map((d) => d.slice(0, 7)).sort()[0] ?? endMonth;
+  const monthRows = (() => {
+    const out: { m: string; gross: number; fee: number; income: number; cost: number; net: number; unpaid: number }[] = [];
+    let [y, m] = startMonth.split("-").map(Number);
+    for (; `${y}-${String(m).padStart(2, "0")}` <= endMonth; m++) {
+      if (m > 12) { m = 1; y++; }
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      if (key > endMonth) break;
+      const rm = reservations.filter((r) => r.paidDate.startsWith(key));
+      const g = rm.reduce((a, r) => a + r.card + (r.cash ?? 0), 0), f = rm.reduce((a, r) => a + feeOf(r.card), 0);
+      const mon = costs.filter((c) => c.kind === "monthly" && c.date.slice(0, 7) <= key).reduce((a, c) => a + c.amount, 0);
+      const one = costs.filter((c) => c.kind === "once" && c.date.startsWith(key)).reduce((a, c) => a + c.amount, 0);
+      const sm = shifts.filter((x) => x.date.startsWith(key));
+      const p = sm.reduce((a, x) => a + shiftTotal(x), 0);
+      out.push({ m: key, gross: g, fee: f, income: g - f, cost: mon + one + p, net: g - f - mon - one - p, unpaid: sm.filter((x) => !x.paid).reduce((a, x) => a + shiftTotal(x), 0) });
+    }
+    return out;
+  })();
+  const sum = (k: "gross" | "fee" | "income" | "cost" | "net" | "unpaid") => monthRows.reduce((a, r) => a + r[k], 0);
+  const allView = !butlerView && range === "all";
+  const nowProj = projection.find((p) => p.m === endMonth);
   const [yy, mm] = month.split("-");
 
   const form = (e: FormEvent<HTMLFormElement>) => { e.preventDefault(); return new FormData(e.currentTarget); };
@@ -142,10 +166,20 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
 
       <div className="top">
         <h1>{butlerView ? "버틀러 관리" : "손익관리"}</h1>
-        <div className="month" role="group" aria-label="월 선택">
-          <button type="button" onClick={() => shiftMonth(-1)} aria-label="이전 달">‹</button>
-          <b className="num">{yy}년 {Number(mm)}월</b>
-          <button type="button" onClick={() => shiftMonth(1)} aria-label="다음 달">›</button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          {!butlerView && (
+            <div className="month" role="group" aria-label="보기 범위">
+              <button type="button" aria-pressed={range === "month"} onClick={() => setRange("month")} style={{ width: "auto", padding: "0 14px", fontWeight: range === "month" ? 800 : 600, background: range === "month" ? "var(--card-bg, #fff)" : "transparent" }}>월별</button>
+              <button type="button" aria-pressed={range === "all"} onClick={() => setRange("all")} style={{ width: "auto", padding: "0 14px", fontWeight: range === "all" ? 800 : 600, background: range === "all" ? "var(--card-bg, #fff)" : "transparent" }}>사업 기간 누적</button>
+            </div>
+          )}
+          {!allView && (
+            <div className="month" role="group" aria-label="월 선택">
+              <button type="button" onClick={() => shiftMonth(-1)} aria-label="이전 달">‹</button>
+              <b className="num">{yy}년 {Number(mm)}월</b>
+              <button type="button" onClick={() => shiftMonth(1)} aria-label="다음 달">›</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -156,6 +190,29 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
           <div className="tile net"><small>미지급 (이번 달)</small><b className="num">{won(unpaid.reduce((a, s) => a + shiftTotal(s), 0))}</b><span>{unpaid.length}건 지급 대기</span></div>
           <div className="tile"><small>누적 총 수입 (전체 기간)</small><b className="num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</b><span>지급 완료 {won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</span></div>
         </div>
+      ) : allView ? (
+      <>
+        <div className="sum">
+          <div className="tile"><small>누적 실수입 (카드수수료 제외)</small><b className="num">{won(sum("income"))}</b><span>매출 {won(sum("gross"))} − 수수료 {won(sum("fee"))}</span></div>
+          <div className="tile"><small>누적 총 비용</small><b className="num">{won(sum("cost"))}</b><span>{startMonth.replace("-", "년 ")}월 ~ {Number(endMonth.slice(5))}월 · {monthRows.length}개월</span></div>
+          <div className="tile net"><small>누적 순수익 (실수입 − 비용)</small><b className="num">{won(sum("net"))}</b><span>{sum("income") ? `이익률 ${Math.round((sum("net") / sum("income")) * 100)}%` : "수입 없음"}</span></div>
+          <div className="tile"><small>버틀러 미정산 (누적)</small><b className="num">{won(sum("unpaid"))}</b><span>지급 대기 합계</span></div>
+          <div className="tile"><small>이번 달 말 예상 통장 잔액</small><b className={`num ${nowProj && nowProj.end < 0 ? "neg" : ""}`}>{nowProj ? won(nowProj.end) : "-"}</b><span>{nowProj ? `기준일 ${md(base)} 잔액에서 계산` : "기준일 이후 달만 계산"}</span></div>
+        </div>
+        <section className="panel">
+          <div className="box"><h2>월별 손익 <small className="sub">{startMonth.replace("-", "년 ")}월부터 · 가장 이른 결제·비용·참석 기록을 사업 시작으로 봅니다</small></h2>
+            <div className="scroll"><table style={{ minWidth: 640 }}>
+              <thead><tr><th>월</th><th className="r">매출</th><th className="r">카드수수료</th><th className="r">실수입</th><th className="r">비용</th><th className="r">순수익</th></tr></thead>
+              <tbody>
+                {monthRows.map((r) => (
+                  <tr key={r.m}><td className="num">{r.m.replace("-", "년 ")}월</td><td className="r num">{won(r.gross)}</td><td className="r num">−{won(r.fee)}</td><td className="r num">{won(r.income)}</td><td className="r num">{won(r.cost)}</td><td className={`r num ${r.net < 0 ? "neg" : ""}`}><b>{won(r.net)}</b></td></tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td>누적 합계</td><td className="r num">{won(sum("gross"))}</td><td className="r num">−{won(sum("fee"))}</td><td className="r num">{won(sum("income"))}</td><td className="r num">{won(sum("cost"))}</td><td className={`r num ${sum("net") < 0 ? "neg" : ""}`}><b>{won(sum("net"))}</b></td></tr></tfoot>
+            </table></div>
+          </div>
+        </section>
+      </>
       ) : (
       <div className="sum">
         <div className="tile"><small>실수입 (카드수수료 제외)</small><b className="num">{won(income)}</b><span>매출 {won(gross)} − 수수료 {won(fee)}</span></div>
@@ -166,7 +223,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
       </div>
       )}
 
-      {!butlerView && (
+      {!butlerView && !allView && (
         <div className="tabs" role="tablist">
           {([["income", "수입"], ["cost", "비용"], ["bank", "통장 잔액"], ["recon", "결제 대사"]] as [Tab, string][]).map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{label}</button>
@@ -174,7 +231,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         </div>
       )}
 
-      {tab === "income" && (
+      {!allView && tab === "income" && (
         <section className="panel">
           <div className="box"><div className="inline">
             <div className="field"><label htmlFor="feeRate">카드 수수료율 (%, 부가세 별도)</label>
@@ -223,7 +280,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         </section>
       )}
 
-      {tab === "cost" && (
+      {!allView && tab === "cost" && (
         <section className="panel">
           <div className="box"><h2>비용 입력</h2>
             <form className="form" key={costs.length} onSubmit={(e) => { const f = form(e); run(() => addCost({ name: String(f.get("name")), amount: toInt(String(f.get("amount"))), kind: String(f.get("kind")), date: String(f.get("date")), memo: String(f.get("memo") ?? "") }), "비용을 추가했습니다."); }}>
@@ -337,7 +394,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         </section>
       )}
 
-      {tab === "butler" && (
+      {!allView && tab === "butler" && (
         <section className="panel">
           <div className="box"><h2>버틀러 리스트 <small className="sub">총 수입은 전체 기간 정산 합계</small></h2>
             <div className="scroll"><table style={{ minWidth: 820 }}>
@@ -493,7 +550,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         </section>
       )}
 
-      {tab === "bank" && (
+      {!allView && tab === "bank" && (
         <section className="panel">
           <div className="box"><h2>통장 잔액 기준</h2>
             <div className="inline">
@@ -531,7 +588,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
           </div>
         </section>
       )}
-      {tab === "recon" && (
+      {!allView && tab === "recon" && (
         <section className="panel">
           <div className="box"><h2>결제 건 대사 <small className="sub">{yy}년 {Number(mm)}월 접수분</small></h2>
             <div className="inline">
