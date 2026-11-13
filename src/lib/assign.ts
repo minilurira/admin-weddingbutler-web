@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables } from "@/lib/finance";
 import { gradePay, isButlerGrade } from "@/lib/financeCalc";
+import { resolveDeskSide } from "@/lib/pricing";
 
 // 예약건에 버틀러를 배정하는 DB 로직. 배정 = 그 예약의 참석·정산 기록(ButlerShift)을 미리 만들어 두는 것이라
 // 버틀러 관리의 참석·정산 기록과 손익관리의 비용·통장 잔액 예상에 그대로 들어간다. 별도 테이블은 없다.
@@ -11,6 +12,8 @@ export interface AssignedView {
   butlerId: string;
   name: string;
   grade: string;
+  /** 맡은 축의대 쪽 ("신랑측" | "신부측" | "양가 통합" | "") */
+  side: string;
   pay: number;
   extra: number;
   paid: boolean;
@@ -27,6 +30,9 @@ export interface AssignableView {
 
 export interface AssignmentView {
   date: string;
+  /** 예약의 축의대 쪽과 요금제 — 담당 쪽 선택칸을 보일지 정한다 (pricing.ts deskSideOptions) */
+  side: string;
+  plan: string;
   assigned: AssignedView[];
   butlers: AssignableView[];
 }
@@ -37,7 +43,7 @@ export interface AssignmentView {
  */
 export async function loadAssignment(reservationId: string): Promise<AssignmentView> {
   await ensureFinanceTables();
-  const r = await prisma.reservation.findUnique({ where: { id: reservationId }, select: { confirmDate: true } });
+  const r = await prisma.reservation.findUnique({ where: { id: reservationId }, select: { confirmDate: true, side: true, confirmPlan: true } });
   if (!r) throw new Error("예약을 찾을 수 없습니다.");
   const date = r.confirmDate;
 
@@ -57,17 +63,19 @@ export async function loadAssignment(reservationId: string): Promise<AssignmentV
 
   return {
     date,
-    assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, pay: s.pay, extra: s.extra, paid: s.paid })),
+    side: r.side,
+    plan: r.confirmPlan,
+    assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, side: s.side, pay: s.pay, extra: s.extra, paid: s.paid })),
     butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, busyAt: busy.has(b.id) ? busy.get(b.id)! : null })),
   };
 }
 
-/** 버틀러를 예약에 배정한다. 참석일은 예약의 예식일, 기본 정산금은 고른 등급의 금액. */
-export async function createAssignment(reservationId: string, butlerId: string, grade: string): Promise<void> {
+/** 버틀러를 예약에 배정한다. 참석일은 예약의 예식일, 기본 정산금은 고른 등급의 금액. 양가 예약은 맡을 쪽(side)도 저장한다. */
+export async function createAssignment(reservationId: string, butlerId: string, grade: string, side = ""): Promise<void> {
   await ensureFinanceTables();
   if (!isButlerGrade(grade)) throw new Error("등급을 확인해 주세요.");
   const [r, butler, existing] = await Promise.all([
-    prisma.reservation.findUnique({ where: { id: reservationId }, select: { id: true, status: true, confirmDate: true } }),
+    prisma.reservation.findUnique({ where: { id: reservationId }, select: { id: true, status: true, confirmDate: true, side: true, confirmPlan: true } }),
     prisma.butler.findUnique({ where: { id: butlerId } }),
     prisma.butlerShift.findFirst({ where: { reservationId, butlerId } }),
   ]);
@@ -76,7 +84,19 @@ export async function createAssignment(reservationId: string, butlerId: string, 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(r.confirmDate)) throw new Error("예식 날짜가 정해진 뒤에 배정할 수 있습니다.");
   if (!butler) throw new Error("버틀러를 찾을 수 없습니다.");
   if (existing) throw new Error(`${butler.name} 님은 이미 이 예약에 배정되어 있습니다.`);
-  await prisma.butlerShift.create({ data: { butlerId, reservationId, date: r.confirmDate, grade, pay: gradePay(grade, butler.name) } });
+  const deskSide = resolveDeskSide(r.side, r.confirmPlan, side);
+  await prisma.butlerShift.create({ data: { butlerId, reservationId, date: r.confirmDate, grade, side: deskSide, pay: gradePay(grade, butler.name) } });
+}
+
+/** 배정된 버틀러의 담당 쪽을 바꾼다. 지급 완료된 기록은 바꾸지 않는다. */
+export async function changeAssignmentSide(shiftId: string, side: string): Promise<void> {
+  await ensureFinanceTables();
+  const shift = await prisma.butlerShift.findUnique({ where: { id: shiftId } });
+  if (!shift) throw new Error("배정 기록을 찾을 수 없습니다.");
+  if (shift.paid) throw new Error("이미 지급 완료된 기록은 바꿀 수 없습니다.");
+  const r = await prisma.reservation.findUnique({ where: { id: shift.reservationId }, select: { side: true, confirmPlan: true } });
+  if (!r) throw new Error("예약을 찾을 수 없습니다.");
+  await prisma.butlerShift.update({ where: { id: shiftId }, data: { side: resolveDeskSide(r.side, r.confirmPlan, side) } });
 }
 
 /** 배정을 해제한다. 이미 지급 완료로 표시된 기록은 버틀러 관리에서 직접 처리해야 한다. */

@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendButlerAssignedAlimtalk } from "@/lib/alimtalk";
 import { ensureMessageLogTable } from "@/lib/messageLog";
-import { createAssignment, loadAssignment, removeAssignment, type AssignmentView } from "@/lib/assign";
+import { changeAssignmentSide, createAssignment, loadAssignment, removeAssignment, type AssignmentView } from "@/lib/assign";
 
 async function guard() {
   const session = await getServerSession(authOptions);
@@ -25,9 +25,9 @@ export async function getAssignment(reservationId: string): Promise<AssignmentVi
 }
 
 /** 배정하고, 아직 배정 알림톡을 보낸 적이 없으면 고객에게 보낸다. 화면에 띄울 결과 문구를 돌려준다. */
-export async function assignButler(reservationId: string, butlerId: string, grade: string): Promise<string> {
+export async function assignButler(reservationId: string, butlerId: string, grade: string, side = ""): Promise<string> {
   await guard();
-  await createAssignment(reservationId, butlerId, grade);
+  await createAssignment(reservationId, butlerId, grade, side);
   done();
   const r = await prisma.reservation.findUnique({ where: { id: reservationId } });
   if (!r || r.status === "취소") return "배정했습니다.";
@@ -38,6 +38,13 @@ export async function assignButler(reservationId: string, butlerId: string, grad
   if (already) return "배정했습니다. (배정 알림톡은 이미 보냈습니다)";
   const res = await sendButlerAssignedAlimtalk(r);
   return res.sent ? "배정하고 고객에게 배정 알림톡을 보냈습니다." : `배정했지만 알림톡은 보내지 못했습니다 (${res.detail}).`;
+}
+
+/** 배정된 버틀러가 맡을 쪽(신랑측/신부측/양가 통합)을 바꾼다. */
+export async function setAssignmentSide(shiftId: string, side: string): Promise<void> {
+  await guard();
+  await changeAssignmentSide(shiftId, side);
+  done();
 }
 
 export async function unassignButler(shiftId: string): Promise<void> {
