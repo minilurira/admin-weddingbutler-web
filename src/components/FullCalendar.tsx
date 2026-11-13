@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { buildMonthGrid, type GridEvent } from "@/lib/calendarGrid";
-import { blockLabel } from "@/lib/calendarBlocks";
+import { blockLabel, slotsBlockedBy } from "@/lib/calendarBlocks";
 import { createCalendarBlocks, deleteCalendarBlock } from "@/lib/blockActions";
 import { TIME_SLOTS } from "@/lib/format";
 import { useToast } from "./ToastContext";
@@ -56,6 +56,7 @@ export default function FullCalendar({
 
   const selEvents = eventsByDate[selected] ?? [];
   const selBlocks = blocksByDate[selected] ?? [];
+  const blockedSlots = new Set(slotsBlockedBy(selBlocks));
   const selDate = selected ? new Date(`${selected}T00:00:00`) : null;
   const selTitle = selDate ? `${selDate.getMonth() + 1}월 ${selDate.getDate()}일 (${WD_KO[selDate.getDay()]})` : "";
 
@@ -164,6 +165,28 @@ export default function FullCalendar({
   const panel = (
     <aside style={{ flex: "0 1 320px", minWidth: 260, borderRadius: 18, background: "#F6F3F5", padding: 20, alignSelf: "flex-start", width: "100%", maxWidth: mobile ? "none" : 340, boxSizing: "border-box" }}>
       <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>{selTitle}</div>
+
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#8C8188", marginBottom: 8 }}>시간대별</div>
+      <div style={{ background: "#FFFFFF", borderRadius: 12, marginBottom: 18, overflow: "hidden" }}>
+        {TIME_SLOTS.map((t) => {
+          const evs = selEvents.filter((e) => e.time === t);
+          const blocked = blockedSlots.has(t);
+          return (
+            <div key={t} style={{ display: "flex", gap: 10, padding: "7px 12px", borderTop: "1px solid #F4F1F2", minHeight: 34, alignItems: "flex-start", background: blocked ? "#F5F3F4" : "transparent" }}>
+              <span style={{ width: 42, flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: "#8C8188", fontVariantNumeric: "tabular-nums", lineHeight: "20px" }}>{t}</span>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                {blocked && <span style={{ fontSize: 12, fontWeight: 700, color: "#9A8F95", lineHeight: "20px" }}>막힘</span>}
+                {evs.map((e) => (
+                  <Link key={e.id} href={`/reservations?id=${e.id}`} style={{ fontSize: 13, fontWeight: 700, color: "#8A3F61", lineHeight: "20px" }}>
+                    {e.customer} · {e.venue} · {e.staff}
+                  </Link>
+                ))}
+                {!blocked && evs.length === 0 && <span style={{ fontSize: 12, color: "#CFC8CC", lineHeight: "20px" }}>비어 있음</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       <div style={{ fontSize: 12.5, fontWeight: 700, color: "#8C8188", marginBottom: 8 }}>예약 {selEvents.length}건</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
