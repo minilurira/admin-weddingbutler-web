@@ -12,6 +12,7 @@ import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { requestPaymentCancel } from "@/lib/paymentCancel";
 import { claimCancel, finishCancel, releaseCancel } from "@/lib/cancel";
 import { cancelPaymentLinkById, sendPaymentLinkFor, type SendLinkOptions } from "@/lib/paymentLink";
+import { cancelReceipt, receiveCash, retryReceipt, type ReceiveInput } from "@/lib/cashReceipt";
 
 import { backfillConfirmedEvents, missingCalendarEnv, syncReservationEvent } from "@/lib/googleCalendar";
 import { logError } from "@/lib/errorLog";
@@ -325,6 +326,30 @@ export async function cancelPaymentLink(linkId: string) {
   const link = await prisma.paymentLink.findUnique({ where: { id: linkId }, select: { reservation: { select: { status: true, confirmDate: true, confirmTime: true } } } });
   if (link && isPast(link.reservation)) return { ok: false, message: "예식 일시가 지난 예약의 결제 링크는 바꿀 수 없습니다." };
   const res = await cancelPaymentLinkById(linkId);
+  revalidateAll();
+  return res;
+}
+
+/** 현장(현금) 잔액을 현금으로 받았을 때: 결제한 금액에 더하고, 원하면 현금영수증을 발급한다. */
+export async function receiveCashPayment(id: string, input: ReceiveInput) {
+  await requireSession();
+  const r = await prisma.reservation.findUniqueOrThrow({ where: { id }, select: { status: true } });
+  if (r.status === "취소") return { ok: false, message: "취소된 예약에는 쓸 수 없습니다." };
+  const res = await receiveCash(id, input);
+  revalidateAll();
+  return res;
+}
+
+export async function retryCashReceipt(receiptId: string) {
+  await requireSession();
+  const res = await retryReceipt(receiptId);
+  revalidateAll();
+  return res;
+}
+
+export async function cancelCashReceiptAction(receiptId: string) {
+  await requireSession();
+  const res = await cancelReceipt(receiptId);
   revalidateAll();
   return res;
 }

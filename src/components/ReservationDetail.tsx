@@ -1,5 +1,7 @@
 "use client";
 
+import CashReceiptCard from "./CashReceiptCard";
+import type { CashReceiptRow } from "@/lib/cashReceipt";
 import ManualAlimtalk from "./ManualAlimtalk";
 import ButlerAssign from "./ButlerAssign";
 import ExtraGuestClaim from "./ExtraGuestClaim";
@@ -66,6 +68,7 @@ export interface DetailReservation {
   /** 관리자 전용 서명이 붙은 고객 화면 주소 (기록이 없으면 null) */
   recordPreviewUrl: string | null;
   paymentLinks: DetailPaymentLink[];
+  cashReceipts: CashReceiptRow[];
   notes: DetailNote[];
   confirm: {
     plan: string;
@@ -581,6 +584,8 @@ export default function ReservationDetail({
             )}
           </section>
         )}
+
+        <CashReceiptCard reservationId={reservation.id} customer={reservation.customer} phone={reservation.phone} balance={onsiteAmount(money.total, reservation.paidAmount)} receipts={reservation.cashReceipts} cancelled={isCancelled} card={card} />
 
         {/* 3. 협의 내용 */}
         <section style={card}>

@@ -5,11 +5,12 @@ import { toRow } from "@/lib/view";
 import { CARD } from "@/lib/badge";
 import { formatStamp, isWeddingPast } from "@/lib/format";
 import ReservationListControls from "@/components/ReservationListControls";
+import { listCashReceipts } from "@/lib/cashReceipt";
 import ReservationDetail, { type DetailReservation } from "@/components/ReservationDetail";
 
 export const dynamic = "force-dynamic";
 
-function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>): DetailReservation {
+function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>, cashReceipts: DetailReservation["cashReceipts"]): DetailReservation {
   return {
     id: r.id,
     customer: r.customer,
@@ -47,6 +48,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
       sentVia: l.sentVia,
       refundedAmount: l.refundedAmount,
     })),
+    cashReceipts,
     notes: r.notes.map((n) => ({ id: n.id, when: formatStamp(n.createdAt), text: n.text })),
     confirm: {
       plan: r.confirmPlan,
@@ -194,7 +196,7 @@ export default async function ReservationsPage({
       {selected && (
         <ReservationDetail
           key={selected.id}
-          reservation={buildDetail(selected)}
+          reservation={buildDetail(selected, await listCashReceipts(selected.id))}
           backHref={`/reservations?${listParams.toString()}`}
           className={explicitlyOpened ? undefined : "wb-detail-pane-closed"}
         />
