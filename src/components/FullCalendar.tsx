@@ -57,9 +57,9 @@ export default function FullCalendar({
   const selEvents = eventsByDate[selected] ?? [];
   const selBlocks = blocksByDate[selected] ?? [];
   const blockedSlots = new Set(slotsBlockedBy(selBlocks));
-  // 홈페이지 예약 화면과 같은 규칙: 예약 시각의 앞 1시간 ~ 뒤 2시간(양 끝 포함)은 다른 예약을 받지 않는다 (weddingbutler src/lib/plans.ts BLOCK_*_MIN)
+  // 홈페이지 예약 화면과 같은 규칙: 예약 시각의 앞 2시간 ~ 뒤 2시간(양 끝 포함)은 다른 예약을 받지 않는다 (weddingbutler src/lib/plans.ts BLOCK_*_MIN)
   const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-  const bufferSlots = new Set(TIME_SLOTS.filter((t) => selEvents.some((e) => mins(t) >= mins(e.time) - 60 && mins(t) <= mins(e.time) + 120)));
+  const bufferSlots = new Set(TIME_SLOTS.filter((t) => selEvents.some((e) => mins(t) >= mins(e.time) - 120 && mins(t) <= mins(e.time) + 120)));
   const selDate = selected ? new Date(`${selected}T00:00:00`) : null;
   const selTitle = selDate ? `${selDate.getMonth() + 1}월 ${selDate.getDate()}일 (${WD_KO[selDate.getDay()]})` : "";
 
