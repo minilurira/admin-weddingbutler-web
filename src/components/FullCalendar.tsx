@@ -57,6 +57,9 @@ export default function FullCalendar({
   const selEvents = eventsByDate[selected] ?? [];
   const selBlocks = blocksByDate[selected] ?? [];
   const blockedSlots = new Set(slotsBlockedBy(selBlocks));
+  // 홈페이지 예약 화면과 같은 규칙: 예약 시각의 앞 1시간 ~ 뒤 2시간(양 끝 포함)은 다른 예약을 받지 않는다 (weddingbutler src/lib/plans.ts BLOCK_*_MIN)
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const bufferSlots = new Set(TIME_SLOTS.filter((t) => selEvents.some((e) => mins(t) >= mins(e.time) - 60 && mins(t) <= mins(e.time) + 120)));
   const selDate = selected ? new Date(`${selected}T00:00:00`) : null;
   const selTitle = selDate ? `${selDate.getMonth() + 1}월 ${selDate.getDate()}일 (${WD_KO[selDate.getDay()]})` : "";
 
@@ -171,8 +174,9 @@ export default function FullCalendar({
         {TIME_SLOTS.map((t) => {
           const evs = selEvents.filter((e) => e.time === t);
           const blocked = blockedSlots.has(t);
+          const buffer = !blocked && bufferSlots.has(t);
           return (
-            <div key={t} style={{ display: "flex", gap: 10, padding: "7px 12px", borderTop: "1px solid #F4F1F2", minHeight: 34, alignItems: "flex-start", background: blocked ? "#F5F3F4" : "transparent" }}>
+            <div key={t} style={{ display: "flex", gap: 10, padding: "7px 12px", borderTop: "1px solid #F4F1F2", minHeight: 34, alignItems: "flex-start", background: blocked || (buffer && evs.length === 0) ? "#F5F3F4" : "transparent" }}>
               <span style={{ width: 42, flexShrink: 0, fontSize: 12.5, fontWeight: 700, color: "#8C8188", fontVariantNumeric: "tabular-nums", lineHeight: "20px" }}>{t}</span>
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
                 {blocked && <span style={{ fontSize: 12, fontWeight: 700, color: "#9A8F95", lineHeight: "20px" }}>막힘</span>}
@@ -181,7 +185,8 @@ export default function FullCalendar({
                     {e.customer} · {e.venue} · {e.staff}
                   </Link>
                 ))}
-                {!blocked && evs.length === 0 && <span style={{ fontSize: 12, color: "#CFC8CC", lineHeight: "20px" }}>비어 있음</span>}
+                {buffer && evs.length === 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#9A8F95", lineHeight: "20px" }}>예약 불가 (앞뒤 여유)</span>}
+                {!blocked && !buffer && evs.length === 0 && <span style={{ fontSize: 12, color: "#CFC8CC", lineHeight: "20px" }}>비어 있음</span>}
               </div>
             </div>
           );
