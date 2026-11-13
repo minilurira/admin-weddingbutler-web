@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { assignButler, getAssignment, setAssignmentSide, unassignButler } from "@/lib/assignActions";
+import { getMessages } from "@/lib/messageActions";
+import type { MessageView } from "@/lib/messageView";
+import { formatStamp } from "@/lib/format";
 import type { AssignedView, AssignmentView } from "@/lib/assign";
 import { updateShiftGrade } from "@/lib/financeActions";
 import { BUTLER_GRADES, OWNER_HEADCOUNT, OWNER_SPLIT, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
@@ -10,6 +13,18 @@ import { useToast } from "./ToastContext";
 
 const GRADES = Object.keys(BUTLER_GRADES) as ButlerGrade[];
 const selectStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 10, padding: "9px 10px", fontSize: 13, color: "#1E1A1C", minWidth: 0 };
+
+/** 버틀러 업무 배정 알림톡 상태 표시. 보낸 기록이 없으면 언제 나갈지 안내한다 (규칙은 src/lib/butlerNotice.ts). */
+function noticeStatus(notice: MessageView | undefined, hasPhone: boolean, date: string): { text: string; bg: string; color: string } {
+  const ok = { bg: "#E3F1E8", color: "#2B6A45" }, bad = { bg: "#F7E4E4", color: "#A8416C" }, wait = { bg: "#EEECED", color: "#6E646A" };
+  if (notice?.status === "sent") return { text: `보냄 ${formatStamp(new Date(notice.createdAt))}`, ...ok };
+  if (notice?.status === "failed") return { text: `실패${notice.detail ? ` (${notice.detail})` : ""} · 매일 10시 재시도`, ...bad };
+  if (!hasPhone) return { text: "휴대폰 번호 미등록", ...bad };
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // 한국 날짜
+  if (!date || date < today) return { text: "보내지 않음", ...wait };
+  if (date.slice(0, 7) > today.slice(0, 7)) return { text: `${Number(date.slice(5, 7))}월 1일 10시 발송 예정`, ...wait };
+  return { text: "10시 자동 발송 예정", ...wait };
+}
 
 /** 예약 상세의 "버틀러 배정" 카드. 필요한 인원(예약 내역의 배정 버틀러 수)만큼 실제 버틀러를 정한다. */
 export default function ButlerAssign({ reservationId, required, cancelled, card }: { reservationId: string; required: number; cancelled: boolean; card: React.CSSProperties }) {
@@ -20,9 +35,13 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
   const [pick, setPick] = useState("");
   const [pickGrade, setPickGrade] = useState("");
   const [pickSide, setPickSide] = useState("");
+  const [notices, setNotices] = useState<MessageView[]>([]);
+  const [openNotice, setOpenNotice] = useState("");
 
   const load = useCallback(() => {
     getAssignment(reservationId).then((d) => { setData(d); setError(""); }).catch((e) => setError(e instanceof Error ? e.message : "배정 정보를 불러오지 못했습니다."));
+    // 버틀러별 업무 배정 알림톡 발송 상태·내용 (발송 내역에서 가져온다)
+    getMessages(reservationId).then((rows) => setNotices(rows.filter((m) => m.kind === "버틀러 업무 배정"))).catch(() => setNotices([]));
   }, [reservationId]);
   useEffect(() => { setData(null); load(); }, [load]);
 
@@ -68,8 +87,14 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
       {data && (
         <>
           {assigned.length === 0 && <p style={{ margin: "0 0 12px", color: "#8C8188", fontSize: 13 }}>아직 배정된 버틀러가 없습니다.</p>}
-          {assigned.map((a) => (
-            <div key={a.shiftId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #F4F1F3", flexWrap: "wrap" }}>
+          {assigned.map((a) => {
+            const mine = notices.filter((m) => m.variables._butlerId === a.butlerId); // 최신 먼저
+            const notice = mine.find((m) => m.status === "sent") ?? mine[0];
+            const status = noticeStatus(notice, a.hasPhone, data.date);
+            const isOpen = openNotice === a.shiftId;
+            return (
+            <div key={a.shiftId} style={{ padding: "10px 0", borderBottom: "1px solid #F4F1F3" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <b style={{ minWidth: 70, fontSize: 14 }}>{a.name}</b>
               <select style={selectStyle} value={a.grade} disabled={busy || a.paid} aria-label={`${a.name} 등급`}
                 onChange={(e) => run(() => updateShiftGrade(a.shiftId, e.target.value), "등급을 바꿨습니다.")}>
@@ -92,7 +117,20 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
               <button type="button" disabled={busy || a.paid} onClick={() => { if (window.confirm(`${a.name} 님의 배정을 해제할까요? 정산 기록도 함께 지워집니다.`)) void run(() => unassignButler(a.shiftId), "배정을 해제했습니다."); }}
                 style={{ border: 0, background: "transparent", color: "#8C8188", fontSize: 12.5, cursor: a.paid ? "default" : "pointer", opacity: a.paid ? 0.4 : 1 }}>해제</button>
             </div>
-          ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontSize: 12 }}>
+              <span style={{ fontWeight: 700, padding: "2px 9px", borderRadius: 99, background: status.bg, color: status.color }}>알림톡 {status.text}</span>
+              {notice && notice.status !== "skipped" && (
+                <button type="button" onClick={() => setOpenNotice(isOpen ? "" : a.shiftId)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>{isOpen ? "닫기" : "보낸 내용 보기"}</button>
+              )}
+            </div>
+            {isOpen && notice && (
+              <div style={{ marginTop: 8, borderRadius: 12, background: "#FEF9DC", padding: "12px 14px", fontSize: 12.5, lineHeight: 1.75, color: "#3C3A2E", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {notice.text ?? Object.entries(notice.variables).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k.replace(/^#\{|\}$/g, "")}: ${v}`).join("\n")}
+              </div>
+            )}
+            </div>
+            );
+          })}
           {assigned.length > 0 && <div style={{ padding: "10px 0 0", fontSize: 13, color: "#6E646A" }}>정산 예정 합계 <b style={{ color: "#B0567E" }}>{won(total)}</b></div>}
           {pool > 0 && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#A79BA1" }}>오너 버틀러는 버틀러 관리의 오너 배분 규칙대로 이 예약 1건을 {won(pool / OWNER_HEADCOUNT)} × {OWNER_HEADCOUNT}명 = {won(pool)}으로 보고 이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}로 나눈 금액입니다 (이강 {won(split.이강)} · 최소연 {won(split.최소연)}).</p>}
 

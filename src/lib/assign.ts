@@ -14,6 +14,8 @@ export interface AssignedView {
   grade: string;
   /** 맡은 축의대 쪽 ("신랑측" | "신부측" | "양가 통합" | "") */
   side: string;
+  /** 버틀러 휴대폰 번호가 등록돼 있는지 (업무 배정 알림톡을 받을 수 있는지) */
+  hasPhone: boolean;
   pay: number;
   extra: number;
   paid: boolean;
@@ -65,7 +67,7 @@ export async function loadAssignment(reservationId: string): Promise<AssignmentV
     date,
     side: r.side,
     plan: r.confirmPlan,
-    assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, side: s.side, pay: s.pay, extra: s.extra, paid: s.paid })),
+    assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, side: s.side, hasPhone: Boolean(s.butler.phone), pay: s.pay, extra: s.extra, paid: s.paid })),
     butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, busyAt: busy.has(b.id) ? busy.get(b.id)! : null })),
   };
 }

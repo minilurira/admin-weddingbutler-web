@@ -16,6 +16,8 @@ export interface MessageView {
   /** 고객이 받은 메시지 전체. 템플릿을 불러오지 못하면 null */
   text: string | null;
   variables: Record<string, string>;
+  /** 버틀러 업무 배정 알림톡이면 받은 버틀러 이름 (번호는 가려져 있어서 이름으로 알아본다) */
+  butlerName?: string;
 }
 
 interface Tpl {
@@ -73,6 +75,15 @@ export function renderTemplate(tpl: Tpl, vars: Record<string, string>): string {
 export async function loadMessages(reservationId: string): Promise<MessageView[]> {
   await ensureMessageLogTable();
   const rows = await prisma.messageLog.findMany({ where: { reservationId }, orderBy: { createdAt: "desc" }, take: 50 });
+  // 버틀러 업무 배정 알림톡은 변수의 _butlerId로 받은 버틀러를 찾는다
+  const butlerIds = new Set<string>();
+  for (const r of rows) {
+    const m = r.variables.match(/"_butlerId":"([^"]+)"/);
+    if (m) butlerIds.add(m[1]);
+  }
+  const names = butlerIds.size
+    ? new Map((await prisma.butler.findMany({ where: { id: { in: Array.from(butlerIds) } }, select: { id: true, name: true } })).map((b) => [b.id, b.name]))
+    : new Map<string, string>();
   return Promise.all(
     rows.map(async (r) => {
       let variables: Record<string, string> = {};
@@ -82,7 +93,8 @@ export async function loadMessages(reservationId: string): Promise<MessageView[]
         const tpl = await template(r.templateId);
         text = tpl ? renderTemplate(tpl, variables) : null;
       }
-      return { id: r.id, kind: r.kind, channel: r.channel, recipient: r.recipient, status: r.status, detail: r.detail, createdAt: r.createdAt.toISOString(), text, variables };
+      const butlerName = variables._butlerId ? names.get(variables._butlerId) ?? "삭제된 버틀러" : undefined;
+      return { id: r.id, kind: r.kind, channel: r.channel, recipient: r.recipient, status: r.status, detail: r.detail, createdAt: r.createdAt.toISOString(), text, variables, butlerName };
     })
   );
 }
