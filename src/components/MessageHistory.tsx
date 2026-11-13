@@ -62,7 +62,7 @@ export default function MessageHistory({ reservationId, card, legacyLabel }: { r
                   <>
                     템플릿 본문을 불러오지 못해, 알림톡에 채워 보낸 값만 보여 드립니다.
                     {"\n\n"}
-                    {Object.entries(m.variables).map(([k, v]) => `${k.replace(/^#\{|\}$/g, "")}: ${v}`).join("\n")}
+                    {Object.entries(m.variables).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k.replace(/^#\{|\}$/g, "")}: ${v}`).join("\n")}
                   </>
                 )}
               </div>
