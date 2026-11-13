@@ -99,6 +99,12 @@ export default async function ReservationsPage({
     return matchesFilter && matchesQuery;
   });
 
+  // 목록 카드에 보여 줄 버틀러 배정 현황: 예약별 배정된 버틀러 이름
+  const assignedBy = new Map<string, string[]>();
+  for (const sh of await prisma.butlerShift.findMany({ where: { reservationId: { in: filtered.map((r) => r.id) } }, select: { reservationId: true, butler: { select: { name: true } } }, orderBy: { createdAt: "asc" } })) {
+    assignedBy.set(sh.reservationId, [...(assignedBy.get(sh.reservationId) ?? []), sh.butler.name]);
+  }
+
   const explicitlyOpened = Boolean(searchParams.id);
   const selectedId = searchParams.id ?? filtered[0]?.id ?? all[0]?.id;
   const selected = selectedId ? await loadReservation(selectedId) : null;
@@ -180,7 +186,20 @@ export default async function ReservationsPage({
                   <span style={{ color: "#B0567E", fontWeight: 600 }}>{row.id}</span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 12.5, color: "#8C8188" }}>
-                  <span>{row.staffLine}</span>
+                  <span>
+                    {row.staffLine}
+                    {it.status !== "취소" && (() => {
+                      const names = assignedBy.get(it.id) ?? [];
+                      if (it.status !== "확정" && names.length === 0) return null; // 확정 전에는 배정 안내를 띄우지 않는다
+                      const full = names.length >= it.confirmButlers;
+                      return (
+                        <span style={{ marginLeft: 8, fontWeight: 700, color: full ? "#2F7A4C" : names.length ? "#9A6516" : "#B03A3A" }}>
+                          {full ? "배정 완료" : names.length ? `배정 ${names.length}/${it.confirmButlers}` : "배정 필요"}
+                          {names.length > 0 && <span style={{ fontWeight: 500, color: "#8C8188" }}> · {names.join(", ")}</span>}
+                        </span>
+                      );
+                    })()}
+                  </span>
                   <span style={{ marginLeft: "auto", fontWeight: 700, color: "#413A3E", fontVariantNumeric: "tabular-nums", textDecoration: card.dim ? "line-through" : "none" }}>{row.amountLine}</span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 12, color: "#A79BA1" }}>
