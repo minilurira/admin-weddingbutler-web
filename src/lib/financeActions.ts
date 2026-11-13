@@ -95,6 +95,15 @@ export async function saveButlerAccount(id: string, input: { bankName: string; a
   done();
 }
 
+/** 버틀러의 휴대폰 번호(업무 배정 알림톡 수신용)를 저장한다. 숫자만 저장하고, 비워서 저장하면 지워진다. */
+export async function saveButlerPhone(id: string, phone: string) {
+  await guard();
+  const digits = String(phone ?? "").replace(/[^0-9]/g, "");
+  if (digits && !/^01[0-9]{8,9}$/.test(digits)) throw new Error("휴대폰 번호를 확인해 주세요. (예: 010-1234-5678)");
+  await prisma.butler.update({ where: { id }, data: { phone: digits } });
+  done();
+}
+
 /** 버틀러를 삭제한다. 그 버틀러의 참석·정산 기록도 함께 지워진다(DB 관계 cascade). */
 export async function deleteButler(id: string) {
   await guard();

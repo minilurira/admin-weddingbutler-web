@@ -28,6 +28,28 @@ export function isSide(v: unknown): v is Side {
   return typeof v === "string" && (SIDES as readonly string[]).includes(v);
 }
 
+/** 배정 기록(ButlerShift.side)에 저장하는 버틀러 담당 쪽 */
+export const DESK_SIDES = ["신랑측", "신부측", "양가 통합"] as const;
+export type DeskSide = (typeof DESK_SIDES)[number];
+
+/**
+ * 버틀러 배정 때 고를 수 있는 담당 쪽. 빈 배열이면 고르지 않는다(예약의 축의대 쪽을 그대로 쓴다).
+ * 양가 예약만 고른다: 프리미엄(양가 분리)은 신랑측/신부측 중 하나, 그 밖(스몰양가 = 양가 통합 등)은 "양가 통합"이 기본.
+ */
+export function deskSideOptions(reservationSide: string, plan: string): DeskSide[] {
+  if (reservationSide !== "양가") return [];
+  return plan === "프리미엄" ? ["신랑측", "신부측"] : ["양가 통합", "신랑측", "신부측"];
+}
+
+/** 배정에 저장할 담당 쪽을 정한다. 양가가 아닌 예약은 예약의 쪽(신랑측/신부측), 이전 예약은 "". 고를 수 없는 값이면 오류. */
+export function resolveDeskSide(reservationSide: string, plan: string, picked: string): string {
+  const options = deskSideOptions(reservationSide, plan);
+  if (!options.length) return reservationSide === "신랑측" || reservationSide === "신부측" ? reservationSide : "";
+  if ((options as string[]).includes(picked)) return picked;
+  if (!picked && options[0] === "양가 통합") return "양가 통합";
+  throw new Error("이 버틀러가 맡을 쪽(신랑측/신부측)을 골라 주세요.");
+}
+
 /** 홈페이지가 보내는 값("groom" | "bride" | "both")을 어드민 표기로 바꾼다. 모르는 값은 "". */
 export function sideFromHomepage(v: unknown): Side | "" {
   if (v === "groom") return "신랑측";

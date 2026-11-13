@@ -190,6 +190,8 @@ model Butler {
   bankName      String        @default("")
   accountNumber String        @default("")
   accountHolder String        @default("")
+  // 업무 배정 알림톡을 받을 휴대폰 번호 (숫자만 저장, 없으면 "")
+  phone         String        @default("")
   createdAt DateTime      @default(now())
   shifts    ButlerShift[]
 }
@@ -209,6 +211,8 @@ model ButlerShift {
   paid          Boolean  @default(false)
   // 실제로 버틀러에게 입금한 날짜 ("YYYY-MM-DD"). 입금 전에는 빈 문자열.
   paidDate      String   @default("")
+  // 이번 배정에서 맡은 축의대 쪽: "신랑측" | "신부측" | "양가 통합" | ""(이전 기록). 양가 예약은 배정할 때 고른다 (src/lib/pricing.ts deskSideOptions)
+  side          String   @default("")
   createdAt     DateTime @default(now())
 
   @@index([date])

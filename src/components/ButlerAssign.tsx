@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { assignButler, getAssignment, unassignButler } from "@/lib/assignActions";
+import { assignButler, getAssignment, setAssignmentSide, unassignButler } from "@/lib/assignActions";
 import type { AssignedView, AssignmentView } from "@/lib/assign";
 import { updateShiftGrade } from "@/lib/financeActions";
 import { BUTLER_GRADES, OWNER_HEADCOUNT, OWNER_SPLIT, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
-import { won } from "@/lib/pricing";
+import { deskSideOptions, won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
 
 const GRADES = Object.keys(BUTLER_GRADES) as ButlerGrade[];
@@ -19,6 +19,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState("");
   const [pickGrade, setPickGrade] = useState("");
+  const [pickSide, setPickSide] = useState("");
 
   const load = useCallback(() => {
     getAssignment(reservationId).then((d) => { setData(d); setError(""); }).catch((e) => setError(e instanceof Error ? e.message : "배정 정보를 불러오지 못했습니다."));
@@ -35,6 +36,10 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
   const sel = free.find((b) => b.id === pick) ?? free[0];
   const grade = pickGrade || sel?.grade || "staff";
   const full = assigned.length >= required;
+  // 양가 예약이면 버틀러마다 맡을 쪽을 고른다. 프리미엄은 신랑측/신부측 필수, 스몰양가는 "양가 통합"이 기본
+  const sideOptions = data ? deskSideOptions(data.side, data.plan) : [];
+  const side = sideOptions.includes(pickSide as never) ? pickSide : sideOptions[0] === "양가 통합" ? "양가 통합" : "";
+  const needSide = sideOptions.length > 0 && !side;
   // 오너 등급은 버틀러 관리의 오너 배분과 같은 규칙: 이 예약 1건 = 1인 기본금 × 2명을 이강 49 : 최소연 51로 나눈다
   const { pool } = ownerPool(assigned.map((a) => ({ rid: reservationId, grade: a.grade, pay: a.pay })));
   const split = splitOwnerPay(pool);
@@ -70,6 +75,15 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
                 onChange={(e) => run(() => updateShiftGrade(a.shiftId, e.target.value), "등급을 바꿨습니다.")}>
                 {GRADES.map((g) => <option key={g} value={g}>{BUTLER_GRADES[g].label}</option>)}
               </select>
+              {sideOptions.length > 0 ? (
+                <select style={selectStyle} value={a.side} disabled={busy || a.paid} aria-label={`${a.name} 담당`}
+                  onChange={(e) => run(() => setAssignmentSide(a.shiftId, e.target.value), "담당을 바꿨습니다.")}>
+                  {!sideOptions.includes(a.side as never) && <option value={a.side}>{a.side || "담당 선택"}</option>}
+                  {sideOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : a.side ? (
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#6E646A", background: "#F6F3F5", padding: "3px 9px", borderRadius: 99 }}>{a.side}</span>
+              ) : null}
               <span style={{ fontSize: 13, color: "#6E646A", fontVariantNumeric: "tabular-nums" }}>
                 {won(amountOf(a))}{a.grade === "owner" && ownerShare(a.name) !== null ? ` (오너 배분 ${OWNER_SPLIT[a.name as keyof typeof OWNER_SPLIT]}%)` : ""}{a.extra ? ` (스페셜 차지 ${won(a.extra)} 포함)` : ""}
               </span>
@@ -96,7 +110,13 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
               <select style={selectStyle} value={grade} onChange={(e) => setPickGrade(e.target.value)} aria-label="이번 참석 등급">
                 {GRADES.map((g) => <option key={g} value={g}>{BUTLER_GRADES[g].label} · {won(BUTLER_GRADES[g].pay)}</option>)}
               </select>
-              <button type="button" disabled={busy || !sel} onClick={() => sel && run(() => assignButler(reservationId, sel.id, grade), `${sel.name} 님을 배정했습니다.`)}
+              {sideOptions.length > 0 && (
+                <select style={selectStyle} value={side} onChange={(e) => setPickSide(e.target.value)} aria-label="맡을 쪽">
+                  {!side && <option value="">담당 선택</option>}
+                  {sideOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
+              <button type="button" disabled={busy || !sel || needSide} title={needSide ? "맡을 쪽(신랑측/신부측)을 골라 주세요" : undefined} onClick={() => sel && run(() => assignButler(reservationId, sel.id, grade, side), `${sel.name} 님을 배정했습니다.`)}
                 style={{ height: 38, padding: "0 18px", border: 0, borderRadius: 12, background: "#B0567E", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>배정</button>
             </div>
           )}
