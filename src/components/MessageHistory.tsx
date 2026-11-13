@@ -28,7 +28,7 @@ export default function MessageHistory({ reservationId, card, legacyLabel }: { r
     <section style={card}>
       <div style={{ marginBottom: 12 }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>알림톡 발송 내역</h2>
-        <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>이 예약으로 고객과 직원에게 나간 알림톡·문자입니다. &quot;내용 보기&quot;로 고객이 받은 메시지를 확인하세요.</p>
+        <p style={{ margin: 0, fontSize: 12.5, color: "#A79BA1" }}>이 예약으로 고객과 직원에게 나간 알림톡·문자입니다. &quot;내용 보기&quot;로 고객·버틀러가 받은 메시지를 확인하세요.</p>
       </div>
 
       {error && <p style={{ margin: 0, color: "#A8416C", fontWeight: 600, fontSize: 13 }}>{error}</p>}
@@ -46,7 +46,7 @@ export default function MessageHistory({ reservationId, card, legacyLabel }: { r
         return (
           <div key={m.id} style={{ borderTop: "1px solid #F4F1F3", padding: "11px 0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <b style={{ fontSize: 13.5 }}>{m.kind}</b>
+              <b style={{ fontSize: 13.5 }}>{m.kind}{m.butlerName ? ` · ${m.butlerName}` : ""}</b>
               <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 99, background: m.channel === "알림톡" ? "#FFF4BF" : "#EDF0F4", color: m.channel === "알림톡" ? "#5A4A00" : "#3E4C5C" }}>{m.channel}</span>
               <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 99, background: st.bg, color: st.color }}>{st.text}</span>
               <span style={{ fontSize: 12.5, color: "#8C8188" }}>{formatStamp(new Date(m.createdAt))} · {m.recipient || "-"}</span>
