@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyReservationButlers } from "@/lib/butlerNotice";
+import { notifyAssignCompleteIfFull } from "@/lib/assignComplete";
 import { changeAssignmentSide, createAssignment, loadAssignment, removeAssignment, type AssignmentView } from "@/lib/assign";
 
 async function guard() {
@@ -27,8 +28,11 @@ export async function getAssignment(reservationId: string): Promise<AssignmentVi
  * 화면에 띄울 결과 문구를 돌려준다. */
 export async function assignButler(reservationId: string, butlerId: string, grade: string, side = ""): Promise<string> {
   await guard();
+  const before = await prisma.butlerShift.count({ where: { reservationId } });
   await createAssignment(reservationId, butlerId, grade, side);
   done();
+  // 필요 인원이 다 차면 오너 버틀러 카카오워크 방에 배정 명단을 알린다 (실패해도 배정은 유지)
+  await notifyAssignCompleteIfFull(reservationId, before).catch((e) => console.error("[assign] complete notice failed", e));
   const shift = await prisma.butlerShift.findFirst({ where: { reservationId, butlerId }, select: { id: true, grade: true } });
   if (!shift) return "배정했습니다.";
   // 오너가 배정되면 먼저 배정돼 기다리던 스태프에게도 이때 나가므로 예약의 배정 전원을 확인한다

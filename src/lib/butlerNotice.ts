@@ -32,7 +32,7 @@ const cut = (v: string, fallback = "추후 안내") => {
   return s.length <= 23 ? s : s.slice(0, 22) + "…";
 };
 
-function weddingDateLabel(date: string, time: string): string {
+export function weddingDateLabel(date: string, time: string): string {
   const [y, m, d] = date.split("-").map(Number);
   const wd = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   return `${y}.${pad2(m)}.${pad2(d)} (${wd}) ${/^\d{1,2}:\d{2}$/.test(time) ? time : "시간 미정"}`;
