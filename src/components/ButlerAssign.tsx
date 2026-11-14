@@ -138,6 +138,35 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
             );
           })}
           {assigned.length > 0 && <div style={{ padding: "10px 0 0", fontSize: 13, color: "#6E646A" }}>정산 예정 합계 <b style={{ color: "#B0567E" }}>{won(total)}</b></div>}
+          {(() => {
+            // 해제된 버틀러에게 보낸 알림톡도 이력으로 남겨 보여 준다 (발송 기록은 해제해도 지워지지 않는다)
+            const gone = notices.filter((m) => m.status !== "skipped" && !assigned.some((x) => x.butlerId === m.variables._butlerId));
+            if (!gone.length) return null;
+            return (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #EAE4E7" }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#6E646A", marginBottom: 4 }}>해제된 버틀러 알림톡 이력</div>
+                {gone.map((m) => {
+                  const isOpen = openNotice === m.id;
+                  return (
+                    <div key={m.id} style={{ padding: "6px 0", fontSize: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <b style={{ fontSize: 13 }}>{m.butlerName ?? "버틀러"}</b>
+                        <span style={{ fontWeight: 700, padding: "2px 9px", borderRadius: 99, background: m.status === "sent" ? "#E3F1E8" : "#F7E4E4", color: m.status === "sent" ? "#2B6A45" : "#A8416C" }}>
+                          알림톡 {m.status === "sent" ? "보냄" : "실패"} {formatStamp(new Date(m.createdAt))} · 배정 해제됨
+                        </span>
+                        <button type="button" onClick={() => setOpenNotice(isOpen ? "" : m.id)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>{isOpen ? "닫기" : "보낸 내용 보기"}</button>
+                      </div>
+                      {isOpen && (
+                        <div style={{ marginTop: 8, borderRadius: 12, background: "#FEF9DC", padding: "12px 14px", fontSize: 12.5, lineHeight: 1.75, color: "#3C3A2E", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {m.text ?? Object.entries(m.variables).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k.replace(/^#\{|\}$/g, "")}: ${v}`).join("\n")}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           {pool > 0 && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#A79BA1" }}>오너 버틀러는 버틀러 관리의 오너 배분 규칙대로 이 예약 1건을 {won(pool / OWNER_HEADCOUNT)} × {OWNER_HEADCOUNT}명 = {won(pool)}으로 보고 이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}로 나눈 금액입니다 (이강 {won(split.이강)} · 최소연 {won(split.최소연)}).</p>}
 
           {cancelled ? (
