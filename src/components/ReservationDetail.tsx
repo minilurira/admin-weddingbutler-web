@@ -98,7 +98,8 @@ export default function ReservationDetail({
   backHref: string;
   className?: string;
 }) {
-  const mobile = useIsMobile();
+  // 700px 미만(폴드 접은 화면·휴대폰)만 상세를 전체 화면으로 덮고, 펼친 화면(700~899px)은 목록 옆에 띄운다
+  const mobile = useIsMobile(700);
   const router = useRouter();
   const showToast = useToast();
   const [isPending, startTransition] = useTransition();
@@ -333,7 +334,7 @@ export default function ReservationDetail({
 
   const inputStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 12, padding: "12px 14px", fontSize: 13.5, color: locked ? "#6E646A" : "#1E1A1C", width: "100%", boxSizing: "border-box" };
   const editInput: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 12, padding: "12px 14px", fontSize: 13.5, color: "#1E1A1C", width: "100%", boxSizing: "border-box", fontFamily: "inherit" };
-  const card: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #EFEBED", borderRadius: 18, padding: 24, boxSizing: "border-box" };
+  const card: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #EFEBED", borderRadius: 18, padding: "clamp(16px, 4.5vw, 24px)", boxSizing: "border-box" };
   const divider: React.CSSProperties = { height: 1, background: "#ECE7E9", margin: "16px 0" };
   const dt: React.CSSProperties = { color: "#8C8188" };
   const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12 };
@@ -350,7 +351,7 @@ export default function ReservationDetail({
     <main
       className={className}
       style={{
-        flex: "1.6 1 280px", minWidth: 0, boxSizing: "border-box", padding: "6px 28px 52px",
+        flex: "1.6 1 280px", minWidth: 0, boxSizing: "border-box", padding: "6px clamp(16px, 4vw, 28px) 52px",
         borderLeft: mobile ? "0" : "1px solid #F0EDEF",
         position: mobile ? "fixed" : "static",
         inset: mobile ? 0 : "auto",
@@ -654,7 +655,7 @@ export default function ReservationDetail({
 
       {draft && (
         <div onClick={() => !isPending && setDraft(null)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(30,26,28,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: 20, padding: 26, boxSizing: "border-box", boxShadow: "0 18px 46px rgba(60,30,45,0.22)" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 640, maxHeight: "90vh", overflowY: "auto", background: "#FFFFFF", borderRadius: 20, padding: "clamp(18px, 5vw, 26px)", boxSizing: "border-box", boxShadow: "0 18px 46px rgba(60,30,45,0.22)" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
               <div>
                 <h2 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 800 }}>예약 내역 수정</h2>
@@ -663,7 +664,7 @@ export default function ReservationDetail({
               <button aria-label="닫기" disabled={isPending} onClick={() => setDraft(null)} style={{ width: 36, height: 36, flex: "0 0 36px", border: 0, borderRadius: 10, background: "#F6F3F5", color: "#6E646A", fontSize: 16, cursor: "pointer" }}>×</button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(200px, 100%), 1fr))", gap: 14 }}>
               <label style={labelStyle}>예식일<input {...draftField("date")} placeholder="2026-09-19" style={editInput} /></label>
               <label style={labelStyle}>예식 시간<input {...draftField("time")} placeholder="12:00" style={editInput} /></label>
               <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>예식장 · 홀<input {...draftField("venue")} style={editInput} /></label>
@@ -693,7 +694,7 @@ export default function ReservationDetail({
 
       {cancelOpen && (
         <div onClick={() => !isPending && setCancelOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(30,26,28,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "#FFFFFF", borderRadius: 18, padding: 24, boxSizing: "border-box" }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "#FFFFFF", borderRadius: 18, padding: "clamp(18px, 5vw, 24px)", boxSizing: "border-box" }}>
             <h2 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 800 }}>예약 취소</h2>
             <p style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.6, color: "#6E646A" }}>
               {reservation.customer} 님 예약({reservation.id})을 취소하고, 이니시스에 아래 환불 금액만큼 결제취소를 요청합니다. 고객에게 취소 알림톡이 갑니다. 결제취소는 되돌릴 수 없습니다.

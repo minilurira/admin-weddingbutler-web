@@ -19,7 +19,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: { sou
   const chip = (active: boolean): React.CSSProperties => ({ display: "inline-flex", alignItems: "center", height: 36, padding: "0 14px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: active ? "#F9EFF4" : "#F6F3F5", color: active ? "#B0567E" : "#6E646A" });
 
   return (
-    <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>
       <h1 style={{ margin: "0 0 10px", fontSize: 27, fontWeight: 800, letterSpacing: "-0.7px" }}>오류 기록</h1>
       <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "#6E646A" }}>
         홈페이지·어드민의 서버 오류와 고객 화면의 오류가 자동으로 모입니다. 전화번호·이메일·키는 가려서 저장하고, 같은 오류는 1분에 한 번만 남깁니다.

@@ -28,7 +28,9 @@ export default function FullCalendar({
   /** 대시보드 안에 넣을 때: 바깥 여백·제목 없이 달력만 */
   embedded?: boolean;
 }) {
-  const mobile = useIsMobile();
+  // 달력 칸을 작게 줄이는 건 700px 미만만. 펼친 폴드(700~899px)는 PC 크기 칸을 쓴다
+  const mobile = useIsMobile(700);
+  const narrow = useIsMobile();
   const router = useRouter();
   const toast = useToast();
   const [, start] = useTransition();
@@ -166,7 +168,7 @@ export default function FullCalendar({
   );
 
   const panel = (
-    <aside style={{ flex: "0 1 320px", minWidth: 260, borderRadius: 18, background: "#F6F3F5", padding: 20, alignSelf: "flex-start", width: "100%", maxWidth: mobile ? "none" : 340, boxSizing: "border-box" }}>
+    <aside style={{ flex: "0 1 320px", minWidth: 260, borderRadius: 18, background: "#F6F3F5", padding: 20, alignSelf: "flex-start", width: "100%", maxWidth: narrow ? "none" : 340, boxSizing: "border-box" }}>
       <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>{selTitle}</div>
 
       <div style={{ fontSize: 12.5, fontWeight: 700, color: "#8C8188", marginBottom: 8 }}>시간대별</div>
@@ -247,5 +249,5 @@ export default function FullCalendar({
 
   const body = <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "flex-start" }}>{calendar}{panel}</div>;
   if (embedded) return body;
-  return <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>{body}</main>;
+  return <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>{body}</main>;
 }

@@ -68,7 +68,18 @@ button {
   }
 }
 
-@media (max-width: 899px) {
+/* 펼친 폴드·태블릿(700~899px): 메뉴는 ☰로 열고, 예약 리스트는 목록 + 상세 2단 */
+@media (min-width: 700px) and (max-width: 899px) {
+  .wb-list-pane-capped {
+    flex: 0 0 300px !important;
+    max-width: 300px;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+/* 폴드 접은 화면·휴대폰(700px 미만): 목록과 상세를 한 번에 하나만 */
+@media (max-width: 699px) {
   .wb-list-pane-hidden {
     display: none;
   }
@@ -77,5 +88,55 @@ button {
   }
   .wb-list-pane-capped {
     max-width: none;
+  }
+}
+
+/* 좁은 화면(600px 미만) */
+@media (max-width: 599px) {
+  /* 헤더: 메뉴·프로필·로그아웃 한 줄, 검색창은 다음 줄 전체 */
+  .wb-header-search {
+    order: 3;
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+  .wb-header-name {
+    display: none;
+  }
+
+  /* 표를 카드형 목록으로 */
+  .wb-stack-table {
+    min-width: 0 !important;
+  }
+  .wb-stack-table thead {
+    display: none;
+  }
+  .wb-stack-table,
+  .wb-stack-table tbody,
+  .wb-stack-table tr,
+  .wb-stack-table td {
+    display: block;
+    width: 100%;
+  }
+  .wb-stack-table tr {
+    padding: 12px 0;
+  }
+  .wb-stack-table td {
+    padding: 4px 2px !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    text-align: left !important;
+    overflow-wrap: anywhere;
+  }
+  .wb-stack-table td:empty {
+    display: none;
+  }
+  .wb-stack-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--wb-text-4);
   }
 }

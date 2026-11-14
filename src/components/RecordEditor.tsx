@@ -229,7 +229,7 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
   const th: React.CSSProperties = { textAlign: "left", fontSize: 12, fontWeight: 700, color: "#8C8188", padding: "0 6px 8px", whiteSpace: "nowrap" };
 
   return (
-    <main style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 28px 60px" }}>
+    <main style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px clamp(16px, 4vw, 28px) 60px" }}>
       <div style={{ marginBottom: 6 }}>
         <Link href={`/reservations?id=${reservation.id}`} style={{ fontSize: 13, fontWeight: 600, color: "#8C8188" }}>← 예약 상세로</Link>
       </div>
@@ -293,7 +293,7 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
             </button>
           ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: 14 }}>
           <label style={labelStyle}>인계 시각<input type="datetime-local" {...setMetaField("handoverAt")} style={inputStyle} /></label>
           <label style={labelStyle}>인계확인서 봉투 매수<input inputMode="numeric" {...setMetaField("handoverEnvelopeCount")} placeholder="0" style={inputStyle} /></label>
           <label style={labelStyle}>축의금 인수자 (고객 화면 표시)<input {...setMetaField("receiverLabel")} placeholder="김○○ (신랑 부친)" style={inputStyle} /></label>

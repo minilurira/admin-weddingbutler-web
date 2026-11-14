@@ -125,7 +125,7 @@ export default async function ReservationsPage({
           a blank gap where the (invisible) detail pane would have sat. */}
       <main
         className={[explicitlyOpened ? "wb-list-pane-hidden" : "", selected ? "wb-list-pane-capped" : ""].filter(Boolean).join(" ") || undefined}
-        style={{ flex: "1 1 240px", minWidth: 0, boxSizing: "border-box", padding: "6px 28px 48px" }}
+        style={{ flex: "1 1 240px", minWidth: 0, boxSizing: "border-box", padding: "6px clamp(16px, 4vw, 28px) 48px" }}
       >
         <ReservationListControls
           currentFilter={filter}

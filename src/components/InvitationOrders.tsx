@@ -133,7 +133,7 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
 
       <div style={{ overflowX: "auto", background: "#F8F6F7", borderRadius: 18, padding: "8px 16px 12px" }}>
         {view === "pay" ? (
-          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 13.5 }}>
+          <table className="wb-stack-table" style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 13.5 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#8C8188", fontSize: 12.5 }}>
                 {["결제 시각", "만든 사람", "템플릿 · 금액", "상태", "청첩장", ""].map((h, i) => <th key={i} style={{ padding: "10px 10px", fontWeight: 600, borderBottom: "1px solid #ECE7E9", whiteSpace: "nowrap" }}>{h}</th>)}
@@ -145,23 +145,23 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
                 const st = STATUS[o.status] ?? { label: o.status, bg: "#EEECED", color: "#6E646A", order: 9 };
                 return (
                   <tr key={o.paymentId} style={{ borderBottom: "1px solid #ECE7E9", verticalAlign: "top" }}>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                    <td data-label="결제 시각" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                       {formatStamp(new Date(o.paidAt ?? o.createdAt))}
                       {o.cancelledAt && <><br /><small style={{ color: "#8C8188" }}>취소 {formatStamp(new Date(o.cancelledAt))}</small></>}
                     </td>
-                    <td style={{ padding: "12px 10px" }}>
+                    <td data-label="만든 사람" style={{ padding: "12px 10px" }}>
                       <b>{[o.groom, o.bride].filter(Boolean).join(" · ") || "이름 없음"}</b><br />
                       {o.phone ? <button type="button" onClick={() => copy(o.phone)} title="누르면 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#B0567E", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>{formatPhone(o.phone)}</button> : <small style={{ color: "#8C8188" }}>연락처 없음</small>}
                     </td>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                    <td data-label="템플릿 · 금액" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                       {TEMPLATE_NAME[o.template] ?? o.template}<br /><b>{won(o.amount)}</b>
                     </td>
-                    <td style={{ padding: "12px 10px", minWidth: 150 }}>
+                    <td data-label="상태" style={{ padding: "12px 10px", minWidth: 150 }}>
                       <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: st.bg, color: st.color }}>{st.label}</span>
                       {o.status === "cancelled" && o.cancelReason && <div style={{ marginTop: 6, fontSize: 12.5, color: "#6E646A", lineHeight: 1.5 }}>사유: {o.cancelReason}</div>}
                       <div style={{ marginTop: 4 }}><button type="button" onClick={() => copy(o.paymentId)} title="결제번호 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#8C8188", fontSize: 11, cursor: "pointer" }}>{o.paymentId.slice(0, 22)}…</button></div>
                     </td>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>{inviteCell(o)}</td>
+                    <td data-label="청첩장" style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>{inviteCell(o)}</td>
                     <td style={{ padding: "12px 10px", textAlign: "right", whiteSpace: "nowrap" }}>
                       {o.status === "paid" && <button type="button" onClick={() => openCancel(o)} style={{ height: 36, padding: "0 14px", border: "1px solid #E5C9D6", borderRadius: 10, background: "#FFFFFF", color: "#A8416C", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>결제 취소</button>}
                     </td>
@@ -171,7 +171,7 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
             </tbody>
           </table>
         ) : (
-          <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse", fontSize: 13.5 }}>
+          <table className="wb-stack-table" style={{ width: "100%", minWidth: 760, borderCollapse: "collapse", fontSize: 13.5 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#8C8188", fontSize: 12.5 }}>
                 {["마지막 시도", "만든 사람", "고른 템플릿 · 금액", "시도", "청첩장"].map((h, i) => <th key={i} style={{ padding: "10px 10px", fontWeight: 600, borderBottom: "1px solid #ECE7E9", whiteSpace: "nowrap" }}>{h}</th>)}
@@ -181,17 +181,17 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
               {unpaid.length === 0 && <tr><td colSpan={5} style={{ padding: "22px 10px", color: "#8C8188" }}>미결제 내역이 없습니다.</td></tr>}
               {unpaid.map(({ last, first, count }) => (
                 <tr key={last.paymentId} style={{ borderBottom: "1px solid #ECE7E9", verticalAlign: "top" }}>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{formatStamp(new Date(last.createdAt))}</td>
-                  <td style={{ padding: "12px 10px" }}>
+                  <td data-label="마지막 시도" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{formatStamp(new Date(last.createdAt))}</td>
+                  <td data-label="만든 사람" style={{ padding: "12px 10px" }}>
                     <b>{[last.groom, last.bride].filter(Boolean).join(" · ") || "이름 없음"}</b><br />
                     {last.phone ? <button type="button" onClick={() => copy(last.phone)} title="누르면 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#B0567E", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>{formatPhone(last.phone)}</button> : <small style={{ color: "#8C8188" }}>연락처 없음</small>}
                   </td>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{TEMPLATE_NAME[last.template] ?? last.template}<br /><b>{won(last.amount)}</b></td>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                  <td data-label="고른 템플릿 · 금액" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>{TEMPLATE_NAME[last.template] ?? last.template}<br /><b>{won(last.amount)}</b></td>
+                  <td data-label="시도" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                     <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: "#FBEFD9", color: "#8A5A00" }}>{count}회</span>
                     {count > 1 && <><br /><small style={{ color: "#8C8188" }}>처음 {formatStamp(new Date(first.createdAt))}</small></>}
                   </td>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>{inviteCell(last)}</td>
+                  <td data-label="청첩장" style={{ padding: "12px 10px", whiteSpace: "nowrap", fontSize: 13 }}>{inviteCell(last)}</td>
                 </tr>
               ))}
             </tbody>
@@ -201,7 +201,7 @@ export default function InvitationOrders({ orders, month }: { orders: Invitation
 
       {target && (
         <div role="dialog" aria-modal="true" aria-label="결제 취소" style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(30,20,26,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ width: "100%", maxWidth: 480, background: "#FFFFFF", borderRadius: 20, padding: 26, boxSizing: "border-box" }}>
+          <div style={{ width: "100%", maxWidth: 480, background: "#FFFFFF", borderRadius: 20, padding: "clamp(18px, 5vw, 26px)", boxSizing: "border-box" }}>
             <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>결제 취소(환불)</h2>
             <p style={{ margin: "8px 0 14px", fontSize: 13.5, lineHeight: 1.7, color: "#6E646A" }}>
               <b style={{ color: "#33232A" }}>{[target.groom, target.bride].filter(Boolean).join(" · ") || "이름 없음"}</b> 님의 <b style={{ color: "#33232A" }}>{won(target.amount)}</b> 결제를 전액 취소합니다. 카드 승인 취소가 바로 진행되고 되돌릴 수 없습니다.

@@ -85,7 +85,7 @@ export default function UnpaidList({ rows, failed, days, dayOptions }: { rows: U
       </div>
 
       <div style={{ overflowX: "auto", background: "#F8F6F7", borderRadius: 18, padding: "8px 16px 12px" }}>
-        <table style={{ width: "100%", minWidth: 860, borderCollapse: "collapse", fontSize: 13.5 }}>
+        <table className="wb-stack-table" style={{ width: "100%", minWidth: 860, borderCollapse: "collapse", fontSize: 13.5 }}>
           <thead>
             <tr style={{ textAlign: "left", color: "#8C8188", fontSize: 12.5 }}>
               {["접수", "고객", "예식", "요금제 · 금액", "이탈 단계"].map((h) => <th key={h} style={{ padding: "10px 10px", fontWeight: 600, borderBottom: "1px solid #ECE7E9", whiteSpace: "nowrap" }}>{h}</th>)}
@@ -97,24 +97,24 @@ export default function UnpaidList({ rows, failed, days, dayOptions }: { rows: U
               const st = STAGE[r.stage];
               return (
                 <tr key={r.bookingNo} style={{ borderBottom: "1px solid #ECE7E9", verticalAlign: "top" }}>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                  <td data-label="접수" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                     {formatStamp(new Date(r.createdAt))}<br />
                     <small style={{ color: r.recent ? "#A8416C" : "#8C8188", fontWeight: r.recent ? 700 : 400 }}>{r.recent ? "방금 · " : ""}{ago(r.createdAt)}</small>
                   </td>
-                  <td style={{ padding: "12px 10px" }}>
+                  <td data-label="고객" style={{ padding: "12px 10px" }}>
                     <b>{r.name}</b>{r.isTest && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: "#8C8188", background: "#EEECED", padding: "1px 7px", borderRadius: 99 }}>테스트</span>}<br />
                     <button type="button" onClick={() => copy(r.phone)} title="누르면 복사" style={{ border: 0, background: "transparent", padding: 0, color: "#B0567E", fontWeight: 700, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap" }}>{r.phone}</button><br />
                     <small style={{ color: "#8C8188" }}>{r.bookingNo}</small>
                   </td>
-                  <td style={{ padding: "12px 10px" }}>
+                  <td data-label="예식" style={{ padding: "12px 10px" }}>
                     {ceremonyLabel(r.ceremony)}<br />
                     <small style={{ color: "#8C8188" }}>{r.venue || "예식장 미입력"} · 하객 {r.guests}명</small>
                   </td>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                  <td data-label="요금제 · 금액" style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
                     {r.plan}{r.special && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: "#8A3F61" }}>링크</span>}<br />
                     <b>{won(r.amount)}</b>{r.totalAmount !== r.amount && <small style={{ color: "#8C8188" }}> / 총 {won(r.totalAmount)}</small>}
                   </td>
-                  <td style={{ padding: "12px 10px", minWidth: 250 }}>
+                  <td data-label="이탈 단계" style={{ padding: "12px 10px", minWidth: 250 }}>
                     <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 700, background: st.bg, color: st.color }}>{r.stageLabel}</span>
                     <div style={{ marginTop: 6, fontSize: 12.5, color: "#6E646A", lineHeight: 1.6 }}>{r.hint}</div>
                   </td>
