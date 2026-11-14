@@ -58,12 +58,15 @@ function deskSideLabel(shiftSide: string, reservationSide: string, couple: strin
   return cut(name ? `${side} (${name})` : side);
 }
 
-/** 같은 쪽을 함께 맡은 동료 이름 (본인 제외): "김준수 (본인 포함 2명)". 혼자면 "본인 1명". */
-function teamLabel(coworkers: string[]): string {
-  if (!coworkers.length) return "본인 1명";
-  const count = `(본인 포함 ${coworkers.length + 1}명)`;
-  const full = `${coworkers.join(", ")} ${count}`;
-  return full.length <= 23 ? full : `본인 포함 ${coworkers.length + 1}명`;
+/** 버틀러팀: 이 예약에 배정된 버틀러 전원(본인 포함). 23자를 넘으면 "이강, 최소연 외 3명"처럼 줄인다. */
+function teamLabel(names: string[]): string {
+  const full = names.join(", ");
+  if (full.length <= 23) return full || "추후 안내";
+  for (let n = names.length - 1; n >= 1; n--) {
+    const short = `${names.slice(0, n).join(", ")} 외 ${names.length - n}명`;
+    if (short.length <= 23) return short;
+  }
+  return `총 ${names.length}명`;
 }
 
 /** 배정 기록 하나에 대해, 보낼 때가 됐고 아직 안 보냈으면 그 버틀러에게 보낸다. 화면·크론에 보여 줄 결과 문구를 돌려준다. */
@@ -94,15 +97,14 @@ export async function notifyButlerShift(shiftId: string, mode: "assign" | "month
 
   const team = await prisma.butlerShift.findMany({ where: { reservationId: r.id }, include: { butler: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
   const couple = r.couple || r.customer;
-  const sideOf = (v: string) => v || (r.side === "신랑측" || r.side === "신부측" ? r.side : "");
   const variables = {
     "#{weddingDate}": weddingDateLabel(date, r.confirmTime),
     "#{venue}": cut(r.confirmVenue || r.venueLabel),
     "#{couple}": cut(couple),
     "#{workStart}": workStartLabel(r.confirmTime),
     "#{deskSide}": deskSideLabel(shift.side, r.side, couple),
-    // 같은 쪽(신랑측/신부측/양가 통합)을 맡은 동료만. 한측 예약은 쪽을 고르지 않으므로(이전 배정은 빈 값) 예약의 쪽으로 본다
-    "#{team}": teamLabel(team.filter((t) => t.id !== shift.id && sideOf(t.side) === sideOf(shift.side)).map((t) => t.butler.name)),
+    // 버틀러팀: 보내는 시점에 이 예약에 배정된 버틀러 전원(본인 포함, 2026-11-14 루리님 요청)
+    "#{team}": teamLabel(team.map((t) => t.butler.name)),
     "#{pay}": won(shift.pay + shift.extra),
   };
   return sendButlerStaffAlimtalk(r.id, shift.butlerId, shift.butler.phone, variables);
