@@ -5,12 +5,12 @@ import { sendButlerStaffAlimtalk } from "@/lib/alimtalk";
 import { pad2 } from "@/lib/format";
 import { won } from "@/lib/pricing";
 
-// 버틀러(스태프) 업무 배정 알림톡을 언제 보낼지 정한다 (2026-11-13 루리님 규칙).
-// - 예식이 이번 달(한국 날짜 기준)인 배정만 보낸다. 이번 달 예식에 배정하면 배정할 때 바로 보낸다.
-// - 다음 달 이후 예식은 그 달 1일 10:00 크론(/api/cron/butler-notices)이 한꺼번에 보낸다.
+// 버틀러(스태프) 업무 배정 알림톡을 언제 보낼지 정한다 (2026-11-14 루리님 규칙, 날짜는 한국 기준).
+// - 배정할 때(mode "assign"): 지나지 않은 예식이면 예식 달과 상관없이 바로 한 번 보낸다.
+// - 예식 달 1일 10:00 크론(mode "month", /api/cron/butler-notices): 그 달 예식인데 그 달 안에 받은 적이 없는 버틀러에게 한 번 더 보낸다.
+//   그래서 이번 달 예식에 이번 달 배정한 사람은 한 번만, 다음 달 이후 예식은 배정 때 + 예식 달 1일 두 번 받는다. 1일 전에 해제하면 1일에는 안 받는다.
 // - 오너 버틀러에게는 보내지 않는다. 스태프·매니저에게는 그 예약에 오너 버틀러가 배정된 뒤에만 보낸다(2026-11-14).
-// - 버틀러 한 명에게 예약 하나당 한 번만: 발송 내역(MessageLog)에 그 버틀러의 성공 기록이 있으면 다시 보내지 않는다.
-//   실패한 건은 성공 기록이 없으니 다음 크론 때 다시 시도한다.
+// - 중복 방지는 발송 내역(MessageLog)의 그 버틀러 성공 기록으로 한다 (assign: 기록이 하나라도 있으면, month: 이번 달 기록이 있으면 안 보냄).
 
 const KIND = "버틀러 업무 배정";
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -67,16 +67,15 @@ function teamLabel(coworkers: string[]): string {
 }
 
 /** 배정 기록 하나에 대해, 보낼 때가 됐고 아직 안 보냈으면 그 버틀러에게 보낸다. 화면·크론에 보여 줄 결과 문구를 돌려준다. */
-export async function notifyButlerShift(shiftId: string, today = kstToday()): Promise<{ sent: boolean; detail: string }> {
+export async function notifyButlerShift(shiftId: string, mode: "assign" | "month" = "assign", today = kstToday()): Promise<{ sent: boolean; detail: string }> {
   await ensureFinanceTables();
   const shift = await prisma.butlerShift.findUnique({ where: { id: shiftId }, include: { butler: true } });
   if (!shift) return { sent: false, detail: "배정 없음" };
   const r = await prisma.reservation.findUnique({ where: { id: shift.reservationId } });
   if (!r || r.status === "취소") return { sent: false, detail: "취소된 예약" };
   const date = r.confirmDate || shift.date;
-  if (!isThisMonthUpcoming(date, today)) {
-    return { sent: false, detail: date > today ? `${Number(date.slice(5, 7))}월 1일 발송 예정` : "지난 예식" };
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today) return { sent: false, detail: "지난 예식" };
+  if (mode === "month" && !isThisMonthUpcoming(date, today)) return { sent: false, detail: "이번 달 예식 아님" };
   if (shift.grade === "owner") return { sent: false, detail: "오너 버틀러" };
   const hasOwner = await prisma.butlerShift.count({ where: { reservationId: r.id, grade: "owner" } });
   if (!hasOwner) return { sent: false, detail: "오너 버틀러 배정 후 발송" };
@@ -84,7 +83,11 @@ export async function notifyButlerShift(shiftId: string, today = kstToday()): Pr
 
   await ensureMessageLogTable();
   const already = await prisma.messageLog.findFirst({
-    where: { reservationId: r.id, kind: KIND, status: "sent", variables: { contains: `"_butlerId":"${shift.butlerId}"` } },
+    where: {
+      reservationId: r.id, kind: KIND, status: "sent", variables: { contains: `"_butlerId":"${shift.butlerId}"` },
+      // 1일 발송은 이번 달(한국 1일 0시 이후)에 받은 기록이 있을 때만 건너뛴다
+      ...(mode === "month" ? { createdAt: { gte: new Date(`${today.slice(0, 7)}-01T00:00:00+09:00`) } } : {}),
+    },
     select: { id: true },
   });
   if (already) return { sent: false, detail: "이미 보냄" };
@@ -112,7 +115,7 @@ export async function notifyThisMonthButlers(today = kstToday()): Promise<string
   const shifts = await prisma.butlerShift.findMany({ where: { date: { gte: today, lte: monthEnd } }, include: { butler: { select: { name: true } } }, orderBy: [{ date: "asc" }, { createdAt: "asc" }] });
   const lines: string[] = [];
   for (const s of shifts) {
-    const res = await notifyButlerShift(s.id, today);
+    const res = await notifyButlerShift(s.id, "month", today);
     // 보냈거나 실패한 건만 알린다 (번호 미등록·이미 보냄은 매일 반복되므로 빼고, 배정 화면에서 확인한다)
     if (res.sent || !["이미 보냄", "휴대폰 번호 미등록", "지난 예식", "취소된 예약", "오너 버틀러", "오너 버틀러 배정 후 발송"].includes(res.detail)) lines.push(`${s.date} ${s.reservationId} ${s.butler.name} · ${res.sent ? "전송 완료" : res.detail}`);
   }
@@ -124,6 +127,6 @@ export async function notifyReservationButlers(reservationId: string): Promise<{
   await ensureFinanceTables();
   const shifts = await prisma.butlerShift.findMany({ where: { reservationId }, select: { id: true }, orderBy: { createdAt: "asc" } });
   const out: { shiftId: string; sent: boolean; detail: string }[] = [];
-  for (const s of shifts) out.push({ shiftId: s.id, ...(await notifyButlerShift(s.id)) });
+  for (const s of shifts) out.push({ shiftId: s.id, ...(await notifyButlerShift(s.id, "assign")) });
   return out;
 }

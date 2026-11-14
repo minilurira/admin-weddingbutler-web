@@ -23,7 +23,7 @@ export async function getAssignment(reservationId: string): Promise<AssignmentVi
   return loadAssignment(reservationId);
 }
 
-/** 배정하고, 예식이 이번 달이면 그 버틀러에게 업무 배정 알림톡을 바로 보낸다(다음 달 이후 예식은 그 달 1일 크론이 보낸다).
+/** 배정하고 그 버틀러에게 업무 배정 알림톡을 바로 보낸다(다음 달 이후 예식이면 예식 달 1일 크론이 한 번 더 보낸다).
  * 화면에 띄울 결과 문구를 돌려준다. */
 export async function assignButler(reservationId: string, butlerId: string, grade: string, side = ""): Promise<string> {
   await guard();
@@ -37,7 +37,7 @@ export async function assignButler(reservationId: string, butlerId: string, grad
   const res = results.find((x) => x.shiftId === shift.id);
   if (sent) return `배정했습니다. 버틀러 ${sent}명에게 업무 배정 알림톡을 보냈습니다.`;
   if (!res || shift.grade === "owner" || ["지난 예식", "이미 보냄"].includes(res.detail)) return "배정했습니다.";
-  if (res.detail.endsWith("발송 예정") || res.detail.endsWith("후 발송")) return `배정했습니다. 버틀러 알림톡은 ${res.detail}입니다.`;
+  if (res.detail.endsWith("후 발송")) return `배정했습니다. 버틀러 알림톡은 ${res.detail}입니다.`;
   return `배정했지만 버틀러 알림톡은 보내지 못했습니다 (${res.detail}).`;
 }
 
