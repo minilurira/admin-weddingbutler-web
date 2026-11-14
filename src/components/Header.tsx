@@ -59,6 +59,7 @@ export default function Header({
         <span style={{ width: 16, height: 2, borderRadius: 1, background: "#6E646A" }} />
       </button>
       <div
+        className="wb-header-search"
         style={{
           flex: "1 1 220px", minWidth: 180, maxWidth: 660, display: "flex", alignItems: "center",
           gap: 10, height: 48, padding: "0 18px", borderRadius: 14, background: "#F6F3F5",
@@ -77,7 +78,7 @@ export default function Header({
         />
       </div>
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ fontSize: 13.5, color: "#6E646A" }}>{userName}</span>
+        <span className="wb-header-name" style={{ fontSize: 13.5, color: "#6E646A" }}>{userName}</span>
         <div
           style={{
             width: 36, height: 36, borderRadius: "50%", background: "#F5E4EC", color: "#8A3F61",

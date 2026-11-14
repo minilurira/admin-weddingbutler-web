@@ -84,7 +84,7 @@ export function FunnelChart({ rows }: { rows: FunnelCount[] }) {
           단계별 이벤트는 2026년 11월 6일 배포 이후부터 쌓입니다. GA4 반영에 하루 정도 걸릴 수 있어요.
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 22 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 22 }}>
         {DEVICES.map((d) => (
           <Column key={d.key} rows={rows} device={d.key} label={d.label} />
         ))}

@@ -12,7 +12,7 @@ export default async function InvitationOrdersPage({ searchParams }: { searchPar
   const result = await fetchInvitationOrders(`${month}-01`, `${month}-${String(last).padStart(2, "0")}`);
 
   return (
-    <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>
       {result.ok ? (
         <InvitationOrders orders={result.orders} month={month} />
       ) : (

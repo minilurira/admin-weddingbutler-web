@@ -11,7 +11,7 @@ export default async function UnpaidPage({ searchParams }: { searchParams: { day
   const result = await fetchUnpaid(days);
 
   return (
-    <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>
       {result.ok ? (
         <UnpaidList rows={result.rows} failed={result.failed} days={days} dayOptions={DAYS} />
       ) : (

@@ -35,10 +35,10 @@ export default async function DashboardPage() {
     .slice(0, 4);
 
   return (
-    <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>
       <h1 style={{ margin: "0 0 22px", fontSize: 27, fontWeight: 800, letterSpacing: "-0.7px" }}>대시보드</h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(178px, 1fr))", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(178px, 100%), 1fr))", gap: 16, marginBottom: 24 }}>
         <Link href="/reservations?filter=신규요청" style={{ background: "#F7EDF2", borderRadius: 18, padding: "22px 24px", minHeight: 112, display: "block" }}>
           <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.45, color: "#7E3855" }}>신규 요청 {newCount}건<br />확인이 필요해요</div>
           <div style={{ fontSize: 12.5, color: "#9E7286", marginTop: 8 }}>협의 후 확정하면 캘린더에 등록됩니다</div>
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
 
       <div style={{ marginTop: 18, borderRadius: 18, background: "#F6F3F5", padding: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>다가오는 확정 일정</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: 14 }}>
           {upcoming.length === 0 && (
             <div style={{ fontSize: 13, color: "#8C8188" }}>확정된 일정이 없습니다.</div>
           )}

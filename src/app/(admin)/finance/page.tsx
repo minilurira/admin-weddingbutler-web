@@ -14,7 +14,7 @@ export default async function FinancePage() {
   }
 
   return (
-    <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>
       {data ? <FinanceView data={data} view="finance" /> : <p style={{ color: "#A8416C", fontWeight: 600 }}>{error}</p>}
     </main>
   );

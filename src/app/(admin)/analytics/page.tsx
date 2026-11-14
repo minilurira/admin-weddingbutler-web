@@ -52,7 +52,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
   for (const d of g?.daily ?? []) dailySessions[d.date] = d.sessions;
 
   return (
-    <main style={{ flex: 1, minWidth: 0, padding: "4px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, padding: "4px clamp(16px, 4vw, 28px) 48px" }}>
       <h1 style={{ margin: "0 0 6px", fontSize: 27, fontWeight: 800, letterSpacing: "-0.7px" }}>유입·검색</h1>
       <div style={{ fontSize: 13, color: "#8C8188", marginBottom: 18 }}>
         {md(period.start)} ~ {md(period.end)} · 직전 기간 {md(period.prevStart)} ~ {md(period.prevEnd)}과 비교
@@ -95,7 +95,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: 12, marginBottom: 18 }}>
         {g && (
           <>
             <StatTile label="방문자" value={n(g.current.users)} current={g.current.users} prev={g.previous.users} />
@@ -138,7 +138,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
         )}
 
         {g && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 16 }}>
             <Card title="유입 채널" sub="세션 기준">
               <RankList rows={g.channels} format={(name) => CHANNEL_KO[name] ?? name} />
             </Card>
@@ -161,7 +161,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
         )}
 
         <Card title="예약·문의·결제" sub={`${period.label} 신청 기준`}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 12 }}>
             <StatTile label="예약 신청" value={`${n(biz.requested)}건`} />
             <StatTile label="그중 확정" value={`${n(biz.confirmed)}건`} />
             <StatTile label="그중 취소" value={`${n(biz.cancelled)}건`} />

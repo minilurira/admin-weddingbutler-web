@@ -20,7 +20,7 @@ export default async function InquiriesPage() {
   }
 
   return (
-    <main style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px 28px 48px" }}>
+    <main style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "6px clamp(16px, 4vw, 28px) 48px" }}>
       {!inquiriesConfigured() && (
         <Notice>Supabase 연결 정보가 없어 문의를 불러올 수 없습니다. Vercel 환경변수 SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 를 설정해 주세요.</Notice>
       )}
