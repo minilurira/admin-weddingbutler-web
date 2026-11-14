@@ -88,8 +88,9 @@ export async function notifyButlerShift(shiftId: string, mode: "assign" | "month
   const already = await prisma.messageLog.findFirst({
     where: {
       reservationId: r.id, kind: KIND, status: "sent", variables: { contains: `"_butlerId":"${shift.butlerId}"` },
-      // 1일 발송은 이번 달(한국 1일 0시 이후)에 받은 기록이 있을 때만 건너뛴다
-      ...(mode === "month" ? { createdAt: { gte: new Date(`${today.slice(0, 7)}-01T00:00:00+09:00`) } } : {}),
+      // 배정 시 발송: 이번 배정(해제 후 다시 배정하면 새 배정) 이후에 받은 기록이 있을 때만 건너뛴다
+      // 1일 발송: 이번 달(한국 1일 0시 이후)에 받은 기록이 있을 때만 건너뛴다
+      createdAt: { gte: mode === "month" ? new Date(`${today.slice(0, 7)}-01T00:00:00+09:00`) : shift.createdAt },
     },
     select: { id: true },
   });
