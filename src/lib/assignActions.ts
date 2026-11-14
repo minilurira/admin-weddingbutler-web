@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { notifyButlerShift } from "@/lib/butlerNotice";
+import { notifyReservationButlers } from "@/lib/butlerNotice";
 import { changeAssignmentSide, createAssignment, loadAssignment, removeAssignment, type AssignmentView } from "@/lib/assign";
 
 async function guard() {
@@ -29,12 +29,15 @@ export async function assignButler(reservationId: string, butlerId: string, grad
   await guard();
   await createAssignment(reservationId, butlerId, grade, side);
   done();
-  const shift = await prisma.butlerShift.findFirst({ where: { reservationId, butlerId }, select: { id: true } });
+  const shift = await prisma.butlerShift.findFirst({ where: { reservationId, butlerId }, select: { id: true, grade: true } });
   if (!shift) return "배정했습니다.";
-  const res = await notifyButlerShift(shift.id);
-  if (res.sent) return "배정하고 버틀러에게 업무 배정 알림톡을 보냈습니다.";
-  if (res.detail.endsWith("발송 예정")) return `배정했습니다. 버틀러 알림톡은 ${res.detail}입니다.`;
-  if (res.detail === "지난 예식" || res.detail === "이미 보냄") return "배정했습니다.";
+  // 오너가 배정되면 먼저 배정돼 기다리던 스태프에게도 이때 나가므로 예약의 배정 전원을 확인한다
+  const results = await notifyReservationButlers(reservationId);
+  const sent = results.filter((x) => x.sent).length;
+  const res = results.find((x) => x.shiftId === shift.id);
+  if (sent) return `배정했습니다. 버틀러 ${sent}명에게 업무 배정 알림톡을 보냈습니다.`;
+  if (!res || shift.grade === "owner" || ["지난 예식", "이미 보냄"].includes(res.detail)) return "배정했습니다.";
+  if (res.detail.endsWith("발송 예정") || res.detail.endsWith("후 발송")) return `배정했습니다. 버틀러 알림톡은 ${res.detail}입니다.`;
   return `배정했지만 버틀러 알림톡은 보내지 못했습니다 (${res.detail}).`;
 }
 

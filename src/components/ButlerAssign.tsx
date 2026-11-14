@@ -15,15 +15,17 @@ const GRADES = Object.keys(BUTLER_GRADES) as ButlerGrade[];
 const selectStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 10, padding: "9px 10px", fontSize: 13, color: "#1E1A1C", minWidth: 0 };
 
 /** 버틀러 업무 배정 알림톡 상태 표시. 보낸 기록이 없으면 언제 나갈지 안내한다 (규칙은 src/lib/butlerNotice.ts). */
-function noticeStatus(notice: MessageView | undefined, hasPhone: boolean, date: string): { text: string; bg: string; color: string } {
+function noticeStatus(notice: MessageView | undefined, hasPhone: boolean, date: string, isOwner: boolean, hasOwner: boolean): { text: string; bg: string; color: string } {
   const ok = { bg: "#E3F1E8", color: "#2B6A45" }, bad = { bg: "#F7E4E4", color: "#A8416C" }, wait = { bg: "#EEECED", color: "#6E646A" };
   if (notice?.status === "sent") return { text: `보냄 ${formatStamp(new Date(notice.createdAt))}`, ...ok };
-  if (notice?.status === "failed") return { text: `실패${notice.detail ? ` (${notice.detail})` : ""} · 매일 10시 재시도`, ...bad };
+  if (notice?.status === "failed") return { text: `실패${notice.detail ? ` (${notice.detail})` : ""} · 해제 후 다시 배정하면 재시도`, ...bad };
+  if (isOwner) return { text: "오너 버틀러는 보내지 않음", ...wait };
+  if (!hasOwner) return { text: "오너 버틀러 배정 후 발송", ...wait };
   if (!hasPhone) return { text: "휴대폰 번호 미등록", ...bad };
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); // 한국 날짜
   if (!date || date < today) return { text: "보내지 않음", ...wait };
   if (date.slice(0, 7) > today.slice(0, 7)) return { text: `${Number(date.slice(5, 7))}월 1일 10시 발송 예정`, ...wait };
-  return { text: "10시 자동 발송 예정", ...wait };
+  return { text: "미발송 · 해제 후 다시 배정하면 발송", ...wait };
 }
 
 /** 예약 상세의 "버틀러 배정" 카드. 필요한 인원(예약 내역의 배정 버틀러 수)만큼 실제 버틀러를 정한다. */
@@ -90,7 +92,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
           {assigned.map((a) => {
             const mine = notices.filter((m) => m.variables._butlerId === a.butlerId); // 최신 먼저
             const notice = mine.find((m) => m.status === "sent") ?? mine[0];
-            const status = noticeStatus(notice, a.hasPhone, data.date);
+            const status = noticeStatus(notice, a.hasPhone, data.date, a.grade === "owner", assigned.some((x) => x.grade === "owner"));
             const isOpen = openNotice === a.shiftId;
             return (
             <div key={a.shiftId} style={{ padding: "10px 0", borderBottom: "1px solid #F4F1F3" }}>

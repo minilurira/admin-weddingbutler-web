@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, type ReconcileResult } from "@/lib/finance";
+import { notifyReservationButlers } from "@/lib/butlerNotice";
 import { homepageUrl } from "@/lib/records";
 import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 
@@ -151,6 +152,8 @@ export async function updateShiftGrade(id: string, grade: string) {
   if (!shift) return;
   await prisma.butlerShift.update({ where: { id }, data: { grade, pay: gradePay(grade, shift.butler.name) } });
   done();
+  // 오너 등급으로 바뀌면 기다리던 스태프 업무 배정 알림톡이 이때 나갈 수 있다
+  if (grade === "owner") await notifyReservationButlers(shift.reservationId);
 }
 
 export async function updateShiftExtra(id: string, extra: number) {

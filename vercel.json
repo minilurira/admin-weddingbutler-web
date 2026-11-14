@@ -3,6 +3,6 @@
   "crons": [
     { "path": "/api/cron/reminders?type=day", "schedule": "0 22 * * *" },
     { "path": "/api/cron/reminders?type=7d", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/butler-notices", "schedule": "0 1 * * *" }
+    { "path": "/api/cron/butler-notices", "schedule": "0 1 1 * *" }
   ]
 }
