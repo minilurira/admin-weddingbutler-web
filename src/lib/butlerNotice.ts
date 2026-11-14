@@ -50,14 +50,19 @@ function deskSideLabel(shiftSide: string, reservationSide: string, couple: strin
   const side = shiftSide || (reservationSide === "신랑측" || reservationSide === "신부측" ? reservationSide : "");
   if (!side) return "추후 안내";
   if (side !== "신랑측" && side !== "신부측") return side;
-  const names = couple.split(/\s*[·,/&]\s*/).map((s) => s.trim()).filter(Boolean);
+  // "박준호 · 이서연" 처럼 구분자가 있으면 그걸로, 없고 "윤지호 유연지"처럼 띄어쓰기로 두 이름이면 띄어쓰기로 나눈다
+  let names = couple.split(/\s*[·,/&]\s*/).map((s) => s.trim()).filter(Boolean);
+  if (names.length === 1 && names[0].split(/\s+/).length === 2) names = names[0].split(/\s+/);
   const name = names.length >= 2 ? names[side === "신랑측" ? 0 : 1] : names[0] ?? "";
   return cut(name ? `${side} (${name})` : side);
 }
 
-function teamLabel(names: string[]): string {
-  const full = `${names.join(", ")} (총 ${names.length}명)`;
-  return full.length <= 23 ? full : `총 ${names.length}명`;
+/** 같은 쪽을 함께 맡은 동료 이름 (본인 제외): "김준수 (본인 포함 2명)". 혼자면 "본인 1명". */
+function teamLabel(coworkers: string[]): string {
+  if (!coworkers.length) return "본인 1명";
+  const count = `(본인 포함 ${coworkers.length + 1}명)`;
+  const full = `${coworkers.join(", ")} ${count}`;
+  return full.length <= 23 ? full : `본인 포함 ${coworkers.length + 1}명`;
 }
 
 /** 배정 기록 하나에 대해, 보낼 때가 됐고 아직 안 보냈으면 그 버틀러에게 보낸다. 화면·크론에 보여 줄 결과 문구를 돌려준다. */
@@ -82,13 +87,15 @@ export async function notifyButlerShift(shiftId: string, today = kstToday()): Pr
 
   const team = await prisma.butlerShift.findMany({ where: { reservationId: r.id }, include: { butler: { select: { name: true } } }, orderBy: { createdAt: "asc" } });
   const couple = r.couple || r.customer;
+  const sideOf = (v: string) => v || (r.side === "신랑측" || r.side === "신부측" ? r.side : "");
   const variables = {
     "#{weddingDate}": weddingDateLabel(date, r.confirmTime),
     "#{venue}": cut(r.confirmVenue || r.venueLabel),
     "#{couple}": cut(couple),
     "#{workStart}": workStartLabel(r.confirmTime),
     "#{deskSide}": deskSideLabel(shift.side, r.side, couple),
-    "#{team}": teamLabel(team.map((t) => t.butler.name)),
+    // 같은 쪽(신랑측/신부측/양가 통합)을 맡은 동료만. 한측 예약은 쪽을 고르지 않으므로(이전 배정은 빈 값) 예약의 쪽으로 본다
+    "#{team}": teamLabel(team.filter((t) => t.id !== shift.id && sideOf(t.side) === sideOf(shift.side)).map((t) => t.butler.name)),
     "#{pay}": won(shift.pay + shift.extra),
   };
   return sendButlerStaffAlimtalk(r.id, shift.butlerId, shift.butler.phone, variables);
