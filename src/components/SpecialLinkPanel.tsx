@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cancelSpecialOffer, createSpecialOffer, listSpecialOffers, type SpecialOfferView } from "@/lib/specialActions";
+import { cancelSpecialOffer, createSpecialOffer, listSpecialOffers, sendSpecialLink, type SpecialOfferView } from "@/lib/specialActions";
 import { won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
 
@@ -21,6 +21,8 @@ export default function SpecialLinkPanel() {
   const [amount, setAmount] = useState("");
   const [label, setLabel] = useState("");
   const [days, setDays] = useState("7");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [offers, setOffers] = useState<SpecialOfferView[]>([]);
   const [created, setCreated] = useState<SpecialOfferView | null>(null);
@@ -48,11 +50,23 @@ export default function SpecialLinkPanel() {
       setLabel("");
       void reload();
       void copy(o.url);
+      if (phone.trim()) {
+        const r = await sendSpecialLink(o.id, phone, name);
+        showToast(r.ok ? `링크를 복사했고 ${r.message}` : r.message);
+        if (r.ok) { setName(""); setPhone(""); }
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "링크를 만들지 못했습니다.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function resend(id: string) {
+    const to = window.prompt("알림톡을 보낼 휴대폰 번호를 입력하세요.");
+    if (!to) return;
+    const who = window.prompt("고객 이름 (비워도 됩니다)") ?? "";
+    showToast((await sendSpecialLink(id, to, who)).message);
   }
 
   async function cancel(id: string) {
@@ -82,8 +96,19 @@ export default function SpecialLinkPanel() {
           </select>
         </label>
       </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <label style={{ ...labelStyle, flex: 1 }}>
+          고객 이름 (선택)
+          <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 김민지" maxLength={20} />
+        </label>
+        <label style={{ ...labelStyle, flex: 1 }}>
+          휴대폰 번호 (선택)
+          <input style={inputStyle} inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" maxLength={13} />
+        </label>
+      </div>
+      <div style={{ fontSize: 12, color: "#8C8188", marginTop: -6 }}>번호를 넣으면 링크를 만들자마자 알림톡으로 보냅니다(알림톡이 안 되면 문자). 비우면 복사만 합니다.</div>
       <button type="button" disabled={saving} onClick={make} style={{ height: 48, border: 0, borderRadius: 12, background: "#B0567E", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
-        {saving ? "만드는 중…" : "링크 만들기"}
+        {saving ? "처리 중…" : phone.trim() ? "링크 만들고 알림톡 보내기" : "링크 만들기"}
       </button>
 
       {created && (
@@ -110,6 +135,7 @@ export default function SpecialLinkPanel() {
               </div>
               <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 700, background: st.bg, color: st.color, whiteSpace: "nowrap" }}>{st.text}</span>
               {live && <button type="button" onClick={() => copy(o.url)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>복사</button>}
+              {live && <button type="button" onClick={() => resend(o.id)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>알림톡</button>}
               {live && <button type="button" onClick={() => cancel(o.id)} style={{ border: 0, background: "transparent", color: "#8C8188", fontSize: 12.5, cursor: "pointer" }}>취소</button>}
             </div>
           );
