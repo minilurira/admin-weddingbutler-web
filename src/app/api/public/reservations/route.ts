@@ -7,6 +7,7 @@ import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 
 import { logError } from "@/lib/errorLog";
+import { saveReservationSource } from "@/lib/reservationSource";
 export const dynamic = "force-dynamic";
 
 interface IncomingBody {
@@ -22,6 +23,7 @@ interface IncomingBody {
   plan?: string;
   memo?: string;
   customerMemo?: string; // 고객이 직접 남긴 메모(선택)
+  source?: string; // 고객이 고른 유입 경로(선택)
   paidAmount?: number;
   paymentType?: string; // "deposit" | "full"
   extraButlers?: number;
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
     return badRequest("invalid JSON body");
   }
 
-  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
+  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, source, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
 
   if (!customer?.trim()) return badRequest("customer is required");
   if (!couple?.trim()) return badRequest("couple is required");
@@ -143,6 +145,8 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  if (typeof source === "string") await saveReservationSource(created.id, source).catch((e) => logError("[api/public/reservations] save source failed", e));
+
   // waitUntil keeps the serverless function alive for these until they settle,
   // since the platform can freeze execution right after the response below is
   // sent — a bare fire-and-forget call here can get cut off mid-flight.
@@ -172,6 +176,7 @@ export async function POST(req: NextRequest) {
         `플랜: ${created.requestedPlan}${resolvedExtraButlers ? ` (버틀러 추가 ${resolvedExtraButlers}명)` : ""}`,
         `결제: ${resolvedPaymentType ? PAYMENT_TYPES[resolvedPaymentType].name : "유형 미지정"} · 결제 ${won(created.paidAmount)} · 현장(현금) ${won(onsite)}`,
         ...(created.customerMemo ? [`메모: ${created.customerMemo}`] : []),
+        ...(typeof source === "string" && source.trim() ? [`유입 경로: ${source.trim().slice(0, 60)}`] : []),
       ].join("\n")
     )
   );

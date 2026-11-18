@@ -54,6 +54,8 @@ export interface DetailReservation {
   guestsLabel: string;
   memo: string;
   customerMemo: string;
+  /** 고객이 예약 때 고른 유입 경로. 없으면 "" */
+  source: string;
   status: string;
   /** 예식 일시(KST)가 지난 예약. 취소된 예약은 false. 변경·취소 버튼이 잠긴다 */
   weddingPast: boolean;
@@ -463,6 +465,7 @@ export default function ReservationDetail({
               <span style={dt}>예약자</span><span>{reservation.couple}{reservation.side ? ` (${reservation.side})` : ""} · {reservation.phone}</span>
               {reservation.memo && (<><span style={dt}>요청 사항</span><span style={{ lineHeight: 1.6 }}>{reservation.memo}</span></>)}
               {reservation.customerMemo && (<><span style={dt}>고객 메모</span><span style={{ lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{reservation.customerMemo}</span></>)}
+              {reservation.source && (<><span style={dt}>유입 경로</span><span>{reservation.source}</span></>)}
               {fields.hours && (<><span style={dt}>근무 시간</span><span>{fields.hours}</span></>)}
               {fields.note && (<><span style={dt}>특이사항</span><span style={{ lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{fields.note}</span></>)}
             </div>
