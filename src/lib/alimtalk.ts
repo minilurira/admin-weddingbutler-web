@@ -379,9 +379,9 @@ export async function sendSpecialLinkAlimtalk(phone: string, variables: Record<s
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_SPECIAL_LINK;
+  const templateId = process.env.SOLAPI_TEMPLATE_SPECIAL_LINK || "KA01TP2611180229261027RAmuCX2gK7";
   if (!svc || !from || !pfId || !templateId) {
-    console.warn(`[alimtalk] SOLAPI_TEMPLATE_SPECIAL_LINK not fully set — ${tag} goes by SMS.`);
+    console.warn(`[alimtalk] Solapi env vars not fully set — ${tag} goes by SMS.`);
     return false;
   }
   try {
