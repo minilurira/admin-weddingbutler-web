@@ -8,7 +8,7 @@ import {
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { formatPhone } from "@/lib/format";
-import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowByMonth, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowEvents, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
@@ -107,28 +107,55 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
      출금 = 월 비용·일회성 비용·버틀러 정산. 지급 완료로 기록한 건은 실제 지급일에, 아직 지급하지 않은 건은 예정일에 나가는 것으로 본다
      (기준일 전에 이미 지급한 건은 잔액에 반영됐다고 보고 뺀다) */
   const base = settings.bankDate, bm = base.slice(0, 7);
+  type Ev = { date: string; type: "card" | "cash" | "mon" | "one" | "pay"; amount: number; label: string; note?: string };
+  const keys = Array.from({ length: 6 }, (_, i) => {
+    let [y, m] = bm.split("-").map(Number);
+    m += i;
+    while (m > 12) { m -= 12; y++; }
+    return `${y}-${String(m).padStart(2, "0")}`;
+  });
+  // 날짜별 입출금 예정 건. 월별 표와 날짜별 표가 같은 건에서 나오므로 합계가 항상 맞는다.
+  const events: Ev[] = (() => {
+    const ev: Ev[] = [];
+    for (const r of reservations) {
+      const settle = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); // 카드: 결제 후 7영업일에 수수료를 뗀 금액이 입금
+      if (settle > base && keys.includes(settle.slice(0, 7)) && r.card > 0) ev.push({ date: settle, type: "card", amount: r.card - feeOf(r.card), label: r.couple, note: `카드 ${won(r.card)} − 수수료 ${won(feeOf(r.card))} (결제 ${md(r.paidDate)})` });
+      const cash = r.cash ?? Math.max(0, r.total - r.card); // 현금: 예식 당일
+      if (r.date > base && keys.includes(r.date.slice(0, 7)) && cash > 0) ev.push({ date: r.date, type: "cash", amount: cash, label: r.couple, note: r.cash === null ? "잔금 예상(총액−카드)" : "현금" });
+    }
+    for (const e of costOutflowEvents(costs, keys, base)) ev.push({ date: e.when, type: e.kind === "once" ? "one" : "mon", amount: e.amount, label: e.name });
+    for (const x of shifts) {
+      // 버틀러: 미지급은 참석일(기준일 이전이면 기준일)에, 기준일 이후에 지급한 건은 실제 지급일에 나간다
+      const when = x.paid ? x.paidDate : x.date < base ? base : x.date;
+      if ((x.paid ? when > base : true) && keys.includes(when.slice(0, 7))) ev.push({ date: when, type: "pay", amount: shiftTotal(x), label: `${data.butlers.find((b) => b.id === x.butlerId)?.name ?? "버틀러"} 정산`, note: x.paid ? "지급 완료" : "미지급" });
+    }
+    return ev.sort((a, b) => a.date.localeCompare(b.date));
+  })();
   const projection = (() => {
     let bal = settings.bankBalance;
-    const keys = Array.from({ length: 6 }, (_, i) => {
-      let [y, m] = bm.split("-").map(Number);
-      m += i;
-      while (m > 12) { m -= 12; y++; }
-      return `${y}-${String(m).padStart(2, "0")}`;
-    });
-    const costOut = costOutflowByMonth(costs, keys, base);
     return keys.map((key) => {
-      const inc = reservations.reduce((a, r) => {
-        const settle = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); // 카드: 결제 후 7영업일에 수수료를 뗀 금액이 입금
-        const cardIn = settle.startsWith(key) && settle > base ? r.card - feeOf(r.card) : 0;
-        const cashIn = r.date.startsWith(key) && r.date > base ? (r.cash ?? Math.max(0, r.total - r.card)) : 0; // 현금: 예식 당일
-        return a + cardIn + cashIn;
-      }, 0);
-      const { mon, one } = costOut[key];
-      // 버틀러: 미지급은 참석월(기준월 이전이면 기준월)에, 기준일 이후에 지급한 건은 실제 지급일의 달에 나간다
-      const py = shifts.filter((x) => (x.paid ? x.paidDate > base && x.paidDate.slice(0, 7) === key : (x.date.slice(0, 7) < bm ? bm : x.date.slice(0, 7)) === key)).reduce((a, x) => a + shiftTotal(x), 0);
-      bal += inc - (mon + one + py);
-      return { m: key, inc, mon, one, pay: py, end: bal };
+      const ms = events.filter((e) => e.date.startsWith(key));
+      const t = (ty: Ev["type"]) => ms.filter((e) => e.type === ty).reduce((a, e) => a + e.amount, 0);
+      const card = t("card"), cashIn = t("cash"), mon = t("mon"), one = t("one"), py = t("pay");
+      bal += card + cashIn - (mon + one + py);
+      return { m: key, card, cash: cashIn, inc: card + cashIn, mon, one, pay: py, end: bal };
     });
+  })();
+  const [bankMonth, setBankMonth] = useState(""); // 날짜별 표에서 고른 달 (비어 있으면 이번 달 또는 기준월)
+  const dayKey = keys.includes(bankMonth) ? bankMonth : keys.includes(data.today.slice(0, 7)) ? data.today.slice(0, 7) : bm;
+  const dayRows = (() => {
+    const mi = keys.indexOf(dayKey);
+    const open = mi > 0 ? projection[mi - 1].end : settings.bankBalance; // 그 달 1일 직전 잔액
+    const byDay = new Map<string, Ev[]>();
+    for (const e of events) if (e.date.startsWith(dayKey)) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e]);
+    let bal = open;
+    const rows = [...byDay.entries()].map(([date, es]) => {
+      const t = (ty: Ev["type"][]) => es.filter((e) => ty.includes(e.type)).reduce((a, e) => a + e.amount, 0);
+      const card = t(["card"]), cash = t(["cash"]), out = t(["mon", "one", "pay"]);
+      bal += card + cash - out;
+      return { date, card, cash, out, bal, es };
+    });
+    return { open, rows };
   })();
   const curProj = projection.find((p) => p.m === month);
   const lowest = projection.reduce((a, p) => (p.end < a.end ? p : a), projection[0]);
@@ -570,12 +597,12 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
           </div>
           <div className="box"><h2>월별 예상 잔액 (6개월)</h2>
             <div className="scroll"><table>
-              <thead><tr><th>월</th><th className="r">입금 예정</th><th className="r">월 비용</th><th className="r">일회성</th><th className="r">버틀러 정산</th><th className="r">월말 예상 잔액</th></tr></thead>
+              <thead><tr><th>월</th><th className="r">카드 입금</th><th className="r">현금 입금</th><th className="r">월 비용</th><th className="r">일회성</th><th className="r">버틀러 정산</th><th className="r">월말 예상 잔액</th></tr></thead>
               <tbody>
                 {projection.map((p) => (
                   <tr key={p.m}>
                     <td className="num">{p.m.replace("-", "년 ")}월</td>
-                    <td className="r num">{won(p.inc)}</td><td className="r num">{won(p.mon)}</td><td className="r num">{won(p.one)}</td><td className="r num">{won(p.pay)}</td>
+                    <td className="r num">{won(p.card)}</td><td className="r num">{won(p.cash)}</td><td className="r num">{won(p.mon)}</td><td className="r num">{won(p.one)}</td><td className="r num">{won(p.pay)}</td>
                     <td className="r num" style={{ minWidth: 150 }}>
                       <b className={p.end < 0 ? "neg" : ""}>{won(p.end)}</b>
                       <div className="meter"><i style={{ width: `${(Math.abs(p.end) / maxAbs) * 100}%`, ...(p.end < 0 ? { background: "var(--bad)" } : {}) }} /></div>
@@ -585,6 +612,34 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               </tbody>
             </table></div>
             <p className="note">입금 예정은 카드결제는 결제일 + {CARD_SETTLE_BUSINESS_DAYS}영업일(주말·공휴일 제외)에 수수료를 뗀 금액이, 현금은 예식일에 들어오는 것으로 계산합니다. 아직 입력하지 않은 잔금은 &quot;총액 − 카드결제&quot;로 예상합니다. 결제일은 예약 접수일입니다. 비용과 버틀러 정산은 지급 완료로 기록한 건은 실제 지급일에, 아직 지급하지 않은 건은 예정일(월 비용의 시작일 일자, 일회성 비용의 날짜, 버틀러는 참석한 달)에 나가는 것으로 봅니다. 기준일 전에 이미 지급한 건은 잔액에 반영된 것으로 보고 뺍니다.</p>
+          </div>
+          <div className="box"><h2>날짜별 입금·출금 예정 <small className="sub">통장 내역과 대조용</small></h2>
+            <div className="inline">
+              <div className="field"><label htmlFor="bankMonth">달 선택</label>
+                <select id="bankMonth" value={dayKey} onChange={(e) => setBankMonth(e.target.value)}>
+                  {keys.map((k) => <option key={k} value={k}>{k.replace("-", "년 ")}월</option>)}
+                </select></div>
+            </div>
+            {dayRows.rows.length === 0 ? <p className="note">이 달에는 기준일({md(base)}) 이후 입금·출금 예정이 없습니다.</p> : (
+              <div className="scroll"><table>
+                <thead><tr><th>날짜</th><th className="r">카드 입금</th><th className="r">현금 입금</th><th className="r">출금</th><th className="r">그날 말 잔액</th><th>내역</th></tr></thead>
+                <tbody>
+                  <tr><td colSpan={4} className="note">{dayKey.replace("-", "년 ")}월 시작 잔액</td><td className="r num"><b>{won(dayRows.open)}</b></td><td /></tr>
+                  {dayRows.rows.map((d) => (
+                    <tr key={d.date}>
+                      <td className="num">{md(d.date)} ({"일월화수목금토"[new Date(`${d.date}T00:00:00Z`).getUTCDay()]})</td>
+                      <td className="r num">{d.card ? won(d.card) : "-"}</td><td className="r num">{d.cash ? won(d.cash) : "-"}</td><td className="r num">{d.out ? won(d.out) : "-"}</td>
+                      <td className="r num"><b className={d.bal < 0 ? "neg" : ""}>{won(d.bal)}</b></td>
+                      <td>{d.es.map((e, i) => (
+                        <div key={i}>{e.type === "card" ? "카드" : e.type === "cash" ? "현금" : e.type === "pay" ? "정산" : "비용"} · {e.label} {e.type === "card" || e.type === "cash" ? "+" : "−"}{won(e.amount)}{e.note ? <small className="sub"> ({e.note})</small> : null}</div>
+                      ))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td>합계</td><td className="r num">{won(dayRows.rows.reduce((a, d) => a + d.card, 0))}</td><td className="r num">{won(dayRows.rows.reduce((a, d) => a + d.cash, 0))}</td><td className="r num">{won(dayRows.rows.reduce((a, d) => a + d.out, 0))}</td><td className="r num">{won(dayRows.rows[dayRows.rows.length - 1].bal)}</td><td /></tr></tfoot>
+              </table></div>
+            )}
+            <p className="note">카드 입금은 결제일 + {CARD_SETTLE_BUSINESS_DAYS}영업일에 들어오는 수수료 차감 금액(여러 건이 같은 날이면 합산)입니다. 실제 통장에 찍힌 날짜·금액과 맞춰 보세요. 입금이 하루 늦거나 금액이 다르면 해당 건의 결제일이나 수수료율을 확인하면 됩니다.</p>
           </div>
         </section>
       )}

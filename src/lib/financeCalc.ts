@@ -68,15 +68,15 @@ export function ownerPool(shifts: readonly { rid: string; grade: string; pay: nu
 export const ownerPay = (name: keyof typeof OWNER_SPLIT): number => splitOwnerPay(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)[name];
 
 /**
- * 통장 잔액 예상용 비용 출금: 비용의 각 지급 건(월 비용은 시작월부터 마지막 달까지 달마다, 일회성은 한 번)이 나가는 날을
- * 정하고(지급 완료면 실제 지급일, 아니면 예정일) 기준일 이후인 건만 그 날이 속한 달(keys 안)에 더한다.
+ * 통장 잔액 예상용 비용 출금(건별): 비용의 각 지급 건(월 비용은 시작월부터 마지막 달까지 달마다, 일회성은 한 번)이 나가는 날을
+ * 정하고(지급 완료면 실제 지급일, 아니면 예정일) 기준일 이후이고 keys 안의 달에 속한 건만 돌려준다.
  */
-export function costOutflowByMonth(
-  costs: readonly { kind: string; amount: number; date: string; payments: Record<string, string> }[],
+export function costOutflowEvents(
+  costs: readonly { kind: string; name?: string; amount: number; date: string; payments: Record<string, string> }[],
   keys: readonly string[],
   base: string,
-): Record<string, { mon: number; one: number }> {
-  const out: Record<string, { mon: number; one: number }> = Object.fromEntries(keys.map((k) => [k, { mon: 0, one: 0 }]));
+): { when: string; amount: number; kind: "once" | "monthly"; name: string }[] {
+  const out: { when: string; amount: number; kind: "once" | "monthly"; name: string }[] = [];
   const last = keys[keys.length - 1];
   for (const x of costs) {
     const months: string[] = [];
@@ -90,9 +90,19 @@ export function costOutflowByMonth(
     }
     for (const mk of months) {
       const when = x.payments[mk] ?? (x.kind === "once" ? x.date : `${mk}-${x.date.slice(8)}`);
-      const bucket = out[when.slice(0, 7)];
-      if (when > base && bucket) bucket[x.kind === "once" ? "one" : "mon"] += x.amount;
+      if (when > base && keys.includes(when.slice(0, 7))) out.push({ when, amount: x.amount, kind: x.kind === "once" ? "once" : "monthly", name: x.name ?? "비용" });
     }
   }
+  return out;
+}
+
+/** 위 건별 출금을 달별 월 비용(mon)·일회성(one)으로 합산한다. */
+export function costOutflowByMonth(
+  costs: readonly { kind: string; name?: string; amount: number; date: string; payments: Record<string, string> }[],
+  keys: readonly string[],
+  base: string,
+): Record<string, { mon: number; one: number }> {
+  const out: Record<string, { mon: number; one: number }> = Object.fromEntries(keys.map((k) => [k, { mon: 0, one: 0 }]));
+  for (const e of costOutflowEvents(costs, keys, base)) out[e.when.slice(0, 7)][e.kind === "once" ? "one" : "mon"] += e.amount;
   return out;
 }
