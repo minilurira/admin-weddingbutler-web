@@ -20,7 +20,8 @@ export function specialLinkVariables(f: SpecialLinkFields): Record<string, strin
     "#{name}": clip(f.name),
     "#{amount}": `${f.amount.toLocaleString("ko-KR")}원`,
     "#{expireAt}": expireLabel(f.expiresAt),
-    "#{url}": f.url,
+    // 템플릿 버튼 링크가 "http://#{url}" 로 등록돼 있어서(카카오 3036 방지) 주소에서 http(s)://를 뺀 값을 보낸다. 문자(LMS) 본문은 전체 주소를 쓴다.
+    "#{url}": f.url.replace(/^https?:\/\//, ""),
   };
 }
 
