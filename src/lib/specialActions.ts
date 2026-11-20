@@ -59,7 +59,7 @@ export async function sendSpecialLink(id: string, phone: string, name: string): 
   if (state !== "open" && state !== "held") return { ok: false, message: "이미 사용했거나 취소·만료된 링크는 보낼 수 없습니다." };
   const fields = { name: name.trim(), amount: o.amount, expiresAt: o.expiresAt, url: specialUrl(o.token) };
   const tag = `special link ${to.slice(-4)}`;
-  if (await sendSpecialLinkAlimtalk(to, specialLinkVariables(fields), tag)) return { ok: true, message: "알림톡을 보냈습니다." };
+  if (await sendSpecialLinkAlimtalk(to, specialLinkVariables(fields), tag, specialLinkText(fields))) return { ok: true, message: "알림톡을 보냈습니다." };
   if (await sendSms(to, specialLinkText(fields), tag)) return { ok: true, message: "알림톡을 보내지 못해 문자로 보냈습니다." };
   return { ok: false, message: "발송하지 못했습니다. 링크를 복사해 직접 보내 주세요." };
 }

@@ -375,7 +375,7 @@ export async function sendButlerStaffAlimtalk(reservationId: string, butlerId: s
 
 /** 스페셜 예약 링크 알림톡(SOLAPI_TEMPLATE_SPECIAL_LINK). 변수와 본문은 src/lib/specialLinkText.ts.
  * 템플릿 ID가 없거나 바로 거절되면 false — 호출부가 문자(LMS)로 대신 보낸다. */
-export async function sendSpecialLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string): Promise<boolean> {
+export async function sendSpecialLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string, fallbackText?: string): Promise<boolean> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
@@ -385,7 +385,7 @@ export async function sendSpecialLinkAlimtalk(phone: string, variables: Record<s
     return false;
   }
   try {
-    const result = await svc.send({ to: digitsOnly(phone), from, kakaoOptions: { pfId, templateId, variables } });
+    const result = await svc.send({ to: digitsOnly(phone), from, ...(fallbackText ? { text: fallbackText } : {}), kakaoOptions: { pfId, templateId, variables, disableSms: !fallbackText } }); // 카카오가 나중에 거절해도(템플릿·버튼 불일치 등) 솔라피가 이 본문을 문자로 대신 보낸다
     logSendResult(tag, result);
     return result.failedMessageList.length === 0;
   } catch (err) {
