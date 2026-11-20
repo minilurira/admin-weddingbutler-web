@@ -7,6 +7,8 @@ import {
   addButler, saveButlerAccount, saveButlerPhone, setShiftsPaid, addCost, addShift, deleteButler, deleteCost, setCostPaid, setCostsPaid, deleteShift, runReconciliation, saveSettings, setCash, setShiftPaid, updateShiftExtra, updateShiftGrade, updateShiftPay,
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
+import { saveTaxInfo } from "@/lib/referralActions";
+import { INCOME_TYPES, withholding, type IncomeType } from "@/lib/taxCalc";
 import { formatPhone } from "@/lib/format";
 import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, costOutflowEvents, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
@@ -15,7 +17,9 @@ export interface FinanceData {
   settings: { feeRate: number; bankDate: string; bankBalance: number };
   reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string; payments: Record<string, string> }[];
-  butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string; phone: string }[];
+  butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string; phone: string; incomeType: IncomeType | ""; residentNoMasked: string }[];
+  /** 주민등록번호 암호화 키가 서버에 있는지 */
+  residentKeyReady: boolean;
   shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
 }
 
@@ -36,6 +40,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const [sDate, setSDate] = useState(data.reservations[0]?.date ?? data.today);
   const [editAcct, setEditAcct] = useState(""); // 계좌 입력 중인 버틀러 id
   const [editPhone, setEditPhone] = useState(""); // 휴대폰 번호 입력 중인 버틀러 id
+  const [editTax, setEditTax] = useState(""); // 주민등록번호 입력 중인 버틀러 id
   const [delButler, setDelButler] = useState(""); // 삭제 확인 중인 버틀러 id
   const [sButler, setSButler] = useState(""); // 기록 입력에서 고른 버틀러 id (비어 있으면 첫 번째)
   const [sGradePick, setSGrade] = useState(""); // 이번 참석 등급 (비어 있으면 그 버틀러의 기본 등급)
@@ -424,10 +429,10 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
       {!allView && tab === "butler" && (
         <section className="panel">
           <div className="box"><h2>버틀러 리스트 <small className="sub">총 수입은 전체 기간 정산 합계</small></h2>
-            <div className="scroll"><table style={{ minWidth: 820 }}>
-              <thead><tr><th>이름</th><th>휴대폰</th><th>입금 계좌</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
+            <div className="scroll"><table style={{ minWidth: 980 }}>
+              <thead><tr><th>이름</th><th>휴대폰</th><th>입금 계좌</th><th>원천징수</th><th className="r">참석</th><th className="r">총 수입</th><th className="r">지급 완료</th><th className="r">미지급</th><th className="r">{Number(mm)}월 정산</th><th /></tr></thead>
               <tbody>
-                {butlers.length === 0 && <tr><td colSpan={9} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
+                {butlers.length === 0 && <tr><td colSpan={10} className="empty">아래에서 버틀러를 먼저 추가해 주세요.</td></tr>}
                 {butlers.map((b) => {
                   const all = shifts.filter((s) => s.butlerId === b.id);
                   const total = all.reduce((a, s) => a + shiftTotal(s), 0);
@@ -467,10 +472,37 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                           </>
                         )}
                       </td>
+                      <td>
+                        <select className="cell" aria-label={`${b.name} 소득 구분`} value={b.incomeType} style={{ width: "auto", padding: "5px 8px" }}
+                          onChange={(e) => run(() => saveTaxInfo("butler", b.id, { incomeType: e.target.value }), "소득 구분을 저장했습니다.")}>
+                          {!b.incomeType && <option value="">소득 구분</option>}
+                          {(Object.keys(INCOME_TYPES) as IncomeType[]).map((t) => <option key={t} value={t}>{INCOME_TYPES[t].label}</option>)}
+                        </select>
+                        <br />
+                        {editTax === b.id ? (
+                          <form style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }} onSubmit={(e) => { const f = form(e); run(async () => { const r = await saveTaxInfo("butler", b.id, { residentNo: String(f.get("rrn")) }); if (!r.ok) throw new Error(r.message); setEditTax(""); }, "주민등록번호를 저장했습니다."); }}>
+                            <input name="rrn" placeholder="000000-0000000" aria-label="주민등록번호" inputMode="numeric" autoComplete="off" style={{ width: 130 }} />
+                            <button className="btn" type="submit" style={{ padding: "5px 10px", fontSize: 12.5 }}>저장</button>
+                            <button type="button" className="del" onClick={() => setEditTax("")}>취소</button>
+                          </form>
+                        ) : (
+                          <>
+                            {b.residentNoMasked ? <span className="num" style={{ fontSize: 12.5 }}>{b.residentNoMasked}</span> : <small className="sub">주민번호 미등록</small>}{" "}
+                            {data.residentKeyReady ? <button type="button" className="del" onClick={() => setEditTax(b.id)}>{b.residentNoMasked ? "수정" : "입력"}</button> : <small className="sub">(암호화 키 필요)</small>}
+                          </>
+                        )}
+                      </td>
                       <td className="r num">{all.length}회</td>
                       <td className="r num"><b>{won(total)}</b></td>
                       <td className="r num">{won(paidSum)}</td>
-                      <td className="r num" style={{ color: all.length === 0 ? "var(--muted)" : total - paidSum ? "var(--accent)" : "var(--good)", fontWeight: 700 }}>{all.length === 0 ? "-" : total - paidSum ? won(total - paidSum) : "정산 완료"}</td>
+                      <td className="r num" style={{ color: all.length === 0 ? "var(--muted)" : total - paidSum ? "var(--accent)" : "var(--good)", fontWeight: 700 }}>
+                        {all.length === 0 ? "-" : total - paidSum ? won(total - paidSum) : "정산 완료"}
+                        {total - paidSum > 0 && b.incomeType && b.incomeType !== "none" && (() => {
+                          // 참석(하루) 1건씩 지급한다고 보고 원천징수 후 금액을 미리 보여 준다
+                          const net = all.filter((x) => !x.paid).reduce((a, x) => a + withholding(b.incomeType as IncomeType, shiftTotal(x)).net, 0);
+                          return <><br /><small className="sub">세후 {won(net)}</small></>;
+                        })()}
+                      </td>
                       <td className="r num">{won(monthSum)}</td>
                       <td className="r">
                         {confirming ? (
@@ -485,7 +517,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                   );
                 })}
               </tbody>
-              <tfoot><tr><td>버틀러 총 수입</td><td /><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
+              <tfoot><tr><td>버틀러 총 수입</td><td /><td /><td /><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
             </table></div>
             <form className="form" key={butlers.length} style={{ marginTop: 14, gridTemplateColumns: "minmax(0,1fr) auto" }}
               onSubmit={(e) => { const f = form(e); run(() => addButler(String(f.get("name"))), "버틀러를 추가했습니다."); }}>
@@ -718,7 +750,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   );
 }
 
-const CSS = `
+export const CSS = `
 .fin { --panel:#F8F6F7; --soft:#F9EFF4; --line:#ECE7E9; --ink:#1E1A1C; --text2:#6E646A; --muted:#8C8188;
   --accent:#B0567E; --accent-dark:#98416A; --rose-tile:#F7EDF2; --beige-tile:#F2F1EE; --beige-ink:#4E4A43; --blue-tile:#EDF0F4; --blue-ink:#3E4C5C;
   --good:#2B6A45; --good-bg:#E3F1E8; --warn:#8A5A00; --warn-bg:#FBEFD9; --bad:#A8416C; --card:#B0567E; --cash:#D9A441;

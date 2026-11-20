@@ -274,3 +274,68 @@ model CalendarBlock {
   reason    String   @default("")
   createdAt DateTime @default(now())
 }
+
+// 영업대행(추천) 코드 주인. 1인(휴대폰 번호) 1코드. src/lib/referral.ts가 처음 쓸 때 표를 만든다.
+model ReferralPartner {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  name             String
+  // 숫자만 (01012345678)
+  phone            String    @unique
+  ratePercent      Float     @default(5)
+  bankName         String    @default("")
+  accountNumber    String    @default("")
+  accountHolder    String    @default("")
+  // 관리자가 예금주=본인임을 확인한 시각. 없으면 [정산] 불가
+  accountCheckedAt DateTime?
+  // "self"(홈페이지 예약 조회, 이전 결제 고객) | "admin"
+  issuedBy         String    @default("admin")
+  // "active" | "blocked"
+  status           String    @default("active")
+  memo             String    @default("")
+  agreedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// 예약 1건당 수수료 1건. 지급은 관리자가 [정산]을 눌러 ReferralPayout을 만들 때만 일어난다.
+model ReferralCommission {
+  id            String    @id @default(cuid())
+  reservationId String    @unique
+  partnerId     String
+  code          String
+  // 최종 서비스 총액(온라인 + 현장 현금, 할인 반영) − 환불액
+  baseAmount    Int       @default(0)
+  ratePercent   Float     @default(5)
+  amount        Int       @default(0)
+  // "pending"(예식 전) | "ready"(정산 가능) | "paid"(정산 완료) | "void"(취소·본인 예약 등)
+  status        String    @default("pending")
+  voidReason    String    @default("")
+  payoutId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([partnerId, status])
+}
+
+// [정산] 버튼 1번 = 1행. 사람별·예식 달별 묶음.
+model ReferralPayout {
+  id          String    @id @default(cuid())
+  partnerId   String
+  // 예식이 있었던 달 "YYYY-MM"
+  period      String
+  grossAmount Int
+  incomeType  String
+  incomeTax   Int       @default(0)
+  localTax    Int       @default(0)
+  netAmount   Int
+  bankSnapshot String   @default("")
+  paidAt      DateTime
+  paidBy      String
+  memo        String    @default("")
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([partnerId])
+  @@index([period])
+}

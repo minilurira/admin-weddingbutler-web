@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, getFinanceSettings } from "@/lib/finance";
 import { reservationTotal } from "@/lib/view";
+import { getTaxProfiles, residentNoReady } from "@/lib/tax";
 import type { FinanceData } from "@/components/FinanceView";
 
 const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -24,6 +25,8 @@ export async function loadFinanceData(): Promise<FinanceData> {
     getFinanceSettings(),
   ]);
   const cashMap = new Map(cash.map((c) => [c.reservationId, c.amount]));
+  // 원천징수 정보는 보조 정보라 표를 못 읽어도 화면은 그대로 연다
+  const taxes = await getTaxProfiles("butler", butlers.map((b) => b.id)).catch(() => new Map());
   return {
     today: kstToday(),
     settings,
@@ -38,7 +41,8 @@ export async function loadFinanceData(): Promise<FinanceData> {
       cash: cashMap.get(r.id) ?? null,
     })),
     costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo, payments: parsePayments(c.payments) })),
-    butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, bankName: b.bankName, accountNumber: b.accountNumber, accountHolder: b.accountHolder, phone: b.phone })),
+    butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, bankName: b.bankName, accountNumber: b.accountNumber, accountHolder: b.accountHolder, phone: b.phone, incomeType: taxes.get(b.id)?.incomeType ?? "", residentNoMasked: taxes.get(b.id)?.residentNoMasked ?? "" })),
+    residentKeyReady: residentNoReady(),
     shifts: shifts.map((s) => ({ id: s.id, butlerId: s.butlerId, date: s.date, rid: s.reservationId, grade: s.grade, pay: s.pay, extra: s.extra, paid: s.paid, paidDate: s.paidDate })),
   };
 }

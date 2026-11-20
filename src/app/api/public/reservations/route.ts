@@ -8,6 +8,7 @@ import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 
 import { logError } from "@/lib/errorLog";
 import { saveReservationSource } from "@/lib/reservationSource";
+import { attachReferral } from "@/lib/referral";
 export const dynamic = "force-dynamic";
 
 interface IncomingBody {
@@ -24,6 +25,7 @@ interface IncomingBody {
   memo?: string;
   customerMemo?: string; // 고객이 직접 남긴 메모(선택)
   source?: string; // 고객이 고른 유입 경로(선택)
+  referralCode?: string; // 영업대행 추천 코드(선택)
   paidAmount?: number;
   paymentType?: string; // "deposit" | "full"
   extraButlers?: number;
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
     return badRequest("invalid JSON body");
   }
 
-  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, source, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
+  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, source, referralCode, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
 
   if (!customer?.trim()) return badRequest("customer is required");
   if (!couple?.trim()) return badRequest("couple is required");
@@ -147,6 +149,16 @@ export async function POST(req: NextRequest) {
 
   if (typeof source === "string") await saveReservationSource(created.id, source).catch((e) => logError("[api/public/reservations] save source failed", e));
 
+  // 추천 코드: 본인 예약·정지된 코드는 붙지 않는다. 실패해도 예약 접수는 그대로 진행한다.
+  let referralLine = "";
+  if (typeof referralCode === "string" && referralCode.trim()) {
+    const ref = await attachReferral(created.id, referralCode).catch((e) => {
+      logError("[api/public/reservations] attach referral failed", e);
+      return null;
+    });
+    referralLine = ref?.ok ? `추천: ${ref.partner.name} (${ref.partner.code})` : `추천 코드 ${referralCode.trim().slice(0, 20)} 미적용${ref ? ` · ${ref.message}` : ""}`;
+  }
+
   // waitUntil keeps the serverless function alive for these until they settle,
   // since the platform can freeze execution right after the response below is
   // sent — a bare fire-and-forget call here can get cut off mid-flight.
@@ -177,6 +189,7 @@ export async function POST(req: NextRequest) {
         `결제: ${resolvedPaymentType ? PAYMENT_TYPES[resolvedPaymentType].name : "유형 미지정"} · 결제 ${won(created.paidAmount)} · 현장(현금) ${won(onsite)}`,
         ...(created.customerMemo ? [`메모: ${created.customerMemo}`] : []),
         ...(typeof source === "string" && source.trim() ? [`유입 경로: ${source.trim().slice(0, 60)}`] : []),
+        ...(referralLine ? [referralLine] : []),
       ].join("\n")
     )
   );
