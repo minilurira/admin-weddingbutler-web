@@ -87,6 +87,16 @@ const navItems = [
     ),
   },
   {
+    href: "/referrals",
+    label: "영업대행",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <path d="M3 9.4 9.4 3H16a1 1 0 0 1 1 1v6.6L10.6 17a1.4 1.4 0 0 1-2 0L3 11.4a1.4 1.4 0 0 1 0-2Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <circle cx="13.2" cy="6.8" r="1.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
     href: "/admins",
     label: "관리자 관리",
     icon: (

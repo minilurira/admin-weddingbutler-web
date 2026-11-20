@@ -5,6 +5,7 @@ import type { CashReceiptRow } from "@/lib/cashReceipt";
 import ManualAlimtalk from "./ManualAlimtalk";
 import ButlerAssign from "./ButlerAssign";
 import ExtraGuestClaim from "./ExtraGuestClaim";
+import ReferralCard, { type DetailReferral } from "./ReferralCard";
 import MessageHistory from "./MessageHistory";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
@@ -56,6 +57,8 @@ export interface DetailReservation {
   customerMemo: string;
   /** 고객이 예약 때 고른 유입 경로. 없으면 "" */
   source: string;
+  /** 영업대행 추천 코드와 수수료. 없으면 null */
+  referral: DetailReferral | null;
   status: string;
   /** 예식 일시(KST)가 지난 예약. 취소된 예약은 false. 변경·취소 버튼이 잠긴다 */
   weddingPast: boolean;
@@ -590,6 +593,7 @@ export default function ReservationDetail({
         )}
 
         <CashReceiptCard reservationId={reservation.id} customer={reservation.customer} phone={reservation.phone} balance={onsiteAmount(money.total, reservation.paidAmount)} receipts={reservation.cashReceipts} cancelled={isCancelled} card={card} />
+        <ReferralCard reservationId={reservation.id} referral={reservation.referral} card={card} />
 
         {/* 3. 협의 내용 */}
         <section style={card}>

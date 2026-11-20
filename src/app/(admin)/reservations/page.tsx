@@ -7,11 +7,12 @@ import { formatStamp, isWeddingPast } from "@/lib/format";
 import ReservationListControls from "@/components/ReservationListControls";
 import { getReservationSource } from "@/lib/reservationSource";
 import { listCashReceipts } from "@/lib/cashReceipt";
+import { reservationReferral } from "@/lib/referral";
 import ReservationDetail, { type DetailReservation } from "@/components/ReservationDetail";
 
 export const dynamic = "force-dynamic";
 
-function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>, cashReceipts: DetailReservation["cashReceipts"], source: string): DetailReservation {
+function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>, cashReceipts: DetailReservation["cashReceipts"], source: string, referral: DetailReservation["referral"]): DetailReservation {
   return {
     id: r.id,
     customer: r.customer,
@@ -25,6 +26,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     memo: r.memo,
     customerMemo: r.customerMemo,
     source,
+    referral,
     status: r.status,
     weddingPast: r.status !== "취소" && isWeddingPast(r.confirmDate, r.confirmTime),
     requestedPlan: r.requestedPlan,
@@ -217,7 +219,7 @@ export default async function ReservationsPage({
       {selected && (
         <ReservationDetail
           key={selected.id}
-          reservation={buildDetail(selected, await listCashReceipts(selected.id), await getReservationSource(selected.id))}
+          reservation={buildDetail(selected, await listCashReceipts(selected.id), await getReservationSource(selected.id), await reservationReferral(selected.id))}
           backHref={`/reservations?${listParams.toString()}`}
           className={explicitlyOpened ? undefined : "wb-detail-pane-closed"}
         />
