@@ -63,7 +63,7 @@ export async function createOffer(input: { amount: number; label: string; days: 
   const days = Math.min(SPECIAL_MAX_DAYS, Math.max(1, Math.floor(input.days) || 7));
   const expiresAt = new Date(Date.now() + days * 86_400_000);
   const offer = await prisma.specialOffer.create({
-    data: { token: randomBytes(16).toString("base64url"), amount, label: input.label.trim().slice(0, 60), expiresAt },
+    data: { token: randomBytes(16).toString("hex") /* 영문·숫자만: 카톡 본문 자동 링크가 -·_ 에서 끊겨 링크가 잘리는 것을 막는다 */, amount, label: input.label.trim().slice(0, 60), expiresAt },
   });
   return { ...offer, url: specialUrl(offer.token) };
 }
