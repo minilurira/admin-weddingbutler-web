@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
       paidAmount: r.paidAmount,
       confirmAmount: price.total,
       balanceAmount: Math.max(0, price.total - r.paidAmount),
+      butlers: r.confirmButlers,
     });
     // 실패한 건은 메모를 남기지 않아 다음 호출 때 다시 시도된다.
     if (result.sent) await prisma.note.create({ data: { reservationId: r.id, text: `${prefix} 발송` } });
