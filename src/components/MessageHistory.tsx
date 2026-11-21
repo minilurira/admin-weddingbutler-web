@@ -7,6 +7,7 @@ import { formatStamp } from "@/lib/format";
 
 const STATUS: Record<string, { text: string; bg: string; color: string }> = {
   sent: { text: "발송 요청 완료", bg: "#E3F1E8", color: "#2B6A45" },
+  delivered: { text: "수신 완료", bg: "#E3F1E8", color: "#2B6A45" },
   failed: { text: "발송 실패", bg: "#F7E4E4", color: "#A8416C" },
   skipped: { text: "미발송", bg: "#EEECED", color: "#8A8487" },
 };
@@ -41,7 +42,7 @@ export default function MessageHistory({ reservationId, card, legacyLabel }: { r
       )}
 
       {rows?.map((m) => {
-        const st = STATUS[m.status] ?? STATUS.sent;
+        const st = (m.status === "sent" && m.variables._result === "delivered" ? STATUS.delivered : STATUS[m.status]) ?? STATUS.sent;
         const isOpen = open === m.id;
         return (
           <div key={m.id} style={{ borderTop: "1px solid #F4F1F3", padding: "11px 0" }}>
