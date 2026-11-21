@@ -11,10 +11,12 @@ import { logError } from "@/lib/errorLog";
 
 /** 이만큼 지난 기록은 더 확인하지 않는다 (솔라피 결과는 보통 몇 분 안에 나온다) */
 const CHECK_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+/** 그룹 ID를 남기기 전(2026-11-21 이전)에 보낸 기록은 지난 30일치까지 번호·시각으로 찾아 확인한다 */
+const LEGACY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const BACKGROUND_INTERVAL_MS = 10 * 60 * 1000;
 let lastBackground = 0;
 
-type Stored = { messageId?: string; type?: string | null; to?: string | readonly string[]; status?: string | null; statusCode?: string | null; reason?: string | null; replacement?: boolean };
+type Stored = { messageId?: string; groupId?: string; dateCreated?: string; type?: string | null; to?: string | readonly string[]; status?: string | null; statusCode?: string | null; reason?: string | null; replacement?: boolean };
 
 function client(): SolapiMessageService | null {
   const key = process.env.SOLAPI_API_KEY;
@@ -85,6 +87,54 @@ export async function refreshMessageResults(reservationId?: string): Promise<voi
     }
   } catch (err) {
     logError("[messageResult] could not refresh Solapi results", err);
+  }
+  try {
+    await refreshLegacyResults(svc, reservationId);
+  } catch (err) {
+    logError("[messageResult] could not refresh legacy Solapi results", err);
+  }
+}
+
+/** 그룹 ID 없이 저장된 과거 고객 알림톡: 받는 번호와 보낸 시각(앞 2분~뒤 10분)으로 솔라피에서 그 알림톡을 찾아 결과를 반영한다.
+ * 지난 일이라 카카오워크 알림은 보내지 않는다. 직원·버틀러 기록은 번호가 가려져 있어 찾을 수 없으므로 건너뛴다.
+ * 솔라피에서 못 찾으면 "_result":"notfound"를 남겨 다시 찾지 않는다. */
+async function refreshLegacyResults(svc: SolapiMessageService, reservationId?: string): Promise<void> {
+  const rows = await prisma.messageLog.findMany({
+    where: {
+      ...(reservationId ? { reservationId } : {}),
+      channel: "알림톡",
+      status: "sent",
+      NOT: [{ variables: { contains: '"_solapiGroupId"' } }, { variables: { contains: '"_result"' } }, { recipient: { contains: "*" } }],
+      createdAt: { gte: new Date(Date.now() - LEGACY_WINDOW_MS) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+  for (const row of rows) {
+    const to = digits(row.recipient);
+    if (to.length < 10) continue;
+    let vars: Record<string, string> = {};
+    try { vars = JSON.parse(row.variables) as Record<string, string>; } catch { continue; }
+    const at = row.createdAt.getTime();
+    const res = await svc.getMessages({ to, startDate: new Date(at - 2 * 60_000), endDate: new Date(at + 10 * 60_000), limit: 20 });
+    const list = Object.values(res.messageList) as Stored[];
+    const ata = list
+      .filter((m) => m.type === "ATA")
+      .sort((a, b) => Math.abs(Date.parse(a.dateCreated ?? "") - at) - Math.abs(Date.parse(b.dateCreated ?? "") - at))[0];
+    if (!ata) {
+      await prisma.messageLog.update({ where: { id: row.id }, data: { variables: JSON.stringify({ ...vars, _result: "notfound" }) } });
+      continue;
+    }
+    // 같은 그룹 안의 문자 대체 발송까지 같이 보려고 그 그룹 메시지로 판정한다
+    const group = ata.groupId ? (Object.values((await svc.getMessages({ groupId: ata.groupId })).messageList) as Stored[]) : [ata];
+    const verdict = judge(group.some((m) => m.messageId === ata.messageId) ? group : [ata, ...group], row.recipient);
+    if (verdict.kind === "pending") continue;
+    await prisma.messageLog.update({
+      where: { id: row.id },
+      data: verdict.kind === "delivered"
+        ? { variables: JSON.stringify({ ...vars, _solapiGroupId: ata.groupId ?? "", _result: "delivered" }) }
+        : { status: "failed", detail: verdict.detail.slice(0, 300), variables: JSON.stringify({ ...vars, _solapiGroupId: ata.groupId ?? "", _result: "failed" }) },
+    });
   }
 }
 
