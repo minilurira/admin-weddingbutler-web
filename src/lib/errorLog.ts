@@ -37,6 +37,32 @@ function allowed(key: string): boolean {
   return true;
 }
 
+/** 알림이 필요 없는 소음: 메시지 화면의 템플릿 조회·결과 새로고침 실패 (고객 영향 없음) */
+const NO_ALERT_SCOPES = new Set(["messageView", "messageResult"]);
+const ALERT_COOLDOWN_MS = 30 * 60_000;
+
+/** 같은 오류는 30분에 한 번만 카카오워크 알림방에 알린다. 서버리스는 인스턴스가 바뀌므로 저장된 오류 기록(error_logs)에서 센다. */
+async function notifyKakaoWork(base: string, key: string, source: string, scope: string, msg: string): Promise<void> {
+  const appKey = process.env.KAKAOWORK_APP_KEY;
+  const conversationId = process.env.KAKAOWORK_ERROR_CONVERSATION_ID || process.env.KAKAOWORK_ASSIGN_CONVERSATION_ID || "1041686349241855";
+  if (!appKey || NO_ALERT_SCOPES.has(scope)) return;
+  try {
+    const since = new Date(Date.now() - ALERT_COOLDOWN_MS).toISOString();
+    const q = `source=eq.${encodeURIComponent(source)}&scope=eq.${encodeURIComponent(scope.slice(0, 80))}&message=eq.${encodeURIComponent(msg)}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=2`;
+    const res = await fetch(`${base}/rest/v1/error_logs?${q}`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: "no-store", signal: AbortSignal.timeout(2500) });
+    if (!res.ok || ((await res.json()) as unknown[]).length > 1) return; // 방금 저장한 1건뿐일 때만 알린다
+    const where = source === "home" ? "홈페이지" : source === "browser" ? "고객 화면" : "어드민";
+    await fetch("https://api.kakaowork.com/v1/messages.send", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${appKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: conversationId, text: `⚠️ [웨딩버틀러 오류] ${where}${scope ? ` · ${scope}` : ""}\n${msg.slice(0, 300)}\n자세한 내용: https://admin.weddingbutler.co.kr/errors` }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch {
+    // 알림 실패가 서비스에 영향을 주지 않게 한다
+  }
+}
+
 export async function saveErrorLog(source: string, scope: string, message: string, detail = ""): Promise<void> {
   const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -44,13 +70,14 @@ export async function saveErrorLog(source: string, scope: string, message: strin
   const msg = redact(message).slice(0, 500);
   if (!allowed(`${source}|${scope}|${msg}`)) return;
   try {
-    await fetch(`${url}/rest/v1/error_logs`, {
+    const saved = await fetch(`${url}/rest/v1/error_logs`, {
       method: "POST",
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ source, scope: scope.slice(0, 80), message: msg, detail: redact(detail).slice(0, 2000) }),
       cache: "no-store",
       signal: AbortSignal.timeout(2500),
     });
+    if (saved.ok) await notifyKakaoWork(url, key, source, scope, msg);
   } catch {
     // 기록 실패가 서비스에 영향을 주지 않게 한다
   }
