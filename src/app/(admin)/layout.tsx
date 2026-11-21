@@ -7,6 +7,7 @@ import { won } from "@/lib/pricing";
 import { monthPaidConfirmed } from "@/lib/monthStats";
 import AdminShell from "@/components/AdminShell";
 import { autoBackfillConfirmedEvents } from "@/lib/googleCalendar";
+import { autoRefreshMessageResults } from "@/lib/messageResult";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // 예식 전인데 구글 캘린더에 없는 확정 예약을 화면을 막지 않고 뒤에서 채운다 (10분에 한 번)
   waitUntil(autoBackfillConfirmedEvents());
+  // 알림톡 카카오 최종 결과(수신 완료/실패)를 솔라피에서 확인해 발송 내역에 반영한다 (10분에 한 번)
+  waitUntil(autoRefreshMessageResults());
 
   const [totalCount, month] = await Promise.all([prisma.reservation.count(), monthPaidConfirmed()]);
 
