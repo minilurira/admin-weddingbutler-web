@@ -9,7 +9,7 @@ import MessageHistory from "./MessageHistory";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { calcConfirm, eventDiscount, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentLinkDefaultAmount, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type PaymentType } from "@/lib/pricing";
+import { calcConfirm, ENVELOPE_MODE_NAME, envelopeModeName, eventDiscount, EXTRA_BUTLER_FEE, onsiteAmount, PAYMENT_TYPES, paymentLinkDefaultAmount, paymentTypeName, planMeta, requestedTotal, resolvePaymentType, won, type EnvelopeMode, type PaymentType } from "@/lib/pricing";
 import { BADGE } from "@/lib/badge";
 import { formatWishDateLabel, toNum } from "@/lib/format";
 import { refundQuote } from "@/lib/refundPolicy";
@@ -64,6 +64,8 @@ export interface DetailReservation {
   paymentType: string;
   requestedTotal: number;
   requestedExtraButlers: number;
+  /** 홈페이지 예약 때 고른 예식장 지역. 없으면 "" */
+  travelRegion: string;
   alimtalkLabel: string;
   cancel: { reason: string; atLabel: string; refundAmount: number } | null;
   recordStatus: "none" | "draft" | "live" | "published" | "revoked";
@@ -80,6 +82,10 @@ export interface DetailReservation {
     butlers: number;
     extraGuests: number;
     discount: number;
+    /** 출장비 */
+    travelFee: number;
+    /** "sealed" | "opened" | "" */
+    envelopeMode: string;
     hours: string;
     note: string;
   };
@@ -124,6 +130,8 @@ export default function ReservationDetail({
     butlers: String(reservation.confirm.butlers),
     extraGuests: String(reservation.confirm.extraGuests),
     discount: String(reservation.confirm.discount),
+    travelFee: String(reservation.confirm.travelFee),
+    envelopeMode: reservation.confirm.envelopeMode,
     hours: reservation.confirm.hours,
     note: reservation.confirm.note,
     paidAmount: String(reservation.paidAmount),
@@ -131,7 +139,7 @@ export default function ReservationDetail({
       resolvePaymentType(
         reservation.paymentType,
         reservation.paidAmount,
-        calcConfirm({ plan: reservation.confirm.plan, butlers: reservation.confirm.butlers, extraGuests: reservation.confirm.extraGuests, discount: reservation.confirm.discount, baseOverride: reservation.requestedTotal }).total
+        calcConfirm({ plan: reservation.confirm.plan, butlers: reservation.confirm.butlers, extraGuests: reservation.confirm.extraGuests, discount: reservation.confirm.discount, baseOverride: reservation.requestedTotal, travelFee: reservation.confirm.travelFee }).total
       ) ?? "",
   });
 
@@ -147,17 +155,20 @@ export default function ReservationDetail({
       note: fields.note,
       paidAmount: toNum(fields.paidAmount),
       paymentType: fields.paymentType,
+      travelFee: toNum(fields.travelFee),
+      envelopeMode: fields.envelopeMode,
     }),
     [fields]
   );
 
-  const money = useMemo(() => calcConfirm({ plan: reservation.confirm.plan, butlers: parsedFields.butlers, extraGuests: parsedFields.extraGuests, discount: parsedFields.discount, baseOverride: reservation.requestedTotal }), [reservation.confirm.plan, reservation.requestedTotal, parsedFields]);
+  const money = useMemo(() => calcConfirm({ plan: reservation.confirm.plan, butlers: parsedFields.butlers, extraGuests: parsedFields.extraGuests, discount: parsedFields.discount, baseOverride: reservation.requestedTotal, travelFee: parsedFields.travelFee }), [reservation.confirm.plan, reservation.requestedTotal, parsedFields]);
   const req = useMemo(() => {
     const est = requestedTotal(reservation.requestedPlan, reservation.guestsLabel);
     // 홈페이지 예약은 홈페이지가 보낸 금액을 그대로 보여준다(초과 식권은 당일 정산이라 총액에 없음).
     if (reservation.requestedTotal > 0) {
       const butlerFee = reservation.requestedExtraButlers * EXTRA_BUTLER_FEE;
-      return { ...est, fromHomepage: true, base: reservation.requestedTotal - butlerFee, butlerFee, total: reservation.requestedTotal };
+      // 출장비는 처음 들어온 값을 따로 남기지 않아 지금 값을 쓴다(홈페이지 예약 이후 바꾼 경우만 다를 수 있다)
+      return { ...est, fromHomepage: true, base: reservation.requestedTotal - butlerFee - reservation.confirm.travelFee, butlerFee, total: reservation.requestedTotal };
     }
     return { ...est, fromHomepage: false, base: est.meta.base, butlerFee: 0 };
   }, [reservation.requestedPlan, reservation.guestsLabel, reservation.requestedTotal, reservation.requestedExtraButlers]);
@@ -195,7 +206,7 @@ export default function ReservationDetail({
     const fromHomepage = reservation.requestedTotal > 0;
     const extraGuests = fromHomepage ? 0 : requestedTotal(reservation.requestedPlan, reservation.guestsLabel).extraGuests;
     const discount = fromHomepage
-      ? Math.max(0, calcConfirm({ plan: reservation.confirm.plan, butlers, extraGuests: 0, discount: 0, baseOverride: reservation.requestedTotal }).total - reservation.requestedTotal)
+      ? Math.max(0, calcConfirm({ plan: reservation.confirm.plan, butlers, extraGuests: 0, discount: 0, baseOverride: reservation.requestedTotal, travelFee: toNum((draft ?? fields).travelFee) }).total - reservation.requestedTotal)
       : 0;
     return {
       ...(draft ?? fields),
@@ -217,6 +228,7 @@ export default function ReservationDetail({
       date: next.date, time: next.time, venue: next.venue,
       butlers: toNum(next.butlers), extraGuests: toNum(next.extraGuests), discount: toNum(next.discount),
       hours: next.hours, note: next.note, paidAmount: toNum(next.paidAmount), paymentType: next.paymentType,
+      travelFee: toNum(next.travelFee), envelopeMode: next.envelopeMode,
     };
     startTransition(async () => {
       await saveConfirmFields(reservation.id, parsed);
@@ -286,7 +298,7 @@ export default function ReservationDetail({
   }
 
   function openLink() {
-    setLinkAmount(String(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType, fields.date)));
+    setLinkAmount(String(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType, fields.date, parsedFields.travelFee)));
     setLinkDays("3");
     setLinkRate("");
     setLinkOpen(true);
@@ -296,7 +308,7 @@ export default function ReservationDetail({
   function onLinkRate(v: string) {
     const rate = Math.min(100, Number(v.replace(/[^0-9]/g, "")) || 0);
     setLinkRate(rate ? String(rate) : "");
-    setLinkAmount(String(Math.round(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType) * (100 - rate) / 100)));
+    setLinkAmount(String(Math.round(paymentLinkDefaultAmount(reservation.confirm.plan, fields.paymentType, fields.date, parsedFields.travelFee) * (100 - rate) / 100)));
   }
 
   function onSendLink() {
@@ -459,7 +471,8 @@ export default function ReservationDetail({
 
             <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", gap: "13px 16px", fontSize: 13.5 }}>
               <span style={dt}>예식 일시</span><span style={{ fontWeight: 600 }}>{dateLabel}</span>
-              <span style={dt}>예식장</span><span>{fields.venue || reservation.venueLabel || "-"}</span>
+              <span style={dt}>예식장</span><span>{reservation.travelRegion ? `${reservation.travelRegion} · ` : ""}{fields.venue || reservation.venueLabel || "-"}</span>
+              <span style={dt}>봉투 처리</span><span style={{ fontWeight: fields.envelopeMode ? 600 : 400, color: fields.envelopeMode ? undefined : "#A79BA1" }}>{envelopeModeName(fields.envelopeMode)}</span>
               <span style={dt}>배정 버틀러</span><span>{parsedFields.butlers}명</span>
               <span style={dt}>예상 하객</span><span>{reservation.guestsLabel || "-"}</span>
               <span style={dt}>예약자</span><span>{reservation.couple}{reservation.side ? ` (${reservation.side})` : ""} · {reservation.phone}</span>
@@ -476,6 +489,7 @@ export default function ReservationDetail({
             <div style={row}><span>기본 요금</span><span style={amt}>{won(money.meta.base)}</span></div>
             <div style={row}><span>추가 하객 {parsedFields.extraGuests}명</span><span style={amt}>{money.guestFee ? won(money.guestFee) : "-"}</span></div>
             <div style={row}><span>버틀러 추가 {money.extraButlers}명</span><span style={amt}>{money.butlerFee ? won(money.butlerFee) : "-"}</span></div>
+            <div style={row}><span>출장비{reservation.travelRegion ? ` (${reservation.travelRegion})` : ""}</span><span style={amt}>{money.travelFee ? won(money.travelFee) : "-"}</span></div>
             {money.discount > 0 && (
               <div style={row}>
                 <span>
@@ -505,7 +519,7 @@ export default function ReservationDetail({
             <div style={{ display: "grid", gridTemplateColumns: "96px minmax(0,1fr)", alignItems: "baseline", rowGap: 10, columnGap: 16, marginTop: 14, paddingTop: 14, borderTop: "1px solid #ECE7E9" }}>
               <span style={dt}>플랜</span><span>{req.meta.key}</span>
               <span style={dt}>예식 일시</span><span>{reservation.wishDateLabel || "-"}</span>
-              <span style={dt}>예식장</span><span>{reservation.venueLabel || "-"}</span>
+              <span style={dt}>예식장</span><span>{reservation.travelRegion ? `${reservation.travelRegion} · ` : ""}{reservation.venueLabel || "-"}</span>
               <span style={dt}>버틀러</span><span>{req.meta.butlers + reservation.requestedExtraButlers}명{reservation.requestedExtraButlers ? ` (추가 ${reservation.requestedExtraButlers}명)` : ""}</span>
               <span style={dt}>신청 금액</span><span>{won(req.total)}{req.fromHomepage && req.extraGuests ? " · 초과 하객은 당일 정산" : ""}</span>
               <span style={dt}>결제</span><span>{paymentTypeName(reservation.paymentType, reservation.paidAmount, req.total)} · {won(reservation.paidAmount)}</span>
@@ -674,6 +688,13 @@ export default function ReservationDetail({
               <label style={labelStyle}>배정 버틀러 (명)<input {...draftField("butlers")} inputMode="numeric" style={editInput} /></label>
               <label style={labelStyle}>추가 하객 (명)<input {...draftField("extraGuests")} inputMode="numeric" style={editInput} /></label>
               <label style={labelStyle}>할인 금액 (원)<input {...draftField("discount")} inputMode="numeric" placeholder="0" style={editInput} /></label>
+              <label style={labelStyle}>출장비 (원)<input {...draftField("travelFee")} inputMode="numeric" placeholder="0" style={editInput} /></label>
+              <label style={labelStyle}>봉투 처리
+                <select {...draftField("envelopeMode")} style={editInput}>
+                  <option value="">미지정</option>
+                  {(Object.keys(ENVELOPE_MODE_NAME) as EnvelopeMode[]).map((m) => <option key={m} value={m}>{ENVELOPE_MODE_NAME[m]}</option>)}
+                </select>
+              </label>
               <label style={labelStyle}>결제 방식
                 <select {...draftField("paymentType")} style={editInput}>
                   <option value="">미지정</option>

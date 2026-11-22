@@ -138,7 +138,7 @@ function eventTimes(date: string, time: string) {
 }
 
 function eventBody(r: Reservation) {
-  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
+  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal, travelFee: r.confirmTravelFee });
   const description = [
     `예약번호: ${r.id}`,
     `예식 시각: ${r.confirmTime || "미정"}`,

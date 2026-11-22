@@ -32,6 +32,7 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
     paymentType: r.paymentType,
     requestedTotal: r.requestedTotal,
     requestedExtraButlers: r.requestedExtraButlers,
+    travelRegion: r.travelRegion,
     alimtalkLabel: r.alimtalkAt ? formatStamp(r.alimtalkAt) : "이력 없음",
     cancel: r.status === "취소"
       ? { reason: r.cancelReason, atLabel: r.cancelledAt ? formatStamp(r.cancelledAt) : "", refundAmount: r.refundAmount }
@@ -60,6 +61,8 @@ function buildDetail(r: NonNullable<Awaited<ReturnType<typeof loadReservation>>>
       butlers: r.confirmButlers,
       extraGuests: r.confirmExtraGuests,
       discount: r.confirmDiscount,
+      travelFee: r.confirmTravelFee,
+      envelopeMode: r.envelopeMode,
       hours: r.confirmHours,
       note: r.confirmNote,
     },

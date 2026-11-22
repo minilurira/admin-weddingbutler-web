@@ -53,7 +53,8 @@ export default async function RecordPage({ params }: { params: { id: string } })
         }
       : null,
     initial: {
-      recordMode: link?.recordMode === "sealed" ? ("sealed" as const) : ("opened" as const),
+      // 기록을 처음 만들 때는 고객이 예약 때 고른 봉투 처리 방식(밀봉/개봉 집계)을 기본으로 쓴다
+      recordMode: (link ? link.recordMode : r.envelopeMode) === "sealed" ? ("sealed" as const) : ("opened" as const),
       handoverAt: toKstInput(link?.handoverAt ?? null),
       handoverEnvelopeCount: link?.handoverEnvelopeCount ?? 0,
       receiverLabel: link?.receiverLabel ?? "",

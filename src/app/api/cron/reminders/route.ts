@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const lines: string[] = [];
   for (const r of reservations) {
     if (r.notes.length > 0) continue;
-    const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
+    const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal, travelFee: r.confirmTravelFee });
     const result = await sendReminderAlimtalk(kind, {
       reservationId: r.id,
       customer: r.customer,

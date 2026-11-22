@@ -109,6 +109,8 @@ export interface ConfirmInput {
   discount: number;
   /** 스페셜 요금제의 기본 금액(= 예약의 requestedTotal). 다른 요금제에서는 무시한다. */
   baseOverride?: number;
+  /** 출장비 (예약의 confirmTravelFee) */
+  travelFee?: number;
 }
 
 export interface PriceBreakdown {
@@ -117,6 +119,7 @@ export interface PriceBreakdown {
   extraButlers: number;
   guestFee: number;
   butlerFee: number;
+  travelFee: number;
   discount: number;
   total: number;
 }
@@ -127,9 +130,10 @@ export function calcConfirm(input: ConfirmInput): PriceBreakdown {
   const extraButlers = Math.max(0, input.butlers - meta.butlers);
   const guestFee = input.extraGuests * EXTRA_GUEST_FEE;
   const butlerFee = extraButlers * EXTRA_BUTLER_FEE;
+  const travelFee = Math.max(0, Math.floor(input.travelFee ?? 0));
   const discount = input.discount;
-  const total = Math.max(0, meta.base + guestFee + butlerFee - discount);
-  return { meta, butlers: input.butlers, extraButlers, guestFee, butlerFee, discount, total };
+  const total = Math.max(0, meta.base + guestFee + butlerFee + travelFee - discount);
+  return { meta, butlers: input.butlers, extraButlers, guestFee, butlerFee, travelFee, discount, total };
 }
 
 export function requestedTotal(planKey: string, guestsLabel: string) {
@@ -152,9 +156,22 @@ export const PAYMENT_TYPES: Record<PaymentType, { name: string; short: string }>
 /** 홈페이지 예약금(예약금 결제 후 현장결제) 금액 */
 export const DEPOSIT_AMOUNT = 100000;
 
-/** 결제 링크 기본 청구 금액: 전액결제면 요금제 기본가(이벤트 기간 예식은 이벤트가), 아니면 예약금 */
-export function paymentLinkDefaultAmount(planKey: string, paymentType: string, date?: string): number {
-  return paymentType === "full" ? planMeta(planKey).base - eventDiscount(planKey, date) : DEPOSIT_AMOUNT;
+/** 결제 링크 기본 청구 금액: 전액결제면 요금제 기본가(이벤트 기간 예식은 이벤트가) + 출장비, 아니면 예약금 */
+export function paymentLinkDefaultAmount(planKey: string, paymentType: string, date?: string, travelFee = 0): number {
+  return paymentType === "full" ? planMeta(planKey).base - eventDiscount(planKey, date) + travelFee : DEPOSIT_AMOUNT;
+}
+
+/** 봉투 처리 방식 — 홈페이지 src/lib/plans.ts의 ENVELOPE_MODES와 같은 값. */
+export type EnvelopeMode = "sealed" | "opened";
+
+export const ENVELOPE_MODE_NAME: Record<EnvelopeMode, string> = { sealed: "밀봉", opened: "개봉 집계" };
+
+export function isEnvelopeMode(v: unknown): v is EnvelopeMode {
+  return v === "sealed" || v === "opened";
+}
+
+export function envelopeModeName(v: string): string {
+  return isEnvelopeMode(v) ? ENVELOPE_MODE_NAME[v] : "미지정";
 }
 
 export function isPaymentType(v: unknown): v is PaymentType {
@@ -184,11 +201,12 @@ interface PricedReservation {
   confirmExtraGuests: number;
   confirmDiscount: number;
   requestedTotal: number;
+  confirmTravelFee: number;
 }
 
 /** 예약 1건의 확정 총액. 스페셜은 예약에 담긴 금액(requestedTotal)이 기본 요금이 된다. */
 export function confirmTotalOf(r: PricedReservation): number {
-  return calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal }).total;
+  return calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal, travelFee: r.confirmTravelFee }).total;
 }
 
 /** 알림톡 등에 보여 줄 "플랜 가격". 스페셜은 그 예약의 금액. */

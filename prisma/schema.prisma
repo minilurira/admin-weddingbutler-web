@@ -52,6 +52,12 @@ model Reservation {
   // 홈페이지가 보낸 신청 금액(기본 요금 + 추가 버틀러). 0이면 홈페이지 금액 없음(이전·수동 예약)
   requestedTotal         Int @default(0)
   requestedExtraButlers  Int @default(0)
+  // 예식장 지역(홈페이지 예약 때 고른 지역 이름, 예: "부산"). 없으면 ""(이전·수동 예약)
+  travelRegion           String @default("")
+  // 출장비(서울·경기·인천 0원). 확정 총액에 더한다
+  confirmTravelFee       Int @default(0)
+  // 봉투 처리 방식: "sealed"(밀봉) | "opened"(개봉 집계) | ""(미지정). 기록 페이지의 기본값이 된다
+  envelopeMode           String @default("")
 
   alimtalkAt     DateTime?
   // 확정 시 만든 구글 캘린더 일정 id (src/lib/googleCalendar.ts). 없으면 ""

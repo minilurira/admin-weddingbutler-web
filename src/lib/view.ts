@@ -16,7 +16,7 @@ export function toRow(r: Reservation) {
     customer: r.customer,
     side: r.side,
     hasCustomerMemo: r.customerMemo !== "",
-    venueLine: `${r.confirmPlan} · ${r.confirmVenue}`,
+    venueLine: `${r.confirmPlan} · ${r.travelRegion ? `${r.travelRegion} · ` : ""}${r.confirmVenue}`,
     staffLine: `버틀러 ${r.confirmButlers}명`,
     dateLine: r.confirmDate.replace(/-/g, ". "),
     amountLine: won(total),

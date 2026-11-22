@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
-import { PAYMENT_TYPES, PLANS, SPECIAL_PLAN, calcConfirm, eventDiscount, isPaymentType, onsiteAmount, planMeta, sideFromHomepage, won } from "@/lib/pricing";
+import { ENVELOPE_MODE_NAME, PAYMENT_TYPES, PLANS, SPECIAL_PLAN, calcConfirm, eventDiscount, isEnvelopeMode, isPaymentType, onsiteAmount, planMeta, sideFromHomepage, won } from "@/lib/pricing";
 import { formatWishDateLabel } from "@/lib/format";
 import { sendNewReservationAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
@@ -29,6 +29,9 @@ interface IncomingBody {
   extraButlers?: number;
   totalAmount?: number; // 홈페이지가 계산한 총 금액(기본 요금 + 추가 버틀러)
   onsiteAmount?: number; // 홈페이지가 안내한 현장결제 금액
+  region?: string; // 예식장 지역 이름(예: "부산")
+  travelFee?: number; // 지역 출장비 (totalAmount에 포함돼 있다)
+  envelopeMode?: string; // "sealed" | "opened"
 }
 
 function unauthorized() {
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest) {
     return badRequest("invalid JSON body");
   }
 
-  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, source, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite } = body;
+  const { externalId, customer, couple, side, phone, weddingDate, weddingTime, venue, guestCount, plan, memo, customerMemo, source, paidAmount, paymentType, extraButlers, totalAmount, onsiteAmount: sentOnsite, region, travelFee, envelopeMode } = body;
 
   if (!customer?.trim()) return badRequest("customer is required");
   if (!couple?.trim()) return badRequest("couple is required");
@@ -94,11 +97,14 @@ export async function POST(req: NextRequest) {
   const resolvedPaymentType = isPaymentType(paymentType) ? paymentType : "";
   const resolvedExtraButlers = typeof extraButlers === "number" && extraButlers > 0 ? Math.floor(extraButlers) : 0;
   const butlers = meta.butlers + resolvedExtraButlers;
+  const resolvedTravelFee = typeof travelFee === "number" && travelFee > 0 ? Math.floor(travelFee) : 0;
+  const resolvedRegion = typeof region === "string" ? region.trim().slice(0, 40) : "";
+  const resolvedEnvelope = isEnvelopeMode(envelopeMode) ? envelopeMode : "";
   // 홈페이지가 금액을 보내면 그대로 쓴다: 홈페이지 총액에는 초과 식권이 없으므로(당일 실제 매수로
   // 현장 정산) 추가 하객은 0으로 두고, 어드민 계산과 차이(테스트 결제 등)는 할인 금액으로 맞춘다.
   const useHomepageAmounts = typeof totalAmount === "number" && totalAmount >= 0;
   const extraGuests = useHomepageAmounts ? 0 : estimatedExtraGuests;
-  const computedTotal = calcConfirm({ plan, butlers, extraGuests, discount: 0, baseOverride: plan === SPECIAL_PLAN ? totalAmount : undefined }).total;
+  const computedTotal = calcConfirm({ plan, butlers, extraGuests, discount: 0, baseOverride: plan === SPECIAL_PLAN ? totalAmount : undefined, travelFee: resolvedTravelFee }).total;
   const discount = useHomepageAmounts ? Math.max(0, computedTotal - totalAmount) : 0;
   const total = computedTotal - discount;
   const onsite =
@@ -111,6 +117,7 @@ export async function POST(req: NextRequest) {
   const memoParts = [
     memo?.trim() ?? "",
     resolvedExtraButlers ? `버틀러 추가 ${resolvedExtraButlers}명` : "",
+    resolvedTravelFee ? `출장비 ${won(resolvedTravelFee)} (${resolvedRegion || "지역"})` : "",
     evDiscount > 0 && discount >= evDiscount ? `연말 이벤트가 적용 (−${won(evDiscount)})` : "",
   ].filter(Boolean);
 
@@ -142,6 +149,9 @@ export async function POST(req: NextRequest) {
       paymentType: resolvedPaymentType,
       requestedTotal: useHomepageAmounts ? totalAmount : 0,
       requestedExtraButlers: resolvedExtraButlers,
+      travelRegion: resolvedRegion,
+      confirmTravelFee: resolvedTravelFee,
+      envelopeMode: resolvedEnvelope,
     },
   });
 
@@ -172,8 +182,8 @@ export async function POST(req: NextRequest) {
       [
         `신규 예약 신청 (${created.id})`,
         `고객: ${created.customer} (${created.couple})${created.side ? ` · ${created.side}` : ""} · ${created.phone}`,
-        `예식: ${created.wishDateLabel} · ${created.venueLabel}`,
-        `플랜: ${created.requestedPlan}${resolvedExtraButlers ? ` (버틀러 추가 ${resolvedExtraButlers}명)` : ""}`,
+        `예식: ${created.wishDateLabel} · ${resolvedRegion ? `${resolvedRegion} · ` : ""}${created.venueLabel}`,
+        `플랜: ${created.requestedPlan}${resolvedExtraButlers ? ` (버틀러 추가 ${resolvedExtraButlers}명)` : ""}${resolvedTravelFee ? ` · 출장비 ${won(resolvedTravelFee)}` : ""}${resolvedEnvelope ? ` · ${ENVELOPE_MODE_NAME[resolvedEnvelope]}` : ""}`,
         `결제: ${resolvedPaymentType ? PAYMENT_TYPES[resolvedPaymentType].name : "유형 미지정"} · 결제 ${won(created.paidAmount)} · 현장(현금) ${won(onsite)}`,
         ...(created.customerMemo ? [`메모: ${created.customerMemo}`] : []),
         ...(typeof source === "string" && source.trim() ? [`유입 경로: ${source.trim().slice(0, 60)}`] : []),

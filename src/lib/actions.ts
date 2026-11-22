@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcConfirm, eventDiscount, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
+import { calcConfirm, envelopeModeName, eventDiscount, isEnvelopeMode, isPaymentType, isSide, onsiteAmount, paymentTypeName, planBaseOf, won } from "@/lib/pricing";
 import { formatWishDateLabel, isWeddingPast } from "@/lib/format";
 import { getInquiry, updateInquiries } from "@/lib/inquiries";
 import { sendConfirmAlimtalk, sendReminderAlimtalk } from "@/lib/alimtalk";
@@ -51,6 +51,8 @@ export interface ConfirmFieldsInput {
   note: string;
   paidAmount: number;
   paymentType: string;
+  travelFee: number;
+  envelopeMode: string;
 }
 
 export async function saveConfirmFields(id: string, fields: ConfirmFieldsInput) {
@@ -70,6 +72,8 @@ export async function saveConfirmFields(id: string, fields: ConfirmFieldsInput) 
       confirmNote: fields.note,
       paidAmount: fields.paidAmount,
       paymentType: isPaymentType(fields.paymentType) ? fields.paymentType : "",
+      confirmTravelFee: Math.max(0, Math.floor(fields.travelFee || 0)),
+      envelopeMode: isEnvelopeMode(fields.envelopeMode) ? fields.envelopeMode : "",
     },
   });
   revalidateAll();
@@ -95,10 +99,12 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
       confirmNote: fields.note,
       paidAmount: fields.paidAmount,
       paymentType: isPaymentType(fields.paymentType) ? fields.paymentType : "",
+      confirmTravelFee: Math.max(0, Math.floor(fields.travelFee || 0)),
+      envelopeMode: isEnvelopeMode(fields.envelopeMode) ? fields.envelopeMode : "",
     },
   });
 
-  const price = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount, baseOverride: updated.requestedTotal });
+  const price = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount, baseOverride: updated.requestedTotal, travelFee: updated.confirmTravelFee });
   const result = await sendConfirmAlimtalk({
     reservationId: updated.id,
     customer: updated.customer,
@@ -125,7 +131,7 @@ export async function confirmReservation(id: string, fields: ConfirmFieldsInput)
       `${wasConfirmed ? "확정 내용 변경" : "예약 확정"} (${updated.id})`,
       `고객: ${updated.customer} (${updated.couple}) · ${updated.phone}`,
       `예식: ${formatWishDateLabel(updated.confirmDate, updated.confirmTime)} · ${updated.confirmVenue}`,
-      `플랜: ${updated.confirmPlan} · 버틀러 ${updated.confirmButlers}명`,
+      `플랜: ${updated.confirmPlan} · 버틀러 ${updated.confirmButlers}명${price.travelFee ? ` · 출장비 ${won(price.travelFee)}${updated.travelRegion ? ` (${updated.travelRegion})` : ""}` : ""} · 봉투 ${envelopeModeName(updated.envelopeMode)}`,
       `결제: ${paymentTypeName(updated.paymentType, updated.paidAmount, price.total)} · 결제 ${won(updated.paidAmount)} · 현장(현금) ${won(onsite)}`,
       `고객 알림톡: ${result.detail}`,
       `구글 캘린더: ${calendar.detail}`,
@@ -358,7 +364,7 @@ export async function resendAlimtalk(id: string) {
   await requireSession();
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
   if (isPast(r)) return { message: PAST_MESSAGE };
-  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
+  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal, travelFee: r.confirmTravelFee });
   const result = await sendConfirmAlimtalk({
     reservationId: r.id,
     customer: r.customer,
@@ -389,7 +395,7 @@ export async function sendAlimtalkManually(id: string, key: ManualAlimtalkKey): 
   if (isPast(r)) return { message: PAST_MESSAGE };
   if (key === "confirm") return resendAlimtalk(id);
 
-  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal });
+  const price = calcConfirm({ plan: r.confirmPlan, butlers: r.confirmButlers, extraGuests: r.confirmExtraGuests, discount: r.confirmDiscount, baseOverride: r.requestedTotal, travelFee: r.confirmTravelFee });
   const res = await sendReminderAlimtalk(key === "remind7d" ? "7d" : "day", {
     reservationId: r.id,
     customer: r.customer,

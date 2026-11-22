@@ -1,0 +1,4 @@
+-- 예식장 지역(출장비)과 봉투 처리 방식
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "travelRegion" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "confirmTravelFee" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Reservation" ADD COLUMN IF NOT EXISTS "envelopeMode" TEXT NOT NULL DEFAULT '';
