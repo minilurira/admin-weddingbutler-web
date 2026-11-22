@@ -1,6 +1,7 @@
 import { SolapiMessageService } from "solapi";
 import { ensureMessageLogTable } from "@/lib/messageLog";
 import { prisma } from "@/lib/prisma";
+import { refreshMessageResults } from "@/lib/messageResult";
 
 import { logError } from "@/lib/errorLog";
 // 발송 내역 화면용: 저장된 변수를 솔라피 알림톡 템플릿 본문에 채워 고객이 받은 메시지 모양으로 만든다.
@@ -20,7 +21,7 @@ export interface MessageView {
   butlerName?: string;
 }
 
-interface Tpl {
+export interface Tpl {
   header?: string | null;
   highlight?: { title?: string | null; description?: string | null } | null;
   item?: { list: { title: string; description: string }[]; summary?: { title?: string | null; description?: string | null } } | null;
@@ -32,7 +33,7 @@ interface Tpl {
 const cache = new Map<string, { at: number; tpl: Tpl | null }>();
 const TTL = 10 * 60_000;
 
-async function template(id: string): Promise<Tpl | null> {
+export async function loadTemplate(id: string): Promise<Tpl | null> {
   const hit = cache.get(id);
   if (hit && Date.now() - hit.at < TTL) return hit.tpl;
   const key = process.env.SOLAPI_API_KEY, secret = process.env.SOLAPI_API_SECRET;
@@ -46,6 +47,18 @@ async function template(id: string): Promise<Tpl | null> {
   }
   if (tpl) cache.set(id, { at: Date.now(), tpl });
   return tpl;
+}
+
+/** 템플릿 곳곳(제목, 강조, 아이템, 본문, 부가정보, 버튼 주소)에 쓰인 #{변수} 이름들 */
+export function templateVariableNames(tpl: Tpl): Set<string> {
+  const texts = [
+    tpl.header, tpl.highlight?.title, tpl.highlight?.description,
+    ...(tpl.item?.list ?? []).flatMap((r) => [r.title, r.description]),
+    tpl.item?.summary?.title, tpl.item?.summary?.description,
+    tpl.content, tpl.extra,
+    ...(tpl.buttons ?? []).flatMap((b) => [b.linkMo, b.linkPc, b.linkAnd, b.linkIos]),
+  ];
+  return new Set(texts.flatMap((t) => (t ? t.match(/#\{[^}]+\}/g) ?? [] : [])));
 }
 
 const fill = (text: string, vars: Record<string, string>) => text.replace(/#\{[^}]+\}/g, (m) => vars[m] ?? m);
@@ -74,6 +87,8 @@ export function renderTemplate(tpl: Tpl, vars: Record<string, string>): string {
 
 export async function loadMessages(reservationId: string): Promise<MessageView[]> {
   await ensureMessageLogTable();
+  // 아직 카카오 최종 결과를 모르는 알림톡은 솔라피에 물어 성공/실패로 바꿔 둔다
+  await refreshMessageResults(reservationId);
   const rows = await prisma.messageLog.findMany({ where: { reservationId }, orderBy: { createdAt: "desc" }, take: 50 });
   // 버틀러 업무 배정 알림톡은 변수의 _butlerId로 받은 버틀러를 찾는다
   const butlerIds = new Set<string>();
@@ -89,8 +104,8 @@ export async function loadMessages(reservationId: string): Promise<MessageView[]
       let variables: Record<string, string> = {};
       try { variables = JSON.parse(r.variables) as Record<string, string>; } catch { /* 깨진 값은 빈 변수로 */ }
       let text: string | null = r.content || null;
-      if (!text && r.channel === "알림톡" && r.templateId && Object.keys(variables).length) {
-        const tpl = await template(r.templateId);
+      if (!text && r.channel === "알림톡" && r.templateId && r.status !== "skipped") {
+        const tpl = await loadTemplate(r.templateId);
         text = tpl ? renderTemplate(tpl, variables) : null;
       }
       const butlerName = variables._butlerId ? names.get(variables._butlerId) ?? "삭제된 버틀러" : undefined;

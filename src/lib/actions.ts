@@ -409,6 +409,7 @@ export async function sendAlimtalkManually(id: string, key: ManualAlimtalkKey): 
     paidAmount: r.paidAmount,
     confirmAmount: price.total,
     balanceAmount: Math.max(0, price.total - r.paidAmount),
+    butlers: r.confirmButlers,
   });
   revalidateAll();
   return { message: res.sent ? "알림톡을 보냈습니다." : `알림톡을 보내지 못했습니다 (${res.detail}).` };

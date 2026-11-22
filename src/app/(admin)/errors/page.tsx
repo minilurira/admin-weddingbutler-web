@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { listErrorLogs } from "@/lib/errorLog";
+import { listErrorLogs, errorRoomId } from "@/lib/errorLog";
+import ErrorRoomButton from "@/components/ErrorRoomButton";
 import { formatStamp } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ const tag = (k: string) => SOURCES.find((s) => s.key === k) ?? { key: k, label: 
 
 export default async function ErrorsPage({ searchParams }: { searchParams: { source?: string } }) {
   const source = SOURCES.some((s) => s.key === searchParams.source) ? (searchParams.source as string) : "all";
-  const [rows, all] = await Promise.all([listErrorLogs(source), listErrorLogs("all", 500)]);
+  const [rows, all, room] = await Promise.all([listErrorLogs(source), listErrorLogs("all", 500), errorRoomId()]);
   const dayAgo = Date.now() - 24 * 3600 * 1000;
   const counts = Object.fromEntries(SOURCES.map((s) => [s.key, (all ?? []).filter((r) => r.source === s.key && new Date(r.created_at).getTime() > dayAgo).length]));
   const chip = (active: boolean): React.CSSProperties => ({ display: "inline-flex", alignItems: "center", height: 36, padding: "0 14px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: active ? "#F9EFF4" : "#F6F3F5", color: active ? "#B0567E" : "#6E646A" });
@@ -24,6 +25,8 @@ export default async function ErrorsPage({ searchParams }: { searchParams: { sou
       <p style={{ margin: "0 0 18px", fontSize: 13.5, lineHeight: 1.7, color: "#6E646A" }}>
         홈페이지·어드민의 서버 오류와 고객 화면의 오류가 자동으로 모입니다. 전화번호·이메일·키는 가려서 저장하고, 같은 오류는 1분에 한 번만 남깁니다.
       </p>
+
+      <ErrorRoomButton hasRoom={!!room} />
 
       {rows === null ? (
         <p style={{ color: "#A8416C", fontWeight: 600, lineHeight: 1.8 }}>
