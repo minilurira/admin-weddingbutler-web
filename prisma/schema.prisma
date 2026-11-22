@@ -280,3 +280,24 @@ model CalendarBlock {
   reason    String   @default("")
   createdAt DateTime @default(now())
 }
+
+// 버틀러 참석 문의: 관리자가 예약 1건에 대해 후보 버틀러에게 보낸 참석 여부 링크. 후보마다 한 행.
+// 같은 batchId(등급·담당 쪽이 같은 한 번의 문의)에서 먼저 참석을 누른 사람 need명이 확정되고 나머지는 마감된다.
+// status: "pending" | "accepted" | "declined" | "closed"(자리가 다 참) | "cancelled". 만료는 expiresAt 로 판단한다.
+model ButlerInvite {
+  id            String    @id
+  reservationId String
+  butlerId      String
+  batchId       String
+  token         String    @unique
+  grade         String
+  side          String    @default("")
+  need          Int       @default(1)
+  status        String    @default("pending")
+  expiresAt     DateTime
+  sentAt        DateTime?
+  respondedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([reservationId])
+}

@@ -10,6 +10,7 @@ import { updateShiftGrade } from "@/lib/financeActions";
 import { BUTLER_GRADES, OWNER_HEADCOUNT, OWNER_SPLIT, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 import { deskSideOptions, won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
+import ButlerInvites from "./ButlerInvites";
 
 const GRADES = Object.keys(BUTLER_GRADES) as ButlerGrade[];
 const selectStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 10, padding: "9px 10px", fontSize: 13, color: "#1E1A1C", minWidth: 0 };
@@ -96,7 +97,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
           {assigned.map((a) => {
             const mine = notices.filter((m) => m.variables._butlerId === a.butlerId); // 최신 먼저
             const notice = mine.find((m) => m.status === "sent") ?? mine[0];
-            const status = noticeStatus(notice, a.hasPhone, data.date, a.grade === "owner", assigned.some((x) => x.grade === "owner"));
+            const status = a.viaInvite ? { text: "참석 문의로 확정 (업무 배정 알림톡은 보내지 않음)", bg: "#E3F1E8", color: "#2B6A45" } : noticeStatus(notice, a.hasPhone, data.date, a.grade === "owner", assigned.some((x) => x.grade === "owner"));
             const isOpen = openNotice === a.shiftId;
             return (
             <div key={a.shiftId} style={{ padding: "10px 0", borderBottom: "1px solid #F4F1F3" }}>
@@ -164,6 +165,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
                 style={{ height: 38, padding: "0 18px", border: 0, borderRadius: 12, background: "#B0567E", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>배정</button>
             </div>
           )}
+          {!cancelled && data.date && <ButlerInvites reservationId={reservationId} required={required} data={data} onChanged={load} />}
           {sel && sel.busyAt !== null && !cancelled && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#A0632E" }}>{sel.name} 님은 같은 날 다른 예약에 이미 배정되어 있습니다. 시간이 겹치지 않는지 확인해 주세요.</p>}
         </>
       )}
