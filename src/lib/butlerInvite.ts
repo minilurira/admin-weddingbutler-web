@@ -112,7 +112,7 @@ async function infoOf(inv: { reservationId: string; butlerId: string; grade: str
     time: /^\d{1,2}:\d{2}$/.test(r.confirmTime) ? r.confirmTime : "시간 미정",
     venue: cut(r.confirmVenue || r.venueLabel),
     side: cut(sideText(inv.side, r.side)),
-    start: workStartLabel(r.confirmTime),
+    start: /^\d{1,2}:\d{2}$/.test(r.confirmTime) ? `${workStartLabel(r.confirmTime)}까지 도착` : "추후 안내", // 예식 1시간 전까지 도착
     pay: won(gradePay(inv.grade, butler.name)),
     deadline: deadlineLabel(inv.expiresAt),
   };
