@@ -3,6 +3,7 @@ import { ensureFinanceTables } from "@/lib/finance";
 import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 import { resolveDeskSide } from "@/lib/pricing";
 import { ensureInviteTable } from "@/lib/butlerInvite";
+import { weddingDateLabel, workStartLabel } from "@/lib/butlerNotice";
 
 // 예약건에 버틀러를 배정하는 DB 로직. 배정 = 그 예약의 참석·정산 기록(ButlerShift)을 미리 만들어 두는 것이라
 // 버틀러 관리의 참석·정산 기록과 손익관리의 비용·통장 잔액 예상에 그대로 들어간다. 별도 테이블은 없다.
@@ -40,6 +41,8 @@ export interface AssignmentView {
   plan: string;
   assigned: AssignedView[];
   butlers: AssignableView[];
+  /** 단톡방 모집 공유 문구용 (StaffRecruitShare.tsx). 고객 이름·연락처는 넣지 않는다 */
+  share: { confirmed: boolean; dateLabel: string; venue: string; arriveBy: string };
 }
 
 /**
@@ -48,7 +51,7 @@ export interface AssignmentView {
  */
 export async function loadAssignment(reservationId: string): Promise<AssignmentView> {
   await ensureFinanceTables();
-  const r = await prisma.reservation.findUnique({ where: { id: reservationId }, select: { confirmDate: true, side: true, confirmPlan: true } });
+  const r = await prisma.reservation.findUnique({ where: { id: reservationId }, select: { confirmDate: true, confirmTime: true, confirmVenue: true, venueLabel: true, status: true, side: true, confirmPlan: true } });
   if (!r) throw new Error("예약을 찾을 수 없습니다.");
   const date = r.confirmDate;
 
@@ -74,6 +77,12 @@ export async function loadAssignment(reservationId: string): Promise<AssignmentV
     plan: r.confirmPlan,
     assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, side: s.side, hasPhone: Boolean(s.butler.phone), pay: s.pay, extra: s.extra, paid: s.paid, viaInvite: accepted.some((a) => a.butlerId === s.butlerId) })),
     butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, busyAt: busy.has(b.id) ? busy.get(b.id)! : null })),
+    share: {
+      confirmed: r.status === "확정",
+      dateLabel: date ? weddingDateLabel(date, r.confirmTime) : "",
+      venue: r.confirmVenue || r.venueLabel,
+      arriveBy: workStartLabel(r.confirmTime),
+    },
   };
 }
 
