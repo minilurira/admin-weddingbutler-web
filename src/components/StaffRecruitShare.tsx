@@ -13,6 +13,8 @@ import { useToast } from "./ToastContext";
 const STAFF_PAY = { base: 65000, transport: 10000 };
 const RECRUIT_GRADES = { staff: "스태프 버틀러", manager: "매니저 버틀러" } as const;
 type RecruitGrade = keyof typeof RECRUIT_GRADES;
+/** 양가 예약의 기본 모집 방식: 신랑측·신부측 각 1명 (2026-11-23 루리님: 거의 대부분 이렇게 모집) */
+const BOTH = "양쪽 각 1명";
 
 const selectStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 10, padding: "9px 10px", fontSize: 13, color: "#1E1A1C", minWidth: 0 };
 const btn: React.CSSProperties = { height: 38, padding: "0 16px", border: 0, borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: "pointer" };
@@ -23,8 +25,8 @@ export function recruitText(o: { dateLabel: string; venue: string; arriveBy: str
     `예식: ${o.dateLabel}`,
     `장소: ${o.venue || "추후 안내"}`,
     `도착: ${o.arriveBy === "추후 안내" ? "추후 안내" : `${o.arriveBy}까지 (예식 1시간 전)`}`,
-    ...(o.side ? [`담당: ${o.side}`] : []),
-    `모집: ${RECRUIT_GRADES[o.grade]} ${o.need}명`,
+    ...(o.side === BOTH ? ["담당: 신랑측 1명 · 신부측 1명"] : o.side ? [`담당: ${o.side}`] : []),
+    `모집: ${RECRUIT_GRADES[o.grade]} ${o.side === BOTH ? 2 : o.need}명`,
     ...(o.grade === "staff" ? [`페이: ${won(STAFF_PAY.base + STAFF_PAY.transport)} (기본급 ${won(STAFF_PAY.base)} + 차비 ${won(STAFF_PAY.transport)})`] : []),
     "가능하신 분은 답장 주세요!",
   ].join("\n");
@@ -46,12 +48,15 @@ async function copy(text: string): Promise<boolean> {
 export default function StaffRecruitShare({ required, data }: { required: number; data: AssignmentView }) {
   const toast = useToast();
   const remaining = Math.max(0, required - data.assigned.length);
-  const sideOptions = deskSideOptions(data.side, data.plan);
+  // 양가 예약: 양쪽 각 1명(기본) / 신랑측만 / 신부측만 (+ 프리미엄이 아니면 양가 통합). 한쪽 예약은 그쪽으로 고정
+  const desk = deskSideOptions(data.side, data.plan);
+  const sideOptions: string[] = desk.length ? [BOTH, ...desk.filter((s) => s !== "양가 통합"), ...desk.filter((s) => s === "양가 통합")] : [];
   const fixedSide = data.side === "신랑측" || data.side === "신부측" ? data.side : "";
   const [open, setOpen] = useState(false);
   const [grade, setGrade] = useState<RecruitGrade>("staff");
   const [side, setSide] = useState<string>(sideOptions[0] ?? "");
-  const [need, setNeed] = useState(remaining || 1);
+  const [need, setNeed] = useState(Math.min(2, remaining || 1));
+  const needChoices = Array.from({ length: Math.max(2, remaining) }, (_, i) => i + 1);
   const generated = useMemo(
     () => recruitText({ ...data.share, side: sideOptions.length ? side : fixedSide, grade, need }),
     [data.share, side, fixedSide, sideOptions.length, grade, need],
@@ -87,10 +92,16 @@ export default function StaffRecruitShare({ required, data }: { required: number
             </select>
             {sideOptions.length > 0 && (
               <select style={selectStyle} value={side} onChange={(e) => setSide(e.target.value)} aria-label="담당 쪽">
-                {sideOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                {sideOptions.map((s) => <option key={s} value={s}>{s === "신랑측" || s === "신부측" ? `${s}만` : s}</option>)}
               </select>
             )}
-            <label style={{ fontSize: 13, color: "#6E646A" }}>모집 <input type="number" min={1} value={need} onChange={(e) => setNeed(Math.max(1, Number(e.target.value) || 1))} style={{ ...selectStyle, width: 56 }} />명 (남은 자리 {remaining}명)</label>
+            {side === BOTH && sideOptions.length > 0 ? (
+              <span style={{ fontSize: 13, color: "#6E646A" }}>모집 2명 (남은 자리 {remaining}명)</span>
+            ) : (
+              <label style={{ fontSize: 13, color: "#6E646A" }}>모집 <select style={selectStyle} value={need} onChange={(e) => setNeed(Number(e.target.value))} aria-label="모집 인원">
+                {needChoices.map((n) => <option key={n} value={n}>{n}명</option>)}
+              </select> (남은 자리 {remaining}명)</label>
+            )}
           </div>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={9} aria-label="모집 문구"
             style={{ display: "block", width: "100%", boxSizing: "border-box", margin: "12px 0", padding: "12px 14px", border: 0, borderRadius: 12, background: "#FEF9DC", color: "#3C3A2E", fontSize: 13, lineHeight: 1.7, fontFamily: "inherit", resize: "vertical" }} />
