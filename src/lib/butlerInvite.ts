@@ -147,7 +147,12 @@ function messageParts(info: InviteInfo, token: string) {
 }
 
 /** 문의 한 건을 보낸다 (알림톡, 실패하면 솔라피가 문자로 대신). */
-async function sendInvite(id: string): Promise<{ sent: boolean; detail: string }> {
+/** 예약 메모에 이력을 남긴다 (예약 상세의 메모 목록에 시각과 함께 보인다). 실패해도 흐름은 막지 않는다. */
+async function logNote(reservationId: string, text: string): Promise<void> {
+  await prisma.note.create({ data: { reservationId, text: `[자동] 참석 문의 · ${text}` } }).catch((e) => console.error("[butlerInvite] note failed", e));
+}
+
+async function sendInvite(id: string, again = false): Promise<{ sent: boolean; detail: string }> {
   const inv = await prisma.butlerInvite.findUnique({ where: { id } });
   if (!inv) return { sent: false, detail: "문의 없음" };
   const butler = await prisma.butler.findUnique({ where: { id: inv.butlerId } });
@@ -157,6 +162,7 @@ async function sendInvite(id: string): Promise<{ sent: boolean; detail: string }
   const { variables, text } = messageParts(info, inv.token);
   const res = await sendButlerInviteAlimtalk(inv.reservationId, inv.butlerId, butler.phone, variables, text);
   if (res.sent) await prisma.butlerInvite.update({ where: { id }, data: { sentAt: new Date() } });
+  await logNote(inv.reservationId, `${butler.name} ${again ? "재발송" : "발송"} ${res.sent ? "(전송 완료)" : `실패 (${res.detail})`} · 응답 기한 ${info.deadline}`);
   return res;
 }
 
@@ -206,15 +212,18 @@ export async function resendInvite(id: string): Promise<string> {
   const r = await prisma.reservation.findUnique({ where: { id: inv.reservationId }, select: { confirmDate: true, status: true } });
   if (!r || r.status === "취소") throw new Error("취소된 예약입니다.");
   await prisma.butlerInvite.update({ where: { id }, data: { expiresAt: inviteExpiry(new Date(), r.confirmDate) } });
-  const res = await sendInvite(id);
+  const res = await sendInvite(id, true);
   if (!res.sent) throw new Error(`보내지 못했습니다 (${res.detail}).`);
   return "다시 보냈습니다.";
 }
 
 export async function cancelInvite(id: string): Promise<void> {
   await ensureInviteTable();
+  const inv = await prisma.butlerInvite.findUnique({ where: { id } });
   const { count } = await prisma.butlerInvite.updateMany({ where: { id, status: "pending" }, data: { status: "cancelled" } });
-  if (!count) throw new Error("응답 대기 중인 문의만 취소할 수 있습니다.");
+  if (!count || !inv) throw new Error("응답 대기 중인 문의만 취소할 수 있습니다.");
+  const b = await prisma.butler.findUnique({ where: { id: inv.butlerId }, select: { name: true } });
+  await logNote(inv.reservationId, `${b?.name ?? ""} 문의 취소`);
 }
 
 export interface InviteRow { id: string; butlerId: string; name: string; state: InviteState; expiresAt: string; sentAt: string | null; respondedAt: string | null }
@@ -254,7 +263,10 @@ export async function respondInvite(token: string, action: "accept" | "decline")
   const next = action === "accept" ? "available" : "unavailable";
   if (inv.status !== next) {
     await prisma.butlerInvite.update({ where: { id: inv.id }, data: { status: next, respondedAt: new Date() } });
-    await notifyResponse(inv, next === "available" ? "참석 가능" : "참석 불가");
+    const what = next === "available" ? "참석 가능" : "참석 불가";
+    const b = await prisma.butler.findUnique({ where: { id: inv.butlerId }, select: { name: true } });
+    await logNote(inv.reservationId, `${b?.name ?? ""} 응답: ${what}${inv.status === "pending" ? "" : " (답 변경)"}`);
+    await notifyResponse(inv, what);
   }
   return { state: next };
 }
