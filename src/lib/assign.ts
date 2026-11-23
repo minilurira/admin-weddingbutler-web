@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables } from "@/lib/finance";
 import { gradePay, isButlerGrade } from "@/lib/financeCalc";
 import { resolveDeskSide } from "@/lib/pricing";
-import { ensureInviteTable } from "@/lib/butlerInvite";
 import { weddingDateLabel, workStartLabel } from "@/lib/butlerNotice";
 
 // 예약건에 버틀러를 배정하는 DB 로직. 배정 = 그 예약의 참석·정산 기록(ButlerShift)을 미리 만들어 두는 것이라
@@ -21,8 +20,6 @@ export interface AssignedView {
   pay: number;
   extra: number;
   paid: boolean;
-  /** 참석 문의(butlerInvite.ts)로 확정한 배정인지 */
-  viaInvite: boolean;
 }
 
 export interface AssignableView {
@@ -57,12 +54,10 @@ export async function loadAssignment(reservationId: string): Promise<AssignmentV
 
   if (date) await prisma.butlerShift.updateMany({ where: { reservationId, paid: false, NOT: { date } }, data: { date } });
 
-  await ensureInviteTable();
-  const [shifts, butlers, sameDay, accepted] = await Promise.all([
+  const [shifts, butlers, sameDay] = await Promise.all([
     prisma.butlerShift.findMany({ where: { reservationId }, include: { butler: true }, orderBy: { createdAt: "asc" } }),
     prisma.butler.findMany({ orderBy: { createdAt: "asc" } }),
     date ? prisma.butlerShift.findMany({ where: { date, NOT: { reservationId } } }) : Promise.resolve([]),
-    prisma.butlerInvite.findMany({ where: { reservationId, status: "accepted" }, select: { butlerId: true } }),
   ]);
   const others = sameDay.length
     ? await prisma.reservation.findMany({ where: { id: { in: Array.from(new Set(sameDay.map((s) => s.reservationId))) }, status: { not: "취소" } }, select: { id: true, confirmTime: true } })
@@ -75,7 +70,7 @@ export async function loadAssignment(reservationId: string): Promise<AssignmentV
     date,
     side: r.side,
     plan: r.confirmPlan,
-    assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, side: s.side, hasPhone: Boolean(s.butler.phone), pay: s.pay, extra: s.extra, paid: s.paid, viaInvite: accepted.some((a) => a.butlerId === s.butlerId) })),
+    assigned: shifts.map((s) => ({ shiftId: s.id, butlerId: s.butlerId, name: s.butler.name, grade: s.grade, side: s.side, hasPhone: Boolean(s.butler.phone), pay: s.pay, extra: s.extra, paid: s.paid })),
     butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, busyAt: busy.has(b.id) ? busy.get(b.id)! : null })),
     share: {
       confirmed: r.status === "확정",

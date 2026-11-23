@@ -4,7 +4,6 @@ import { ensureMessageLogTable } from "@/lib/messageLog";
 import { sendButlerStaffAlimtalk } from "@/lib/alimtalk";
 import { pad2 } from "@/lib/format";
 import { won } from "@/lib/pricing";
-import { viaInvite } from "@/lib/butlerInvite";
 
 // 버틀러(스태프) 업무 배정 알림톡을 언제 보낼지 정한다 (2026-11-14 루리님 규칙, 날짜는 한국 기준).
 // - 배정할 때(mode "assign"): 지나지 않은 예식이면 예식 달과 상관없이 바로 한 번 보낸다.
@@ -81,8 +80,6 @@ export async function notifyButlerShift(shiftId: string, mode: "assign" | "month
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today) return { sent: false, detail: "지난 예식" };
   if (mode === "month" && !isThisMonthUpcoming(date, today)) return { sent: false, detail: "이번 달 예식 아님" };
   if (shift.grade === "owner") return { sent: false, detail: "오너 버틀러" };
-  // 참석 문의(src/lib/butlerInvite.ts)로 확정한 버틀러는 문의 알림톡이 그 역할을 하므로 업무 배정 알림톡을 보내지 않는다
-  if (await viaInvite(r.id, shift.butlerId)) return { sent: false, detail: "참석 문의로 확정" };
   const hasOwner = await prisma.butlerShift.count({ where: { reservationId: r.id, grade: "owner" } });
   if (!hasOwner) return { sent: false, detail: "오너 버틀러 배정 후 발송" };
   if (!shift.butler.phone) return { sent: false, detail: "휴대폰 번호 미등록" };
@@ -122,7 +119,7 @@ export async function notifyThisMonthButlers(today = kstToday()): Promise<string
   for (const s of shifts) {
     const res = await notifyButlerShift(s.id, "month", today);
     // 보냈거나 실패한 건만 알린다 (번호 미등록·이미 보냄은 매일 반복되므로 빼고, 배정 화면에서 확인한다)
-    if (res.sent || !["이미 보냄", "휴대폰 번호 미등록", "지난 예식", "취소된 예약", "오너 버틀러", "오너 버틀러 배정 후 발송", "참석 문의로 확정"].includes(res.detail)) lines.push(`${s.date} ${s.reservationId} ${s.butler.name} · ${res.sent ? "전송 완료" : res.detail}`);
+    if (res.sent || !["이미 보냄", "휴대폰 번호 미등록", "지난 예식", "취소된 예약", "오너 버틀러", "오너 버틀러 배정 후 발송"].includes(res.detail)) lines.push(`${s.date} ${s.reservationId} ${s.butler.name} · ${res.sent ? "전송 완료" : res.detail}`);
   }
   return lines;
 }

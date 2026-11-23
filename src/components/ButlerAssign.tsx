@@ -98,7 +98,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
           {assigned.map((a) => {
             const mine = notices.filter((m) => m.variables._butlerId === a.butlerId); // 최신 먼저
             const notice = mine.find((m) => m.status === "sent") ?? mine[0];
-            const status = a.viaInvite ? { text: "참석 문의로 확정 (업무 배정 알림톡은 보내지 않음)", bg: "#E3F1E8", color: "#2B6A45" } : noticeStatus(notice, a.hasPhone, data.date, a.grade === "owner", assigned.some((x) => x.grade === "owner"));
+            const status = noticeStatus(notice, a.hasPhone, data.date, a.grade === "owner", assigned.some((x) => x.grade === "owner"));
             const isOpen = openNotice === a.shiftId;
             return (
             <div key={a.shiftId} style={{ padding: "10px 0", borderBottom: "1px solid #F4F1F3" }}>
@@ -167,7 +167,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
             </div>
           )}
           {!cancelled && data.date && data.share.confirmed && !full && <StaffRecruitShare required={required} data={data} />}
-          {!cancelled && data.date && <ButlerInvites reservationId={reservationId} required={required} data={data} onChanged={load} />}
+          {!cancelled && data.date && <ButlerInvites reservationId={reservationId} required={required} data={data} onChanged={load} onPick={(id) => { setPick(id); setPickGrade(""); toast("아래 배정 칸에서 등급·담당 쪽을 고른 뒤 배정해 주세요."); }} />}
           {sel && sel.busyAt !== null && !cancelled && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#A0632E" }}>{sel.name} 님은 같은 날 다른 예약에 이미 배정되어 있습니다. 시간이 겹치지 않는지 확인해 주세요.</p>}
         </>
       )}

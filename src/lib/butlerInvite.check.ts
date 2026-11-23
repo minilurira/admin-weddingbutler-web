@@ -7,5 +7,5 @@ assert.equal(inviteExpiry(now, "2026-12-20").toISOString(), "2026-11-24T01:00:00
 assert.equal(inviteExpiry(now, "2026-11-23").toISOString(), "2026-11-23T14:59:59.000Z"); // 예식일(한국) 밤 12시까지
 assert.equal(inviteState({ status: "pending", expiresAt: new Date("2026-11-23T00:59:00Z") }, now), "expired");
 assert.equal(inviteState({ status: "pending", expiresAt: new Date("2026-11-24T01:00:00Z") }, now), "pending");
-assert.equal(inviteState({ status: "accepted", expiresAt: new Date("2026-11-20T00:00:00Z") }, now), "accepted");
+assert.equal(inviteState({ status: "available", expiresAt: new Date("2026-11-20T00:00:00Z") }, now), "available"); // 답한 뒤에는 기한이 지나도 그 답을 유지
 console.log("ok");
