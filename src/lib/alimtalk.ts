@@ -395,7 +395,7 @@ export async function sendButlerInviteAlimtalk(reservationId: string, butlerId: 
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_INVITE || "KA01TP261122234013526riULxxO678q";
+  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_INVITE || "KA01TP261124040341304MCHy2WA0y0q";
   const logged = { ...variables, _butlerId: butlerId };
   if (!svc || !from || !pfId) {
     await logKakao(reservationId, "버틀러 참석 문의", phone, templateId, logged, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." }, true);
