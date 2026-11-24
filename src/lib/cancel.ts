@@ -5,6 +5,7 @@ import { formatWishDateLabel } from "@/lib/format";
 import { sendCancelAlimtalk } from "@/lib/alimtalk";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { deleteReservationEvent } from "@/lib/googleCalendar";
+import { notifyReservationCancelledButlers } from "@/lib/butlerNotice";
 
 export type CancelBy = "admin" | "customer";
 
@@ -68,10 +69,13 @@ export async function finishCancel(r: Reservation, input: FinishCancelInput): Pr
     cancelReason: input.reason,
   });
 
+  // 배정된 버틀러에게 배정 취소 알림톡 (업무 배정 알림톡을 받았던 버틀러만). 실패해도 취소는 유지된다.
+  const butlerNotices = await notifyReservationCancelledButlers(r.id).catch((e) => { console.error("[cancel] butler notices failed", e); return [] as string[]; });
+
   const who = input.by === "customer" ? "고객이 홈페이지에서 예약 취소" : "예약 취소";
   const payment = input.paymentCancelled ? `결제 ${won(input.refundAmount)} 환불 요청` : "결제취소 없음";
   await prisma.note.create({
-    data: { reservationId: r.id, text: `${who} · ${payment} · 사유: ${input.reason} · 취소 알림톡 ${alimtalk.detail}` },
+    data: { reservationId: r.id, text: `${who} · ${payment} · 사유: ${input.reason} · 취소 알림톡 ${alimtalk.detail}${butlerNotices.length ? ` · 버틀러 ${butlerNotices.join(" ")}` : ""}` },
   });
 
   await sendNewReservationKakaoWorkNotice(

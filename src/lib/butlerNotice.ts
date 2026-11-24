@@ -136,13 +136,13 @@ export async function notifyReservationButlers(reservationId: string): Promise<{
 /** 배정이 해제된 버틀러에게 배정 취소 알림톡을 보낸다. 해제하기 전에 읽어 둔 배정 정보(shift)를 받는다.
  * 보내는 경우: 지나지 않은 예식이고, 휴대폰 번호가 있고, 오너가 아니고, 그 버틀러가 업무 배정 알림톡을 이미 받았을 때(받은 적 없으면 취소를 알릴 필요가 없다).
  * 화면에 띄울 결과 문구를 돌려준다(보내지 않았으면 빈 문자열). */
-export async function notifyButlerUnassigned(shift: { reservationId: string; butlerId: string; grade: string; date: string }, today = kstToday()): Promise<string> {
+export async function notifyButlerUnassigned(shift: { reservationId: string; butlerId: string; grade: string; date: string }, today = kstToday(), reservationCancelled = false): Promise<string> {
   if (shift.grade === "owner") return "";
   const [r, butler] = await Promise.all([
     prisma.reservation.findUnique({ where: { id: shift.reservationId } }),
     prisma.butler.findUnique({ where: { id: shift.butlerId } }),
   ]);
-  if (!r || !butler || r.status === "취소") return "";
+  if (!r || !butler || (r.status === "취소" && !reservationCancelled)) return "";
   const date = r.confirmDate || shift.date;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today) return "";
   if (!butler.phone) return "";
@@ -163,4 +163,16 @@ export async function notifyButlerUnassigned(shift: { reservationId: string; but
   ].join("\n");
   const res = await sendButlerCancelAlimtalk(r.id, butler.id, butler.phone, { "#{name}": butler.name, "#{weddingDate}": weddingDate, "#{venue}": venue }, text);
   return res.sent ? `${butler.name} 님에게 배정 취소 알림을 보냈습니다.` : `배정 취소 알림은 보내지 못했습니다 (${res.detail}).`;
+}
+
+/** 예약이 취소됐을 때, 그 예약에 배정된 버틀러 모두에게 배정 취소 알림톡을 보낸다(보내는 조건은 notifyButlerUnassigned와 같다). 배정 기록 자체는 그대로 둔다. */
+export async function notifyReservationCancelledButlers(reservationId: string): Promise<string[]> {
+  await ensureFinanceTables();
+  const shifts = await prisma.butlerShift.findMany({ where: { reservationId }, select: { reservationId: true, butlerId: true, grade: true, date: true }, orderBy: { createdAt: "asc" } });
+  const out: string[] = [];
+  for (const s of shifts) {
+    const msg = await notifyButlerUnassigned(s, kstToday(), true).catch((e) => { console.error("[cancel] butler notice failed", e); return "배정 취소 알림은 보내지 못했습니다."; });
+    if (msg) out.push(msg);
+  }
+  return out;
 }
