@@ -5,7 +5,7 @@ import { getInviteView, respondInvite } from "@/lib/butlerInvite";
 export const dynamic = "force-dynamic";
 
 // 홈페이지 서버만 부르는 버틀러 참석 문의 API (Authorization: Bearer RESERVATION_API_KEY).
-//   GET  → { state, info? }   (state: pending | available | unavailable | cancelled | expired | not_found)
+//   GET  → { state, info?, locked? }   (state: pending | available | unavailable | cancelled | expired | not_found)
 //   POST { action: "accept" | "decline" } → { state }
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const denied = requireRecordApiKey(req);
