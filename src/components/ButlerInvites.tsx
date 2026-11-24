@@ -41,7 +41,7 @@ export default function ButlerInvites({ reservationId, required, data, onChanged
     <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #F4F1F3" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <b style={{ fontSize: 14 }}>참석 문의</b>
-        <span style={{ fontSize: 12.5, color: "#A79BA1" }}>후보에게 링크를 보내 참석 가능 여부만 받습니다 (응답 24시간). 배정은 응답을 보고 직접 합니다.</span>
+        <span style={{ fontSize: 12.5, color: "#A79BA1" }}>후보에게 링크를 보내 참석 가능 여부만 받습니다 (응답 24시간, 발송 후 48시간까지 링크에서 답 변경 가능). 배정은 응답을 보고 직접 합니다.</span>
         <span style={{ flex: 1 }} />
         {!full && <button type="button" onClick={() => setOpen(!open)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>{open ? "닫기" : "문의 보내기"}</button>}
       </div>

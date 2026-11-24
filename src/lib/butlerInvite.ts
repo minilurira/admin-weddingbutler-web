@@ -9,7 +9,7 @@ import { cut, workStartLabel } from "@/lib/butlerNotice";
 
 // 버틀러 참석 문의 (2026-11-23). 관리자가 예약 1건에 대해 후보 버틀러에게 링크를 보내면, 후보는 홈페이지 /b/<token> 에서
 // "참석 가능" / "참석 불가"만 답한다. 배정(등급·담당 쪽·확정)은 응답을 보고 관리자가 배정 카드에서 직접 한다.
-// 응답 기한은 발송 후 24시간(예식일이 더 가까우면 예식일 끝까지). 답한 뒤에는 예식일까지, 배정되기 전이면 링크에서 답을 바꿀 수 있다.
+// 응답 기한은 발송 후 24시간(예식일이 더 가까우면 예식일 끝까지). 답한 뒤에는 발송 후 48시간까지, 배정되기 전이면 링크에서 답을 바꿀 수 있다.
 
 export const INVITE_HOURS = 24;
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -58,6 +58,13 @@ export function inviteExpiry(now: Date, weddingDate: string): Date {
   return end.getTime() < limit.getTime() ? end : limit;
 }
 
+/** 답을 바꿀 수 있는 마지막 시각: 응답 기한(발송 후 24시간)에서 24시간을 더해 발송 후 48시간. 예식일이 더 가까우면 예식일 끝까지. */
+export function inviteChangeUntil(expiresAt: Date, weddingDate: string): Date {
+  const limit = new Date(expiresAt.getTime() + 24 * 3600_000);
+  const end = new Date(`${weddingDate}T23:59:59+09:00`);
+  return end.getTime() < limit.getTime() ? end : limit;
+}
+
 /** 화면에 보여 줄 상태. 아직 답하지 않았는데 기한이 지났으면 만료로 본다(답한 뒤에는 그 답을 유지). */
 export function inviteState(o: { status: string; expiresAt: Date }, now = new Date()): InviteState {
   if (o.status === "pending") return o.expiresAt.getTime() <= now.getTime() ? "expired" : "pending";
@@ -85,6 +92,8 @@ export interface InviteInfo {
   venue: string;
   start: string;
   deadline: string;
+  /** 답을 바꿀 수 있는 마지막 시각 (표시용) */
+  changeUntil: string;
 }
 
 async function infoOf(inv: { reservationId: string; butlerId: string; expiresAt: Date }): Promise<InviteInfo | null> {
@@ -100,6 +109,7 @@ async function infoOf(inv: { reservationId: string; butlerId: string; expiresAt:
     venue: cut(r.confirmVenue || r.venueLabel),
     start: /^\d{1,2}:\d{2}$/.test(r.confirmTime) ? `${workStartLabel(r.confirmTime)}까지 도착` : "추후 안내", // 예식 1시간 전까지 도착
     deadline: deadlineLabel(inv.expiresAt),
+    changeUntil: deadlineLabel(inviteChangeUntil(inv.expiresAt, r.confirmDate)),
   };
 }
 
@@ -135,6 +145,7 @@ function messageParts(info: InviteInfo, token: string) {
     "#{start}": info.start,
     "#{pay}": "추후 안내",
     "#{deadline}": info.deadline,
+    "#{changeUntil}": info.changeUntil, // 새 템플릿에만 있다(없으면 발송할 때 빠진다)
     "#{url}": inviteUrl(token).replace(/^https?:\/\//, ""), // 버튼 링크가 http://#{url} 이라 스킴을 뺀다
   };
   const text = [
@@ -147,6 +158,7 @@ function messageParts(info: InviteInfo, token: string) {
     `근무 시작: ${info.start}`,
     "",
     `${info.deadline}까지 응답해 주세요.`,
+    `응답 후에도 아래 링크에서 ${info.changeUntil}까지 답을 바꿀 수 있습니다.`,
     inviteUrl(token),
   ].join("\n");
   return { variables, text };
@@ -254,7 +266,7 @@ async function notifyResponse(inv: { reservationId: string; butlerId: string }, 
 
 export interface RespondResult { state: InviteState }
 
-/** 버틀러의 응답. 답한 뒤에도 예식일까지(배정 전) 링크에서 바꿀 수 있고, 같은 답을 다시 눌러도 결과는 같다. */
+/** 버틀러의 응답. 답한 뒤에도 발송 후 48시간까지(배정 전) 링크에서 바꿀 수 있고, 같은 답을 다시 눌러도 결과는 같다. */
 export async function respondInvite(token: string, action: "accept" | "decline"): Promise<RespondResult> {
   if (!TOKEN.test(token)) return { state: "not_found" };
   await ensureInviteTable();
@@ -264,8 +276,8 @@ export async function respondInvite(token: string, action: "accept" | "decline")
   if (state !== "pending" && state !== "available" && state !== "unavailable") return { state };
   const r = await prisma.reservation.findUnique({ where: { id: inv.reservationId }, select: { status: true, confirmDate: true } });
   if (!r || r.status === "취소") return { state: "cancelled" };
-  // 아직 답하지 않았으면 기한(24시간) 안에, 이미 답했으면 예식일(한국)까지 바꿀 수 있다. 이미 배정됐으면 바꿀 수 없다.
-  if (state === "pending" ? inv.expiresAt.getTime() <= Date.now() : new Date(`${r.confirmDate}T23:59:59+09:00`).getTime() <= Date.now()) return { state: "expired" };
+  // 아직 답하지 않았으면 응답 기한(발송 후 24시간) 안에, 이미 답했으면 변경 기한(발송 후 48시간) 안에 바꿀 수 있다. 이미 배정됐으면 바꿀 수 없다.
+  if ((state === "pending" ? inv.expiresAt : inviteChangeUntil(inv.expiresAt, r.confirmDate)).getTime() <= Date.now()) return { state: "expired" };
   if (await isAssigned(inv)) return { state };
   const next = action === "accept" ? "available" : "unavailable";
   if (inv.status !== next) {
