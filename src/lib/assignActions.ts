@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { notifyReservationButlers } from "@/lib/butlerNotice";
+import { notifyButlerUnassigned, notifyReservationButlers } from "@/lib/butlerNotice";
 import { notifyAssignCompleteIfFull } from "@/lib/assignComplete";
 import { changeAssignmentSide, createAssignment, loadAssignment, removeAssignment, type AssignmentView } from "@/lib/assign";
 
@@ -52,8 +52,12 @@ export async function setAssignmentSide(shiftId: string, side: string): Promise<
   done();
 }
 
-export async function unassignButler(shiftId: string): Promise<void> {
+/** 배정을 해제하고, 업무 배정 알림톡을 받았던 버틀러에게는 배정 취소 알림톡을 보낸다. 화면에 띄울 결과 문구를 돌려준다. */
+export async function unassignButler(shiftId: string): Promise<string> {
   await guard();
+  const shift = await prisma.butlerShift.findUnique({ where: { id: shiftId }, select: { reservationId: true, butlerId: true, grade: true, date: true } });
   await removeAssignment(shiftId);
   done();
+  const notice = shift ? await notifyButlerUnassigned(shift).catch((e) => { console.error("[assign] unassign notice failed", e); return "배정 취소 알림은 보내지 못했습니다."; }) : "";
+  return ["배정을 해제했습니다.", notice].filter(Boolean).join(" ");
 }

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables } from "@/lib/finance";
 import { ensureMessageLogTable } from "@/lib/messageLog";
-import { sendButlerStaffAlimtalk } from "@/lib/alimtalk";
+import { sendButlerCancelAlimtalk, sendButlerStaffAlimtalk } from "@/lib/alimtalk";
 import { pad2 } from "@/lib/format";
 import { won } from "@/lib/pricing";
 
@@ -131,4 +131,36 @@ export async function notifyReservationButlers(reservationId: string): Promise<{
   const out: { shiftId: string; sent: boolean; detail: string }[] = [];
   for (const s of shifts) out.push({ shiftId: s.id, ...(await notifyButlerShift(s.id, "assign")) });
   return out;
+}
+
+/** 배정이 해제된 버틀러에게 배정 취소 알림톡을 보낸다. 해제하기 전에 읽어 둔 배정 정보(shift)를 받는다.
+ * 보내는 경우: 지나지 않은 예식이고, 휴대폰 번호가 있고, 오너가 아니고, 그 버틀러가 업무 배정 알림톡을 이미 받았을 때(받은 적 없으면 취소를 알릴 필요가 없다).
+ * 화면에 띄울 결과 문구를 돌려준다(보내지 않았으면 빈 문자열). */
+export async function notifyButlerUnassigned(shift: { reservationId: string; butlerId: string; grade: string; date: string }, today = kstToday()): Promise<string> {
+  if (shift.grade === "owner") return "";
+  const [r, butler] = await Promise.all([
+    prisma.reservation.findUnique({ where: { id: shift.reservationId } }),
+    prisma.butler.findUnique({ where: { id: shift.butlerId } }),
+  ]);
+  if (!r || !butler || r.status === "취소") return "";
+  const date = r.confirmDate || shift.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today) return "";
+  if (!butler.phone) return "";
+  await ensureMessageLogTable();
+  const told = await prisma.messageLog.findFirst({ where: { reservationId: r.id, kind: KIND, status: "sent", variables: { contains: `"_butlerId":"${butler.id}"` } }, select: { id: true } });
+  if (!told) return "";
+  const weddingDate = weddingDateLabel(date, r.confirmTime);
+  const venue = cut(r.confirmVenue || r.venueLabel);
+  const text = [
+    "[웨딩버틀러] 배정 취소 안내",
+    "",
+    `${butler.name} 버틀러님, 아래 예식의 배정이 취소되었습니다.`,
+    "",
+    `일시: ${weddingDate}`,
+    `장소: ${venue}`,
+    "",
+    "해당 예식에는 참석하지 않으셔도 됩니다. 문의사항은 웨딩버틀러로 연락해 주세요.",
+  ].join("\n");
+  const res = await sendButlerCancelAlimtalk(r.id, butler.id, butler.phone, { "#{name}": butler.name, "#{weddingDate}": weddingDate, "#{venue}": venue }, text);
+  return res.sent ? `${butler.name} 님에게 배정 취소 알림을 보냈습니다.` : `배정 취소 알림은 보내지 못했습니다 (${res.detail}).`;
 }

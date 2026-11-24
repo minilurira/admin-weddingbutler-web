@@ -122,7 +122,7 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
               </span>
               {a.paid && <span style={{ fontSize: 11.5, fontWeight: 700, color: "#2B6A45", background: "#E3F1E8", padding: "2px 9px", borderRadius: 99 }}>지급 완료</span>}
               <span style={{ flex: 1 }} />
-              <button type="button" disabled={busy || a.paid} onClick={() => { if (window.confirm(`${a.name} 님의 배정을 해제할까요? 정산 기록도 함께 지워집니다.`)) void run(() => unassignButler(a.shiftId), "배정을 해제했습니다."); }}
+              <button type="button" disabled={busy || a.paid} onClick={() => { if (window.confirm(`${a.name} 님의 배정을 해제할까요? 정산 기록도 함께 지워지고, 업무 배정 알림톡을 받은 버틀러에게는 배정 취소 알림이 발송됩니다.`)) void run(() => unassignButler(a.shiftId), "배정을 해제했습니다."); }}
                 style={{ border: 0, background: "transparent", color: "#8C8188", fontSize: 12.5, cursor: a.paid ? "default" : "pointer", opacity: a.paid ? 0.4 : 1 }}>해제</button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap", fontSize: 12 }}>
