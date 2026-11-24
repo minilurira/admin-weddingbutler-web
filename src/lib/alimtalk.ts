@@ -415,13 +415,13 @@ export async function sendButlerInviteAlimtalk(reservationId: string, butlerId: 
 }
 
 /** 버틀러 배정 취소 알림톡 — 배정이 해제된 버틀러 본인에게. 언제 보낼지는 src/lib/butlerNotice.ts(notifyButlerUnassigned).
- * 템플릿 ID는 환경변수 SOLAPI_TEMPLATE_BUTLER_CANCEL (기본값 없음 — 템플릿이 승인돼 ID를 넣기 전에는 같은 내용을 문자로 보낸다).
+ * 템플릿 ID는 환경변수 SOLAPI_TEMPLATE_BUTLER_CANCEL로 바꿀 수 있다(비우면 같은 내용을 문자로 보낸다).
  * 템플릿이 있으면 카카오가 거절해도 솔라피가 text를 문자로 대신 보낸다. */
 export async function sendButlerCancelAlimtalk(reservationId: string, butlerId: string, phone: string, variables: Record<string, string>, fallbackText: string): Promise<{ sent: boolean; detail: string }> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_CANCEL || "";
+  const templateId = process.env.SOLAPI_TEMPLATE_BUTLER_CANCEL || "KA01TP261124042606321BgPaWdnwXWa";
   const logged = { ...variables, _butlerId: butlerId };
   if (!svc || !from) {
     await logKakao(reservationId, "버틀러 배정 취소", phone, templateId, logged, { status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." }, true);
