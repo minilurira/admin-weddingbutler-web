@@ -485,7 +485,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                   );
                 })}
               </tbody>
-              <tfoot><tr><td>버틀러 총 수입</td><td /><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
+              <tfoot><tr><td colSpan={3}>버틀러 총 수입</td><td className="r num">{shifts.length}회</td><td className="r num">{won(shifts.reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(shifts.filter((s) => !s.paid).reduce((a, s) => a + shiftTotal(s), 0))}</td><td className="r num">{won(pay)}</td><td /></tr></tfoot>
             </table></div>
             <form className="form" key={butlers.length} style={{ marginTop: 14, gridTemplateColumns: "minmax(0,1fr) auto" }}
               onSubmit={(e) => { const f = form(e); run(() => addButler(String(f.get("name"))), "버틀러를 추가했습니다."); }}>
