@@ -500,11 +500,11 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
             const { count: ownerMonth, pool: poolM } = ownerPool(ms), { count: ownerAll, pool: poolA } = ownerPool(shifts);
             const m = splitOwnerPay(poolM), t = splitOwnerPay(poolA);
             return (
-              <div className="box"><h2>오너 버틀러 배분 <small className="sub">이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}</small></h2>
+              <div className="box"><h2>오너 몫 배분 <small className="sub">이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}</small></h2>
                 <div className="scroll"><table style={{ minWidth: 520 }}>
                   <thead><tr><th>구분</th><th className="r">{Number(mm)}월</th><th className="r">전체 기간</th></tr></thead>
                   <tbody>
-                    <tr><td>오너 정산금 합계 <small className="sub">오너 예약 {ownerMonth}건 · 전체 {ownerAll}건</small></td><td className="r num">{won(poolM)}</td><td className="r num">{won(poolA)}</td></tr>
+                    <tr><td>오너 몫 합계 <small className="sub">오너 예약 {ownerMonth}건 · 전체 {ownerAll}건</small></td><td className="r num">{won(poolM)}</td><td className="r num">{won(poolA)}</td></tr>
                     <tr><td><b>이강</b> <small className="sub">{OWNER_SPLIT.이강}%</small></td><td className="r num"><b>{won(m.이강)}</b></td><td className="r num"><b>{won(t.이강)}</b></td></tr>
                     <tr><td><b>최소연</b> <small className="sub">{OWNER_SPLIT.최소연}%</small></td><td className="r num"><b>{won(m.최소연)}</b></td><td className="r num"><b>{won(t.최소연)}</b></td></tr>
                   </tbody>
