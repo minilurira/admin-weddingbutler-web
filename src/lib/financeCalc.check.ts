@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { addBusinessDays, costOutflowByMonth, cardFee, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
+import { addBusinessDays, costOutflowByMonth, cardFee, companyProfit, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -27,6 +27,9 @@ assert.equal(gradePay("owner", "이강"), 147000);
 assert.equal(gradePay("owner", "최소연"), 153000);
 assert.equal(gradePay("owner", "다른사람"), 150000);
 assert.equal(gradePay("staff", "이강"), 75000);
+assert.equal(companyProfit(1000000, [{ rid: "r1", grade: "owner", pay: 147000 }, { rid: "r1", grade: "owner", pay: 153000 }]), 1000000); // 두 분 모두 기록: 순수익과 같다
+assert.equal(companyProfit(1000000, [{ rid: "r1", grade: "owner", pay: 147000 }]), 847000);   // 한 분만 기록: 나머지 153,000도 뺀다
+assert.equal(companyProfit(1000000, [{ rid: "r2", grade: "staff", pay: 75000 }]), 1000000);   // 스태프 정산은 이미 순수익에서 빠져 있다
 const keys = ["2026-10", "2026-11", "2026-12"];
 const rent = { kind: "monthly", amount: 100, date: "2026-09-05", payments: {} as Record<string, string> };
 let o = costOutflowByMonth([rent], keys, "2026-10-10");

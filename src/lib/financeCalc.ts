@@ -64,6 +64,15 @@ export function ownerPool(shifts: readonly { rid: string; grade: string; pay: nu
   return { count: rids.size, pool: rids.size * BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT };
 }
 
+/**
+ * 회사 자체 수익 = 순수익에서 오너 몫까지 뺀 금액. 순수익에 이미 들어 있는 오너 기본 정산금(기록 금액)은
+ * 오너 몫(예약당 300,000원)으로 바꿔 계산해 두 번 빼지 않는다. 한 분만 기록한 예약도 오너 몫 전액을 뺀다.
+ */
+export function companyProfit(net: number, shifts: readonly { rid: string; grade: string; pay: number }[]): number {
+  const recorded = shifts.reduce((a, s) => a + (s.grade === "owner" ? s.pay : 0), 0);
+  return net + recorded - ownerPool(shifts).pool;
+}
+
 /** 오너 등급 한 건에서 대표 한 명의 기본 정산금: 두 대표 합 300,000원을 49:51로 → 이강 147,000 / 최소연 153,000 */
 export const ownerPay = (name: keyof typeof OWNER_SPLIT): number => splitOwnerPay(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)[name];
 
