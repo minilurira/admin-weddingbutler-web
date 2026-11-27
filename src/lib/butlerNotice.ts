@@ -182,53 +182,78 @@ export function nextDay(date: string): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 }
 
-/** 내일 예식에 배정된 버틀러 모두(오너 포함)에게 업무 1일 전 안내를 보낸다 (크론 /api/cron/butler-day-before).
- * 확정 예약만, 같은 예식 일시로 이미 받은 버틀러는 건너뛴다(예식 일시가 바뀌면 다시 보낸다). 결과 줄을 돌려준다. */
-export async function notifyTomorrowButlers(today = kstToday()): Promise<string[]> {
-  await ensureFinanceTables();
-  await ensureMessageLogTable();
-  const date = nextDay(today);
-  const reservations = await prisma.reservation.findMany({ where: { status: "확정", confirmDate: date } });
-  const lines: string[] = [];
-  for (const r of reservations) {
-    const shifts = await prisma.butlerShift.findMany({ where: { reservationId: r.id }, include: { butler: true }, orderBy: { createdAt: "asc" } });
-    const team = teamLabel(shifts.map((s) => s.butler.name));
-    for (const s of shifts) {
-      const weddingDate = weddingDateLabel(date, r.confirmTime);
+/** 한 예약의 배정 버틀러(오너 포함)에게 업무 1일 전 안내를 보낸다. shiftId를 주면 그 버틀러에게만.
+ * skipSentSince를 주면(크론) 그 시각 이후에 같은 예식 일시로 이미 받은 버틀러는 건너뛴다. 관리자가 직접 보낼 때는 다시 보낸다. */
+async function sendDayBefore(reservationId: string, opts: { shiftId?: string; skipSentSince?: Date } = {}): Promise<{ name: string; sent: boolean; detail: string }[]> {
+  const r = await prisma.reservation.findUnique({ where: { id: reservationId } });
+  if (!r || r.status === "취소" || !/^\d{4}-\d{2}-\d{2}$/.test(r.confirmDate)) return [];
+  const shifts = await prisma.butlerShift.findMany({ where: { reservationId }, include: { butler: true }, orderBy: { createdAt: "asc" } });
+  const team = teamLabel(shifts.map((s) => s.butler.name));
+  const weddingDate = weddingDateLabel(r.confirmDate, r.confirmTime);
+  const out: { name: string; sent: boolean; detail: string }[] = [];
+  for (const s of shifts) {
+    if (opts.shiftId && s.id !== opts.shiftId) continue;
+    if (opts.skipSentSince) {
       const already = await prisma.messageLog.findFirst({
-        where: { reservationId: r.id, kind: "버틀러 1일 전 안내", status: "sent", AND: [{ variables: { contains: `"_butlerId":"${s.butlerId}"` } }, { variables: { contains: weddingDate } }] },
+        where: { reservationId, kind: "버틀러 1일 전 안내", status: "sent", createdAt: { gte: opts.skipSentSince }, AND: [{ variables: { contains: `"_butlerId":"${s.butlerId}"` } }, { variables: { contains: weddingDate } }] },
         select: { id: true },
       });
       if (already) continue;
-      if (!s.butler.phone) { lines.push(`${r.id} ${s.butler.name} · 휴대폰 번호 미등록`); continue; }
-      const couple = r.couple || r.customer;
-      const start = workStartLabel(r.confirmTime);
-      const variables = {
-        "#{name}": s.butler.name,
-        "#{weddingDate}": weddingDate,
-        "#{venue}": cut(r.confirmVenue || r.venueLabel),
-        "#{couple}": cut(couple),
-        "#{deskSide}": deskSideLabel(s.side, r.side, couple),
-        "#{workStart}": start === "추후 안내" ? start : `${start}까지`, // 예식 1시간 전까지 도착
-        "#{team}": team,
-      };
-      const text = [
-        "[웨딩버틀러] 업무 1일전 안내",
-        "",
-        `${s.butler.name} 버틀러님, 내일 배정된 예식 업무를 안내드립니다.`,
-        "",
-        `일시: ${weddingDate}`,
-        `장소: ${variables["#{venue}"]}`,
-        `신랑신부: ${variables["#{couple}"]}`,
-        `담당: ${variables["#{deskSide}"]}`,
-        `도착 시각: ${variables["#{workStart}"]}`,
-        `버틀러팀: ${team}`,
-        "",
-        "예식 1시간 전까지 도착해 주세요. 참석이 어려우면 바로 웨딩버틀러로 연락해 주세요.",
-      ].join("\n");
-      const res = await sendButlerDayBeforeAlimtalk(r.id, s.butlerId, s.butler.phone, variables, text);
-      lines.push(`${r.id} ${s.butler.name} · ${res.detail}`);
     }
+    if (!s.butler.phone) { out.push({ name: s.butler.name, sent: false, detail: "휴대폰 번호 미등록" }); continue; }
+    const couple = r.couple || r.customer;
+    const start = workStartLabel(r.confirmTime);
+    const variables = {
+      "#{name}": s.butler.name,
+      "#{weddingDate}": weddingDate,
+      "#{venue}": cut(r.confirmVenue || r.venueLabel),
+      "#{couple}": cut(couple),
+      "#{deskSide}": deskSideLabel(s.side, r.side, couple),
+      "#{workStart}": start === "추후 안내" ? start : `${start}까지`, // 예식 1시간 전까지 도착
+      "#{team}": team,
+    };
+    const text = [
+      "[웨딩버틀러] 업무 1일전 안내",
+      "",
+      `${s.butler.name} 버틀러님, 내일 배정된 예식 업무를 안내드립니다.`,
+      "",
+      `일시: ${weddingDate}`,
+      `장소: ${variables["#{venue}"]}`,
+      `신랑신부: ${variables["#{couple}"]}`,
+      `담당: ${variables["#{deskSide}"]}`,
+      `도착 시각: ${variables["#{workStart}"]}`,
+      `버틀러팀: ${team}`,
+      "",
+      "예식 1시간 전까지 도착해 주세요. 참석이 어려우면 바로 웨딩버틀러로 연락해 주세요.",
+    ].join("\n");
+    const res = await sendButlerDayBeforeAlimtalk(reservationId, s.butlerId, s.butler.phone, variables, text);
+    out.push({ name: s.butler.name, sent: res.sent, detail: res.detail });
   }
+  return out;
+}
+
+/** 내일 예식의 배정 버틀러 모두에게 보낸다 (크론 /api/cron/butler-day-before, 매일 09:00 한국). 확정 예약만. 결과 줄을 돌려준다. */
+export async function notifyTomorrowButlers(today = kstToday()): Promise<string[]> {
+  await ensureFinanceTables();
+  await ensureMessageLogTable();
+  const reservations = await prisma.reservation.findMany({ where: { status: "확정", confirmDate: nextDay(today) }, select: { id: true } });
+  const since = new Date(`${today}T00:00:00+09:00`); // 오늘 관리자가 이미 보냈으면 다시 보내지 않는다
+  const lines: string[] = [];
+  for (const r of reservations) for (const x of await sendDayBefore(r.id, { skipSentSince: since })) lines.push(`${r.id} ${x.name} · ${x.detail}`);
   return lines;
+}
+
+/** 관리자가 배정 카드에서 직접 보낸다. 화면에 띄울 결과 문구를 돌려준다. */
+export async function sendDayBeforeByAdmin(reservationId: string, shiftId?: string, today = kstToday()): Promise<string> {
+  await ensureFinanceTables();
+  await ensureMessageLogTable();
+  const r = await prisma.reservation.findUnique({ where: { id: reservationId }, select: { status: true, confirmDate: true } });
+  if (!r) throw new Error("예약을 찾을 수 없습니다.");
+  if (r.status === "취소") throw new Error("취소된 예약에는 보낼 수 없습니다.");
+  if (!r.confirmDate || r.confirmDate < today) throw new Error("예식 날짜가 없거나 지난 예식입니다.");
+  const results = await sendDayBefore(reservationId, { shiftId });
+  if (!results.length) throw new Error("보낼 배정 버틀러가 없습니다.");
+  const ok = results.filter((x) => x.sent).length;
+  const failed = results.filter((x) => !x.sent).map((x) => `${x.name}(${x.detail})`);
+  return [`업무 1일 전 안내를 ${ok}명에게 보냈습니다.`, failed.length ? `보내지 못함: ${failed.join(", ")}` : ""].filter(Boolean).join(" ");
 }

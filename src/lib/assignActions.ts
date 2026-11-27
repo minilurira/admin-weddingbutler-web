@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { notifyButlerUnassigned, notifyReservationButlers } from "@/lib/butlerNotice";
+import { notifyButlerUnassigned, notifyReservationButlers, sendDayBeforeByAdmin } from "@/lib/butlerNotice";
 import { notifyAssignCompleteIfFull } from "@/lib/assignComplete";
 import { changeAssignmentSide, createAssignment, loadAssignment, removeAssignment, type AssignmentView } from "@/lib/assign";
 
@@ -60,4 +60,10 @@ export async function unassignButler(shiftId: string): Promise<string> {
   done();
   const notice = shift ? await notifyButlerUnassigned(shift).catch((e) => { console.error("[assign] unassign notice failed", e); return "배정 취소 알림은 보내지 못했습니다."; }) : "";
   return ["배정을 해제했습니다.", notice].filter(Boolean).join(" ");
+}
+
+/** 업무 1일 전 안내를 지금 보낸다(shiftId를 주면 그 버틀러에게만). 화면에 띄울 결과 문구를 돌려준다. */
+export async function sendDayBeforeNotice(reservationId: string, shiftId?: string): Promise<string> {
+  await guard();
+  return sendDayBeforeByAdmin(reservationId, shiftId);
 }

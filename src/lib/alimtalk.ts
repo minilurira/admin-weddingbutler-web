@@ -443,9 +443,9 @@ export const sendButlerCancelAlimtalk = (reservationId: string, butlerId: string
   sendToButler("버틀러 배정 취소", process.env.SOLAPI_TEMPLATE_BUTLER_CANCEL || "KA01TP261124042606321BgPaWdnwXWa", reservationId, butlerId, phone, variables, fallbackText);
 
 /** 버틀러 업무 1일 전 안내 알림톡(오너 포함). 언제 보낼지는 src/lib/butlerNotice.ts(notifyTomorrowButlers).
- * 템플릿 ID는 SOLAPI_TEMPLATE_BUTLER_DAY1 (기본값 없음 — 넣기 전에는 같은 내용을 문자로 보낸다). */
+ * 템플릿 ID는 환경변수 SOLAPI_TEMPLATE_BUTLER_DAY1로 바꿀 수 있다. */
 export const sendButlerDayBeforeAlimtalk = (reservationId: string, butlerId: string, phone: string, variables: Record<string, string>, fallbackText: string) =>
-  sendToButler("버틀러 1일 전 안내", process.env.SOLAPI_TEMPLATE_BUTLER_DAY1 || "", reservationId, butlerId, phone, variables, fallbackText);
+  sendToButler("버틀러 1일 전 안내", process.env.SOLAPI_TEMPLATE_BUTLER_DAY1 || "KA01TP261127005500580HIYrxpvMOVx", reservationId, butlerId, phone, variables, fallbackText);
 
 /** 스페셜 예약 링크 알림톡(SOLAPI_TEMPLATE_SPECIAL_LINK). 변수와 본문은 src/lib/specialLinkText.ts.
  * 템플릿 ID가 없거나 바로 거절되면 false — 호출부가 문자(LMS)로 대신 보낸다. */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { assignButler, getAssignment, setAssignmentSide, unassignButler } from "@/lib/assignActions";
+import { assignButler, getAssignment, sendDayBeforeNotice, setAssignmentSide, unassignButler } from "@/lib/assignActions";
 import { getMessages } from "@/lib/messageActions";
 import type { MessageView } from "@/lib/messageView";
 import { formatStamp } from "@/lib/format";
@@ -56,6 +56,14 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
   async function run(fn: () => Promise<unknown>, okMsg: string) {
     setBusy(true);
     try { const res = await fn(); toast(typeof res === "string" ? res : okMsg); load(); } catch (e) { toast(e instanceof Error ? e.message : "처리하지 못했습니다."); } finally { setBusy(false); }
+  }
+
+  // 업무 1일 전 안내: 매일 9시에 자동 발송되고, 여기서는 관리자가 따로 보낸다. 본문이 "내일"이라 전날이 아니면 확인을 받는다.
+  const kst = (days: number) => new Date(Date.now() + (9 + days * 24) * 3600 * 1000).toISOString().slice(0, 10);
+  const canSendDayBefore = !cancelled && !!data?.date && data.date >= kst(0);
+  function sendDayBefore(who: string, shiftId?: string) {
+    const warn = data?.date === kst(1) ? "" : "\n\n주의: 예식이 내일이 아닌데 본문에는 \"내일\" 예식이라고 나갑니다.";
+    if (window.confirm(`${who}에게 업무 1일 전 안내를 지금 보낼까요?${warn}`)) void run(() => sendDayBeforeNotice(reservationId, shiftId), "보냈습니다.");
   }
 
   const assigned = data?.assigned ?? [];
@@ -130,6 +138,9 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
               {notice && notice.status !== "skipped" && (
                 <button type="button" onClick={() => setOpenNotice(isOpen ? "" : a.shiftId)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>{isOpen ? "닫기" : "보낸 내용 보기"}</button>
               )}
+              {canSendDayBefore && (
+                <button type="button" disabled={busy || !a.hasPhone} onClick={() => sendDayBefore(`${a.name} 님`, a.shiftId)} style={{ border: 0, background: "transparent", color: "#8A3F61", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, opacity: a.hasPhone ? 1 : 0.4 }}>1일 전 안내 보내기</button>
+              )}
             </div>
             {isOpen && notice && (
               <div style={{ marginTop: 8, borderRadius: 12, background: "#FEF9DC", padding: "12px 14px", fontSize: 12.5, lineHeight: 1.75, color: "#3C3A2E", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
@@ -139,6 +150,12 @@ export default function ButlerAssign({ reservationId, required, cancelled, card 
             </div>
             );
           })}
+          {assigned.length > 0 && canSendDayBefore && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 0 0", fontSize: 12.5, color: "#A79BA1" }}>
+              <span>업무 1일 전 안내는 예식 전날 오전 9시에 자동 발송됩니다.</span>
+              <button type="button" disabled={busy} onClick={() => sendDayBefore(`배정된 버틀러 ${assigned.length}명`)} style={{ border: 0, background: "#F6F3F5", borderRadius: 10, padding: "7px 12px", color: "#8A3F61", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>전체에게 지금 보내기</button>
+            </div>
+          )}
           {assigned.length > 0 && <div style={{ padding: "10px 0 0", fontSize: 13, color: "#6E646A" }}>정산 예정 합계 <b style={{ color: "#B0567E" }}>{won(total)}</b></div>}
           {pool > 0 && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#A79BA1" }}>오너 버틀러는 버틀러 관리의 오너 배분 규칙대로 이 예약 1건을 {won(pool / OWNER_HEADCOUNT)} × {OWNER_HEADCOUNT}명 = {won(pool)}으로 보고 이강 {OWNER_SPLIT.이강} : 최소연 {OWNER_SPLIT.최소연}로 나눈 금액입니다 (이강 {won(split.이강)} · 최소연 {won(split.최소연)}).</p>}
 
