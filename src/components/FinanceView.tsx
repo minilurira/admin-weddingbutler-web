@@ -186,7 +186,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const company = companyProfitAll(reservations, costs, shifts, settings.feeRate, data.today);
   const companyTile = (
     <div className="tile net"><small>누적 회사 수익<br />(예정예약 포함)</small><b className={`num ${company.profit < 0 ? "neg" : ""}`}>{won(company.profit)}</b>
-      <span>예약 {company.count}건 · 예정 잔금 {won(company.expectedCash)} 포함 · 비용·버틀러 정산·오너 몫까지 뺀 금액{company.unassigned ? ` · 배정 전 ${company.unassigned}건은 정산·오너 몫 미반영` : ""}</span></div>
+      <span>총 예약 {company.count}건, 버틀러정산 제외</span></div>
   );
   const nowProj = projection.find((p) => p.m === endMonth);
   const [yy, mm] = month.split("-");
