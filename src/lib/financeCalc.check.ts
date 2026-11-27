@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { addBusinessDays, costOutflowByMonth, cardFee, companyProfit, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
+import { companyProfitAll, addBusinessDays, costOutflowByMonth, cardFee, companyProfit, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -43,3 +43,13 @@ assert.equal(o["2026-12"].one, 50);                                             
 const y = costOutflowByMonth([{ ...rent, date: "2026-11-15" }], ["2026-12", "2027-01"], "2026-12-01");
 assert.deepEqual([y["2026-12"].mon, y["2027-01"].mon], [100, 100]);                                          // 연도 넘김
 console.log("financeCalc: all checks passed");
+
+// 예정 예약 포함 누적 회사 자체 수익: 지난 예식은 입력한 현금만, 예정 예식은 잔금 예상 포함, 월 비용은 마지막 예식 달까지
+const all = companyProfitAll(
+  [{ id: "a", date: "2026-11-01", card: 100000, cash: null, total: 400000 }, { id: "b", date: "2026-12-05", card: 100000, cash: null, total: 400000 }],
+  [{ kind: "monthly", amount: 10000, date: "2026-11-01" }],
+  [{ rid: "a", date: "2026-11-01", grade: "staff", pay: 75000, extra: 0 }],
+  0, "2026-11-27",
+);
+assert.deepEqual(all, { profit: 100000 + 400000 - 20000 - 75000, count: 2, unassigned: 1, expectedCash: 300000, endMonth: "2026-12" });
+console.log("companyProfitAll ok");

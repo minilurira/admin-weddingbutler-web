@@ -8,7 +8,7 @@ import {
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { formatPhone } from "@/lib/format";
-import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, companyProfit, costOutflowEvents, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, companyProfit, companyProfitAll, costOutflowEvents, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
@@ -182,7 +182,12 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   })();
   const sum = (k: "gross" | "fee" | "income" | "cost" | "net" | "unpaid") => monthRows.reduce((a, r) => a + r[k], 0);
   const allView = !butlerView && range === "all";
-  const doneShifts = shifts.filter((s) => s.date.slice(0, 7) <= endMonth); // 누적: 월별 손익과 같은 범위(이번 달까지)
+  // 회사 자체 수익은 월별·누적 보기 모두에서 예정 예약까지 포함한 누적 금액을 보여 준다
+  const company = companyProfitAll(reservations, costs, shifts, settings.feeRate, data.today);
+  const companyTile = (
+    <div className="tile net"><small>누적 회사 자체 수익 (예정 예약 포함)</small><b className={`num ${company.profit < 0 ? "neg" : ""}`}>{won(company.profit)}</b>
+      <span>예약 {company.count}건 · 예정 잔금 {won(company.expectedCash)} 포함 · 비용·버틀러 정산·오너 몫까지 뺀 금액{company.unassigned ? ` · 배정 전 ${company.unassigned}건은 정산·오너 몫 미반영` : ""}</span></div>
+  );
   const nowProj = projection.find((p) => p.m === endMonth);
   const [yy, mm] = month.split("-");
 
@@ -226,7 +231,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
           <div className="tile net"><small>누적 순수익 (실수입 − 비용)</small><b className="num">{won(sum("net"))}</b><span>{sum("income") ? `이익률 ${Math.round((sum("net") / sum("income")) * 100)}%` : "수입 없음"}</span></div>
           <div className="tile"><small>버틀러 미정산 (누적)</small><b className="num">{won(sum("unpaid"))}</b><span>지급 대기 합계</span></div>
           <div className="tile"><small>이번 달 말 예상 통장 잔액</small><b className={`num ${nowProj && nowProj.end < 0 ? "neg" : ""}`}>{nowProj ? won(nowProj.end) : "-"}</b><span>{nowProj ? `기준일 ${md(base)} 잔액에서 계산` : "기준일 이후 달만 계산"}</span></div>
-          <div className="tile net"><small>누적 회사 자체 수익</small><b className="num">{won(companyProfit(sum("net"), doneShifts))}</b><span>비용·버틀러 정산·오너 몫 {won(ownerPool(doneShifts).pool)}까지 뺀 금액</span></div>
+          {companyTile}
         </div>
         <section className="panel">
           <div className="box"><h2>월별 손익 <small className="sub">{startMonth.replace("-", "년 ")}월부터 · 가장 이른 결제·비용·참석 기록을 사업 시작으로 봅니다</small></h2>
@@ -249,7 +254,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         <div className="tile net"><small>순수익 (실수입 − 비용)</small><b className="num">{won(net)}</b><span>{income ? `이익률 ${Math.round((net / income) * 100)}%` : "수입 없음"}</span></div>
         <div className="tile"><small>버틀러 미정산</small><b className="num">{won(unpaid.reduce((a, s) => a + shiftTotal(s), 0))}</b><span>{unpaid.length}건 지급 대기</span></div>
         <div className="tile"><small>월말 예상 통장 잔액</small><b className={`num ${curProj && curProj.end < 0 ? "neg" : ""}`}>{curProj ? won(curProj.end) : "-"}</b><span>{curProj ? `기준일 ${md(base)} 잔액에서 계산` : "기준일 이후 달만 계산"}</span></div>
-        <div className="tile net"><small>회사 자체 수익</small><b className="num">{won(companyProfit(net, ms))}</b><span>비용·버틀러 정산·오너 몫 {won(ownerPool(ms).pool)}까지 뺀 금액</span></div>
+        {companyTile}
       </div>
       )}
 

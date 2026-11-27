@@ -73,6 +73,35 @@ export function companyProfit(net: number, shifts: readonly { rid: string; grade
   return net + recorded - ownerPool(shifts).pool;
 }
 
+/**
+ * 예정 예약까지 포함한 누적 회사 자체 수익.
+ * 수입 = 모든 확정 예약의 카드(수수료 제외) + 현금. 아직 안 치른 예식(today 이후)의 미입력 잔금은 총액 − 카드로 예상하고, 지난 예식은 입력한 현금만 센다.
+ * 비용 = 모든 버틀러 정산(예정 배정 포함) + 일회성 비용 전부 + 월 비용(시작월부터 기록이 있는 마지막 달까지). 오너 몫은 companyProfit 규칙.
+ * 배정 전 예약(unassigned)은 버틀러 정산·오너 몫이 아직 빠지지 않는다.
+ */
+export function companyProfitAll(
+  reservations: readonly { id: string; date: string; card: number; cash: number | null; total: number }[],
+  costs: readonly { kind: string; amount: number; date: string }[],
+  shifts: readonly { rid: string; date: string; grade: string; pay: number; extra: number }[],
+  feeRate: number,
+  today: string,
+): { profit: number; count: number; unassigned: number; expectedCash: number; endMonth: string } {
+  const endMonth = [today, ...reservations.map((r) => r.date), ...shifts.map((s) => s.date), ...costs.map((c) => c.date)].map((d) => d.slice(0, 7)).sort().pop()!;
+  const monthIndex = (m: string) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7));
+  let income = 0, expectedCash = 0, unassigned = 0;
+  const assigned = new Set(shifts.map((s) => s.rid));
+  for (const r of reservations) {
+    const upcoming = r.date >= today;
+    const expected = r.cash === null && upcoming ? Math.max(0, r.total - r.card) : 0;
+    expectedCash += expected;
+    income += r.card - cardFee(r.card, feeRate) + (r.cash ?? expected);
+    if (upcoming && !assigned.has(r.id)) unassigned++;
+  }
+  const cost = costs.reduce((a, c) => a + c.amount * (c.kind === "monthly" ? monthIndex(endMonth) - monthIndex(c.date.slice(0, 7)) + 1 : 1), 0)
+    + shifts.reduce((a, s) => a + shiftTotal(s), 0);
+  return { profit: companyProfit(income - cost, shifts), count: reservations.length, unassigned, expectedCash, endMonth };
+}
+
 /** 오너 등급 한 건에서 대표 한 명의 기본 정산금: 두 대표 합 300,000원을 49:51로 → 이강 147,000 / 최소연 153,000 */
 export const ownerPay = (name: keyof typeof OWNER_SPLIT): number => splitOwnerPay(BUTLER_GRADES.owner.pay * OWNER_HEADCOUNT)[name];
 
