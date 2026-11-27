@@ -213,7 +213,7 @@ export async function notifyTomorrowButlers(today = kstToday()): Promise<string[
         "#{team}": team,
       };
       const text = [
-        "[웨딩버틀러] 내일 업무 안내",
+        "[웨딩버틀러] 업무 1일전 안내",
         "",
         `${s.butler.name} 버틀러님, 내일 배정된 예식 업무를 안내드립니다.`,
         "",
