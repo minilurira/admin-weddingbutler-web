@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables } from "@/lib/finance";
 import { ensureMessageLogTable } from "@/lib/messageLog";
-import { sendButlerCancelAlimtalk, sendButlerStaffAlimtalk } from "@/lib/alimtalk";
+import { sendButlerCancelAlimtalk, sendButlerDayBeforeAlimtalk, sendButlerStaffAlimtalk } from "@/lib/alimtalk";
 import { pad2 } from "@/lib/format";
 import { won } from "@/lib/pricing";
 
@@ -175,4 +175,60 @@ export async function notifyReservationCancelledButlers(reservationId: string): 
     if (msg) out.push(msg);
   }
   return out;
+}
+
+/** "YYYY-MM-DD" 다음 날 */
+export function nextDay(date: string): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+/** 내일 예식에 배정된 버틀러 모두(오너 포함)에게 업무 1일 전 안내를 보낸다 (크론 /api/cron/butler-day-before).
+ * 확정 예약만, 같은 예식 일시로 이미 받은 버틀러는 건너뛴다(예식 일시가 바뀌면 다시 보낸다). 결과 줄을 돌려준다. */
+export async function notifyTomorrowButlers(today = kstToday()): Promise<string[]> {
+  await ensureFinanceTables();
+  await ensureMessageLogTable();
+  const date = nextDay(today);
+  const reservations = await prisma.reservation.findMany({ where: { status: "확정", confirmDate: date } });
+  const lines: string[] = [];
+  for (const r of reservations) {
+    const shifts = await prisma.butlerShift.findMany({ where: { reservationId: r.id }, include: { butler: true }, orderBy: { createdAt: "asc" } });
+    const team = teamLabel(shifts.map((s) => s.butler.name));
+    for (const s of shifts) {
+      const weddingDate = weddingDateLabel(date, r.confirmTime);
+      const already = await prisma.messageLog.findFirst({
+        where: { reservationId: r.id, kind: "버틀러 1일 전 안내", status: "sent", AND: [{ variables: { contains: `"_butlerId":"${s.butlerId}"` } }, { variables: { contains: weddingDate } }] },
+        select: { id: true },
+      });
+      if (already) continue;
+      if (!s.butler.phone) { lines.push(`${r.id} ${s.butler.name} · 휴대폰 번호 미등록`); continue; }
+      const couple = r.couple || r.customer;
+      const start = workStartLabel(r.confirmTime);
+      const variables = {
+        "#{name}": s.butler.name,
+        "#{weddingDate}": weddingDate,
+        "#{venue}": cut(r.confirmVenue || r.venueLabel),
+        "#{couple}": cut(couple),
+        "#{deskSide}": deskSideLabel(s.side, r.side, couple),
+        "#{workStart}": start === "추후 안내" ? start : `${start}까지`, // 예식 1시간 전까지 도착
+        "#{team}": team,
+      };
+      const text = [
+        "[웨딩버틀러] 내일 업무 안내",
+        "",
+        `${s.butler.name} 버틀러님, 내일 배정된 예식 업무를 안내드립니다.`,
+        "",
+        `일시: ${weddingDate}`,
+        `장소: ${variables["#{venue}"]}`,
+        `신랑신부: ${variables["#{couple}"]}`,
+        `담당: ${variables["#{deskSide}"]}`,
+        `도착 시각: ${variables["#{workStart}"]}`,
+        `버틀러팀: ${team}`,
+        "",
+        "예식 1시간 전까지 도착해 주세요. 참석이 어려우면 바로 웨딩버틀러로 연락해 주세요.",
+      ].join("\n");
+      const res = await sendButlerDayBeforeAlimtalk(r.id, s.butlerId, s.butler.phone, variables, text);
+      lines.push(`${r.id} ${s.butler.name} · ${res.detail}`);
+    }
+  }
+  return lines;
 }
