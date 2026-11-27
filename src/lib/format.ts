@@ -57,15 +57,17 @@ export function parseLooseDate(v: string | null | undefined) {
   return `${y}-${pad2(mo)}-${pad2(d)}`;
 }
 
-/** 예약 목록 정렬: 날짜 미정(확인 필요) → 다가오는 예식(가까운 순) → 지난 예식(최근 순) → 취소. 같은 순위 안에서는 들어온 순서를 유지한다. */
+/** 예약 목록 정렬: 신규 요청 → 협의 중 (둘 다 새로 들어온 순) → 확정: 다가오는 예식(가까운 순), 지난 예식(최근 순) → 취소.
+ * 들어온 순서(접수 최신순)로 받은 목록을 넘긴다. 같은 순위 안에서는 그 순서를 유지한다. */
 export function sortByUpcoming<T extends { status: string; confirmDate: string; confirmTime: string }>(list: readonly T[], now: Date = new Date()): T[] {
   const key = (r: T) => `${r.confirmDate} ${r.confirmTime.padStart(5, "0")}`;
-  const group = (r: T) => (r.status === "취소" ? 3 : !/^\d{4}-\d{2}-\d{2}$/.test(r.confirmDate) ? 0 : isWeddingPast(r.confirmDate, r.confirmTime, now) ? 2 : 1);
+  const group = (r: T) =>
+    r.status === "신규요청" ? 0 : r.status === "협의중" ? 1 : r.status === "취소" ? 4 : isWeddingPast(r.confirmDate, r.confirmTime, now) ? 3 : 2;
   return [...list].sort((a, b) => {
     const ga = group(a), gb = group(b);
     if (ga !== gb) return ga - gb;
-    if (ga === 1) return key(a).localeCompare(key(b));
-    if (ga === 2) return key(b).localeCompare(key(a));
+    if (ga === 2) return key(a).localeCompare(key(b));
+    if (ga === 3) return key(b).localeCompare(key(a));
     return 0;
   });
 }
