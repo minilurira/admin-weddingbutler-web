@@ -3,7 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { toRow } from "@/lib/view";
 import { CARD } from "@/lib/badge";
-import { formatStamp, isWeddingPast } from "@/lib/format";
+import { formatStamp, isWeddingPast, sortByUpcoming } from "@/lib/format";
 import ReservationListControls from "@/components/ReservationListControls";
 import { getReservationSource } from "@/lib/reservationSource";
 import { listCashReceipts } from "@/lib/cashReceipt";
@@ -97,7 +97,7 @@ export default async function ReservationsPage({
   const showCancelled = searchParams.cancelled === "show";
   const cancelledCount = all.filter((r) => r.status === "취소").length;
   const hideCancelled = filter === "전체" && !q && !showCancelled;
-  const filtered = all.filter((it) => {
+  const filtered = sortByUpcoming(all).filter((it) => {
     if (hideCancelled && it.status === "취소") return false;
     const matchesFilter = filter === "전체" || it.status === filter;
     const matchesQuery = !q || `${it.customer}${it.confirmVenue}${it.id}`.toLowerCase().includes(q.toLowerCase());

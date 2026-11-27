@@ -56,3 +56,16 @@ export function parseLooseDate(v: string | null | undefined) {
   if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return "";
   return `${y}-${pad2(mo)}-${pad2(d)}`;
 }
+
+/** 예약 목록 정렬: 날짜 미정(확인 필요) → 다가오는 예식(가까운 순) → 지난 예식(최근 순) → 취소. 같은 순위 안에서는 들어온 순서를 유지한다. */
+export function sortByUpcoming<T extends { status: string; confirmDate: string; confirmTime: string }>(list: readonly T[], now: Date = new Date()): T[] {
+  const key = (r: T) => `${r.confirmDate} ${r.confirmTime.padStart(5, "0")}`;
+  const group = (r: T) => (r.status === "취소" ? 3 : !/^\d{4}-\d{2}-\d{2}$/.test(r.confirmDate) ? 0 : isWeddingPast(r.confirmDate, r.confirmTime, now) ? 2 : 1);
+  return [...list].sort((a, b) => {
+    const ga = group(a), gb = group(b);
+    if (ga !== gb) return ga - gb;
+    if (ga === 1) return key(a).localeCompare(key(b));
+    if (ga === 2) return key(b).localeCompare(key(a));
+    return 0;
+  });
+}
