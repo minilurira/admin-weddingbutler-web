@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
 import { publishRecord, revokeRecord, saveRecord, startLiveRecord, stopLiveRecord } from "@/lib/recordActions";
-import { TEMPLATE_HEADER, readSheet, toGuests } from "@/lib/sheet";
+import { TEMPLATE_HEADER, num, readSheet, toGuests, type ParsedGuest } from "@/lib/sheet";
 
 type Side = "신랑측" | "신부측";
 
@@ -65,7 +65,6 @@ const toRow = (e: RecordEditorProps["initial"]["entries"][number]): Row => ({
   tickets: String(e.tickets),
   memo: e.memo,
 });
-const num = (v: string) => Number(String(v).replace(/[^0-9]/g, "")) || 0;
 
 export default function RecordEditor({ reservation, link, codeUrl, initial, retentionDays }: RecordEditorProps) {
   const router = useRouter();
@@ -83,6 +82,8 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
   });
   const [rows, setRows] = useState<Row[]>(() => initial.entries.map(toRow));
   const [dirty, setDirty] = useState(false);
+  /** 표에 명단이 있을 때 올린 파일: 아래에 추가할지 전체를 바꿀지 고를 때까지 보관 */
+  const [pendingImport, setPendingImport] = useState<{ fileName: string; guests: ParsedGuest[] } | null>(null);
 
   const sealed = mode === "sealed";
   const status = STATUS_LABEL[link?.status ?? "draft"] ?? STATUS_LABEL.draft;
@@ -139,13 +140,28 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
     try {
       const guests = toGuests(await readSheet(file));
       if (guests.length === 0) { showToast("명단에서 이름이 있는 줄을 찾지 못했어요."); return; }
-      if (rows.some((r) => r.name.trim()) && !window.confirm(`지금 표의 명단을 지우고 파일의 ${guests.length}명으로 바꿀까요?`)) return;
-      setRows(guests.map(toRow));
-      touch();
-      showToast(`${guests.length}명을 불러왔어요. 확인한 뒤 저장해 주세요.`);
+      if (rows.some((r) => r.name.trim())) { setPendingImport({ fileName: file.name, guests }); return; }
+      applyImport(guests, "replace");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "파일을 읽지 못했어요.");
     }
+  }
+
+  function applyImport(guests: ParsedGuest[], how: "append" | "replace") {
+    setPendingImport(null);
+    if (how === "replace") {
+      setRows(guests.map(toRow));
+      touch();
+      showToast(`${guests.length}명을 불러왔어요. 확인한 뒤 저장해 주세요.`);
+      return;
+    }
+    const kept = rows.filter((r) => r.name.trim());
+    const used = new Set(kept.map((r) => num(r.envelopeNo)).filter(Boolean));
+    // 파일의 봉투번호가 지금 명단과 겹치면, 파일 번호 전체를 지금 명단의 마지막 번호 뒤로 민다
+    const offset = guests.some((g) => used.has(g.envelopeNo)) ? Math.max(0, ...Array.from(used)) : 0;
+    setRows([...kept, ...guests.map((g) => toRow({ ...g, envelopeNo: g.envelopeNo + offset }))]);
+    touch();
+    showToast(`기존 ${kept.length}명 아래에 ${guests.length}명을 추가했어요.${offset ? ` 봉투번호는 ${offset + 1}번부터 이어 붙였어요.` : ""} 확인한 뒤 저장해 주세요.`);
   }
 
   function downloadTemplate() {
@@ -312,6 +328,18 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
         <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "#8C8188" }}>
           파일을 불러오거나 표에 직접 입력하세요. 머리글(봉투번호·구분·이름·관계·금액·식권·메모)이 있으면 열 순서는 달라도 돼요.
         </p>
+        {pendingImport && (
+          <div role="dialog" aria-label="명단 불러오기 방식" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#F9EFF4", border: "1px solid #EBCFDD" }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#413A3E", marginBottom: 10, wordBreak: "keep-all" }}>
+              {pendingImport.fileName}에서 {pendingImport.guests.length}명을 찾았어요. 지금 명단({rows.filter((r) => r.name.trim()).length}명)에 어떻게 넣을까요?
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <button type="button" onClick={() => applyImport(pendingImport.guests, "append")} style={{ ...ghostBtn, borderColor: "#B0567E", color: "#8A3F61" }}>기존 명단 아래에 추가</button>
+              <button type="button" onClick={() => applyImport(pendingImport.guests, "replace")} style={ghostBtn}>전체 바꾸기</button>
+              <button type="button" onClick={() => setPendingImport(null)} style={{ ...ghostBtn, color: "#8C8188" }}>취소</button>
+            </div>
+          </div>
+        )}
 
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", minWidth: sealed ? 720 : 820, borderCollapse: "separate", borderSpacing: "0 6px" }}>

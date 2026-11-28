@@ -144,7 +144,11 @@ const HEADERS: [keyof ParsedGuest, RegExp][] = [
 
 export const TEMPLATE_HEADER = ["봉투번호", "구분(신랑측/신부측)", "이름", "관계", "금액", "식권", "메모"];
 
-const num = (v: string) => Number(String(v).replace(/[^0-9]/g, "")) || 0;
+/** "1.0"·"50,000원"·"2장" 같은 값을 정수로 읽는다. 소수점은 살려서 반올림한다(예전엔 "1.0"이 10이 됐다). */
+export const num = (v: string) => {
+  const n = Number(String(v).replace(/[^0-9.]/g, "").replace(/\.(?=.*\.)/g, ""));
+  return Number.isFinite(n) ? Math.round(n) : 0;
+};
 
 /** 머리글(이름·금액 등)을 찾아 열을 맞춘다. 머리글이 없으면 양식 순서로 읽는다. */
 export function toGuests(rows: string[][]): ParsedGuest[] {
