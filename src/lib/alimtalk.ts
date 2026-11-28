@@ -448,12 +448,12 @@ export const sendButlerDayBeforeAlimtalk = (reservationId: string, butlerId: str
   sendToButler("버틀러 1일 전 안내", process.env.SOLAPI_TEMPLATE_BUTLER_DAY1 || "KA01TP261127005500580HIYrxpvMOVx", reservationId, butlerId, phone, variables, fallbackText);
 
 /** 축의 기록 링크 안내 — 고객에게. 언제 보낼지는 src/lib/recordActions.ts(sendRecordLink).
- * 템플릿 ID는 SOLAPI_TEMPLATE_RECORD_LINK (없으면 문자). 버튼 링크는 https://report.weddingbutler.co.kr/#{recordCode}. 카카오가 거절해도 text가 문자로 대신 간다. */
+ * 템플릿 ID는 환경변수 SOLAPI_TEMPLATE_RECORD_LINK로 바꿀 수 있다. 버튼 링크는 https://report.weddingbutler.co.kr/#{recordCode}. 카카오가 거절해도 text가 문자로 대신 간다. */
 export async function sendRecordLinkAlimtalk(reservationId: string, phone: string, variables: Record<string, string>, fallbackText: string): Promise<{ sent: boolean; detail: string }> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_RECORD_LINK || "";
+  const templateId = process.env.SOLAPI_TEMPLATE_RECORD_LINK || "KA01TP2611280630294006J2YnCb2965";
   const useTemplate = Boolean(templateId && pfId);
   const log = (outcome: { status: "sent" | "failed" | "skipped"; detail?: string }, groupId?: string) =>
     useTemplate ? logKakao(reservationId, "축의 기록 안내", phone, templateId, variables, outcome, false, groupId)
