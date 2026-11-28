@@ -51,22 +51,31 @@ export interface CreateLinkInput {
 
 /** 결제 URL 생성. 결제 결과는 포트원 V1 웹훅으로만 온다(/api/public/portone/webhook). */
 export async function createPaymentLink(input: CreateLinkInput): Promise<string> {
+  // 포트원 문서(결제 URL 생성하기, V1) 형식: 결제 정보는 모두 payment_info(JSON 문자열) 안에 넣는다.
+  // user_code(고객사 식별코드)가 없으면 링크 화면이 "결제 정보를 불러오는데 문제가 발생했어요"로 열리지 않는다.
+  const userCode = process.env.PORTONE_V1_IMP_CODE?.trim();
+  if (!userCode) throw new PortOneV1Error("PORTONE_V1_IMP_CODE(포트원 고객사 식별코드)가 설정되지 않았습니다.");
   const token = await accessToken();
-  const channelKey = process.env.PORTONE_V1_CHANNEL_KEY;
-  const paymentInfo = {
+  const channelKey = process.env.PORTONE_V1_CHANNEL_KEY?.trim();
+  const paymentInfo: Record<string, unknown> = {
+    title: "웨딩버틀러",
+    user_code: userCode,
     merchant_uid: input.merchantUid,
     name: input.name,
     amount: input.amount,
+    currency: "KRW",
+    language: "ko",
     buyer_name: input.buyerName,
     buyer_tel: input.buyerTel.replace(/[^0-9]/g, ""),
-    pay_method: "card",
+    // 채널 키가 있으면 링크 화면을 건너뛰고 바로 그 채널(이니시스) 카드 결제창으로 보낸다
+    ...(channelKey
+      ? { direct: { channelKey, pay_method: "card" } }
+      : { pay_methods: [{ pay_method: "card", label: "신용/체크카드" }] }),
   };
-  const body: Record<string, unknown> = {
+  const body = {
     expired_at: Math.floor(input.expiresAt.getTime() / 1000),
     payment_info: JSON.stringify(paymentInfo),
   };
-  // 채널 키를 넣으면 고객이 결제창 선택 없이 바로 이니시스 카드 결제로 간다
-  if (channelKey) body.direct = { channelKey, pay_method: "card" };
 
   const res = await fetch(LINK_API, {
     method: "POST",
