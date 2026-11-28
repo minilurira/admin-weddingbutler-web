@@ -1,6 +1,6 @@
 // 실행: npx tsx src/lib/financeCalc.check.ts
 import assert from "node:assert/strict";
-import { companyProfitAll, addBusinessDays, costOutflowByMonth, cardFee, companyProfit, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
+import { splitInflow, companyProfitAll, addBusinessDays, costOutflowByMonth, cardFee, companyProfit, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay } from "./financeCalc";
 
 assert.equal(addBusinessDays("2026-10-20", 7), "2026-10-29"); // 화 → 21,22,23,26,27,28,29
 assert.equal(addBusinessDays("2026-10-02", 1), "2026-10-06"); // 금 → 10/3 토·10/4 일·10/5 대체공휴일 건너뜀
@@ -53,3 +53,13 @@ const all = companyProfitAll(
 );
 assert.deepEqual(all, { profit: 100000 + 400000 - 20000 - 75000, count: 2, unassigned: 1, expectedCash: 300000, endMonth: "2026-12" });
 console.log("companyProfitAll ok");
+
+// 결제 링크: 대기 중인 잔금 링크는 현금에서 빼고 카드로, 결제된 링크는 접수 카드에서 분리
+assert.deepEqual(splitInflow({ total: 400000, card: 100000, cash: null }).cash, 300000);
+const waiting = splitInflow({ total: 400000, card: 100000, cash: null, links: [{ paid: false, amount: 300000, balance: 300000, date: "2026-11-28" }] });
+assert.equal(waiting.cash, 0); assert.equal(waiting.baseCard, 100000); assert.equal(waiting.linkCards.length, 1);
+const done = splitInflow({ total: 400000, card: 400000, cash: null, links: [{ paid: true, amount: 300000, balance: 0, date: "2026-11-28" }] });
+assert.equal(done.cash, 0); assert.equal(done.baseCard, 100000);
+// 추가 하객만 담은 링크(balance 0)는 현장 잔금 현금을 줄이지 않는다
+assert.equal(splitInflow({ total: 400000, card: 100000, cash: null, links: [{ paid: false, amount: 20000, balance: 0, date: "2026-11-28" }] }).cash, 300000);
+console.log("splitInflow ok");

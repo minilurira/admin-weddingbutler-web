@@ -8,12 +8,12 @@ import {
 } from "@/lib/financeActions";
 import type { ReconcileResult } from "@/lib/finance";
 import { formatPhone } from "@/lib/format";
-import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, companyProfit, companyProfitAll, costOutflowEvents, gradePay, ownerPay, ownerPool, shiftTotal, splitOwnerPay, type ButlerGrade } from "@/lib/financeCalc";
+import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT, addBusinessDays, cardFee, companyProfit, companyProfitAll, costOutflowEvents, gradePay, ownerPay, ownerPool, shiftTotal, splitInflow, splitOwnerPay, type ButlerGrade, type FinanceLink } from "@/lib/financeCalc";
 
 export interface FinanceData {
   today: string;
   settings: { feeRate: number; bankDate: string; bankBalance: number };
-  reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null }[];
+  reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null; links: FinanceLink[] }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string; payments: Record<string, string> }[];
   butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string; phone: string }[];
   shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
@@ -118,9 +118,13 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   const events: Ev[] = (() => {
     const ev: Ev[] = [];
     for (const r of reservations) {
-      const settle = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); // 카드: 결제 후 7영업일에 수수료를 뗀 금액이 입금
-      if (settle > base && keys.includes(settle.slice(0, 7)) && r.card > 0) ev.push({ date: settle, type: "card", amount: r.card - feeOf(r.card), label: r.couple, note: `카드 ${won(r.card)} − 수수료 ${won(feeOf(r.card))} (결제 ${md(r.paidDate)})` });
-      const cash = r.cash ?? Math.max(0, r.total - r.card); // 현금: 예식 당일
+      const split = splitInflow(r);
+      // 카드: 결제 후 7영업일에 수수료를 뗀 금액이 입금. 접수 때 결제분 + 결제 링크분(대기 중이면 기한일에 결제되는 것으로 예상)
+      for (const c of [{ amount: split.baseCard, date: r.paidDate, note: "결제" }, ...split.linkCards.map((l) => ({ amount: l.amount, date: l.date, note: l.paid ? "링크 결제" : "링크 결제 대기" }))]) {
+        const settle = addBusinessDays(c.date, CARD_SETTLE_BUSINESS_DAYS);
+        if (settle > base && keys.includes(settle.slice(0, 7)) && c.amount > 0) ev.push({ date: settle, type: "card", amount: c.amount - feeOf(c.amount), label: r.couple, note: `카드 ${won(c.amount)} − 수수료 ${won(feeOf(c.amount))} (${c.note} ${md(c.date)})` });
+      }
+      const cash = split.cash; // 현금: 예식 당일
       if (r.date > base && keys.includes(r.date.slice(0, 7)) && cash > 0) ev.push({ date: r.date, type: "cash", amount: cash, label: r.couple, note: r.cash === null ? "잔금 예상(총액−카드)" : "현금" });
     }
     for (const e of costOutflowEvents(costs, keys, base)) ev.push({ date: e.when, type: e.kind === "once" ? "one" : "mon", amount: e.amount, label: e.name });

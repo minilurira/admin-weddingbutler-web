@@ -73,6 +73,19 @@ export function companyProfit(net: number, shifts: readonly { rid: string; grade
   return net + recorded - ownerPool(shifts).pool;
 }
 
+/** 예약에 보낸 결제 링크 중 통장 예상에 필요한 것. paid: 결제된 금액(환불 뺀 값)과 결제일. 미결제: 청구액, 그중 잔금 몫(balance), 예상 결제일(기한). */
+export interface FinanceLink { paid: boolean; amount: number; balance: number; date: string }
+
+/** 예약의 입금을 나눈다: 접수 때 카드(card − 링크로 결제된 금액), 링크 카드(결제됨·대기), 현장 현금.
+ * 결제 대기 중인 링크가 담은 잔금은 현금에서 빼고 카드로 본다. 현금을 이미 입력했으면 그 값을 쓴다. */
+export function splitInflow(r: { total: number; card: number; cash: number | null; links?: readonly FinanceLink[] }) {
+  const links = r.links ?? [];
+  const paid = links.filter((l) => l.paid), pending = links.filter((l) => !l.paid);
+  const baseCard = Math.max(0, r.card - paid.reduce((a, l) => a + l.amount, 0));
+  const cash = r.cash ?? Math.max(0, r.total - r.card - pending.reduce((a, l) => a + l.balance, 0));
+  return { baseCard, linkCards: [...paid, ...pending], pending, cash };
+}
+
 /**
  * 예정 예약까지 포함한 누적 회사 자체 수익.
  * 수입 = 모든 확정 예약의 카드(수수료 제외) + 현금. 아직 안 치른 예식(today 이후)의 미입력 잔금은 총액 − 카드로 예상하고, 지난 예식은 입력한 현금만 센다.
@@ -80,7 +93,7 @@ export function companyProfit(net: number, shifts: readonly { rid: string; grade
  * 배정 전 예약(unassigned)은 버틀러 정산·오너 몫이 아직 빠지지 않는다.
  */
 export function companyProfitAll(
-  reservations: readonly { id: string; date: string; card: number; cash: number | null; total: number }[],
+  reservations: readonly { id: string; date: string; card: number; cash: number | null; total: number; links?: readonly FinanceLink[] }[],
   costs: readonly { kind: string; amount: number; date: string }[],
   shifts: readonly { rid: string; date: string; grade: string; pay: number; extra: number }[],
   feeRate: number,
@@ -92,9 +105,11 @@ export function companyProfitAll(
   const assigned = new Set(shifts.map((s) => s.rid));
   for (const r of reservations) {
     const upcoming = r.date >= today;
-    const expected = r.cash === null && upcoming ? Math.max(0, r.total - r.card) : 0;
+    const split = splitInflow(r);
+    const expected = r.cash === null && upcoming ? split.cash : 0;
+    const pendingCard = split.pending.reduce((a, l) => a + l.amount, 0); // 결제 대기 링크는 카드로 들어올 예정
     expectedCash += expected;
-    income += r.card - cardFee(r.card, feeRate) + (r.cash ?? expected);
+    income += r.card - cardFee(r.card, feeRate) + pendingCard - cardFee(pendingCard, feeRate) + (r.cash ?? expected);
     if (upcoming && !assigned.has(r.id)) unassigned++;
   }
   const cost = costs.reduce((a, c) => a + c.amount * (c.kind === "monthly" ? monthIndex(endMonth) - monthIndex(c.date.slice(0, 7)) + 1 : 1), 0)

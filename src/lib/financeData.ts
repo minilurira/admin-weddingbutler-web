@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, getFinanceSettings } from "@/lib/finance";
 import { reservationTotal } from "@/lib/view";
+import { EXTRA_GUEST_FEE } from "@/lib/pricing";
+import type { FinanceLink } from "@/lib/financeCalc";
 import type { FinanceData } from "@/components/FinanceView";
 
-const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+const kstDay = (d: Date) => new Date(d.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+const kstToday = () => kstDay(new Date());
 
 function parsePayments(raw: string): Record<string, string> {
   try {
@@ -16,7 +19,7 @@ function parsePayments(raw: string): Record<string, string> {
 export async function loadFinanceData(): Promise<FinanceData> {
   await ensureFinanceTables();
   const [reservations, cash, costs, butlers, shifts, settings] = await Promise.all([
-    prisma.reservation.findMany({ where: { status: "확정", confirmDate: { not: "" } }, orderBy: { confirmDate: "asc" } }),
+    prisma.reservation.findMany({ where: { status: "확정", confirmDate: { not: "" } }, orderBy: { confirmDate: "asc" }, include: { paymentLinks: { where: { status: { in: ["sent", "paid"] } } } } }),
     prisma.financeCash.findMany(),
     prisma.financeCost.findMany({ orderBy: { date: "asc" } }),
     prisma.butler.findMany({ orderBy: { createdAt: "asc" } }),
@@ -34,8 +37,13 @@ export async function loadFinanceData(): Promise<FinanceData> {
       plan: r.confirmPlan,
       total: reservationTotal(r),
       card: r.paidAmount,
-      paidDate: new Date(r.requestedAt.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10), // 접수(결제) 날짜, 한국시간
+      paidDate: kstDay(r.requestedAt), // 접수(결제) 날짜, 한국시간
       cash: cashMap.get(r.id) ?? null,
+      links: r.paymentLinks.flatMap((l): FinanceLink[] => {
+        if (l.status === "paid") return [{ paid: true, amount: l.paidAmount - l.refundedAmount, balance: 0, date: kstDay(l.paidAt ?? l.createdAt) }];
+        if (l.expiresAt.getTime() <= Date.now()) return []; // 기한이 지난 미결제 링크는 다시 현장 현금으로 본다
+        return [{ paid: false, amount: l.amount, balance: Math.max(0, l.amount - l.extraGuests * EXTRA_GUEST_FEE), date: kstDay(l.expiresAt) }];
+      }),
     })),
     costs: costs.map((c) => ({ id: c.id, name: c.name, amount: c.amount, kind: c.kind === "monthly" ? "monthly" : "once", date: c.date, memo: c.memo, payments: parsePayments(c.payments) })),
     butlers: butlers.map((b) => ({ id: b.id, name: b.name, grade: b.grade, bankName: b.bankName, accountNumber: b.accountNumber, accountHolder: b.accountHolder, phone: b.phone })),
