@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { claimExtraGuests, getExtraGuest } from "@/lib/extraGuestActions";
 import type { ExtraGuestView } from "@/lib/extraGuest";
-import { extraGuestDue, won } from "@/lib/pricing";
+import { EXTRA_GUEST_FEE, won } from "@/lib/pricing";
 import { useToast } from "./ToastContext";
 
 const input: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 10, padding: "9px 12px", fontSize: 14, color: "#1E1A1C", width: 120 };
 const STATUS: Record<string, string> = { sent: "결제 대기", paid: "결제 완료", cancelled: "취소" };
 
-/** 예약 상세의 "추가 하객 차액 청구" 카드. 예식 후 실제 접수 인원을 넣으면 기준 초과 인원 × 2,000원에서 이미 낸 금액을 뺀 차액을 결제 링크로 보낸다. */
+/** 예약 상세의 "추가 하객 차액 청구" 카드. 청구할 추가 인원을 넣으면 인원 × 2,000원을 결제 링크로 보낸다(잔금이 남았으면 잔금도 함께). */
 export default function ExtraGuestClaim({ reservationId, card }: { reservationId: string; card: React.CSSProperties }) {
   const toast = useToast();
   const [data, setData] = useState<ExtraGuestView | null>(null);
@@ -25,8 +25,7 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
   useEffect(() => { setData(null); load(); }, [load]);
 
   const n = Number(actual.replace(/[^0-9]/g, "")) || 0;
-  const due = data && n ? extraGuestDue({ actualGuests: n, guestLimit: data.guestLimit, billedExtraGuests: data.billedExtraGuests, paidClaim: data.paidClaim }) : null;
-  const diff = due?.amount ?? 0;
+  const diff = n * EXTRA_GUEST_FEE;
   const hasBalance = !!data && data.balance > 0;
   const balance = hasBalance && withBalance ? data!.balance : 0;
   const total = diff + balance;
@@ -34,7 +33,7 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
   async function send() {
     if (!data || total <= 0) return;
     const what = [balance ? `잔금 ${won(balance)}` : "", diff ? `추가 하객 차액 ${won(diff)}` : ""].filter(Boolean).join(" + ");
-    if (!window.confirm(`${n ? `실제 접수 ${n}명 기준 ` : ""}${what}${balance && diff ? ` = ${won(total)}` : ""} 결제 링크를 고객에게 보낼까요?`)) return;
+    if (!window.confirm(`${n ? `추가 인원 ${n}명 ` : ""}${what}${balance && diff ? ` = ${won(total)}` : ""} 결제 링크를 고객에게 보낼까요?`)) return;
     setBusy(true);
     try { const res = await claimExtraGuests(reservationId, n, balance > 0); toast(res.message); load(); } catch (e) { toast(e instanceof Error ? e.message : "처리하지 못했습니다."); } finally { setBusy(false); }
   }
@@ -42,7 +41,7 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
   return (
     <section style={card}>
       <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 800 }}>추가 하객 차액 청구</h2>
-      <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "#A79BA1" }}>예식 후 실제 접수 인원이 기준을 넘으면 초과 인원 × 2,000원에서 이미 낸 금액을 뺀 차액을 결제 링크로 청구합니다. 잔금이 남은 고객은 잔금도 함께 담을 수 있어요.</p>
+      <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "#A79BA1" }}>청구할 추가 인원을 넣으면 인원 × 2,000원을 결제 링크로 청구합니다. 이미 청구한 인원은 빼고 넣어 주세요. 잔금이 남은 고객은 잔금도 함께 담을 수 있어요.</p>
       {error && <p style={{ margin: 0, fontSize: 13, color: "#A8416C" }}>{error}</p>}
       {!data && !error && <p style={{ margin: 0, fontSize: 13, color: "#A79BA1" }}>불러오는 중…</p>}
       {data && !data.eligible && <p style={{ margin: 0, fontSize: 13, color: "#8C8188" }}>{data.reason}</p>}
@@ -58,13 +57,13 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
             </label>
           )}
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-            <label style={{ fontSize: 13, fontWeight: 700, color: "#6E646A", display: "flex", alignItems: "center", gap: 8 }}>실제 접수 인원
-              <input inputMode="numeric" value={actual} onChange={(e) => setActual(e.target.value.replace(/[^0-9]/g, ""))} placeholder="예: 130" style={input} />명
+            <label style={{ fontSize: 13, fontWeight: 700, color: "#6E646A", display: "flex", alignItems: "center", gap: 8 }}>추가 인원
+              <input inputMode="numeric" value={actual} onChange={(e) => setActual(e.target.value.replace(/[^0-9]/g, ""))} placeholder={hasBalance ? "없으면 비워 두세요" : "예: 30"} style={input} />명
             </label>
             <span style={{ fontSize: 13.5, fontWeight: 800, color: total > 0 ? "#B0567E" : "#A79BA1" }}>
               {balance > 0
-                ? `잔금 ${won(balance)}${diff > 0 ? ` + 차액 ${won(diff)} = ${won(total)}` : n ? " (추가 하객 차액 없음)" : ""}`
-                : n ? (diff > 0 ? `청구 차액 ${won(diff)}` : "청구할 차액 없음") : ""}
+                ? `잔금 ${won(balance)}${diff > 0 ? ` + 차액 ${won(diff)} = ${won(total)}` : ""}`
+                : diff > 0 ? `청구 차액 ${won(diff)}` : ""}
             </span>
             <button disabled={busy || total <= 0} onClick={send}
               style={{ marginLeft: "auto", height: 40, padding: "0 16px", border: 0, borderRadius: 12, background: "#B0567E", color: "#FFFFFF", fontSize: 13, fontWeight: 800, cursor: "pointer", opacity: busy || total <= 0 ? 0.5 : 1 }}>

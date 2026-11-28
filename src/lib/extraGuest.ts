@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { confirmTotalOf, EXTRA_GUEST_FEE, extraGuestDue, guestLimitAt, onsiteAmount, PAYMENT_TYPES, isPaymentType, planMeta, won } from "@/lib/pricing";
+import { confirmTotalOf, EXTRA_GUEST_FEE, guestLimitAt, onsiteAmount, PAYMENT_TYPES, isPaymentType, planMeta, won } from "@/lib/pricing";
 import { isClaimUid, sendPaymentLinkFor } from "@/lib/paymentLink";
 import { formatStamp } from "@/lib/format";
 
@@ -46,22 +46,20 @@ export async function loadExtraGuest(reservationId: string): Promise<ExtraGuestV
   };
 }
 
-/** actualGuests가 0이면 인원 없이 잔금만 청구한다(includeBalance일 때만). */
-export async function sendExtraGuestClaim(reservationId: string, actualGuests: number, includeBalance: boolean): Promise<{ ok: boolean; message: string }> {
-  if (!Number.isInteger(actualGuests) || actualGuests < 0 || actualGuests > 5000 || (actualGuests === 0 && !includeBalance)) return { ok: false, message: "실제 접수 인원을 확인해 주세요." };
+/** 청구할 추가 인원(extraGuests) × 1인 요금을 결제 링크로 보낸다. 0명이면 잔금만 청구한다(includeBalance일 때만). */
+export async function sendExtraGuestClaim(reservationId: string, extraGuests: number, includeBalance: boolean): Promise<{ ok: boolean; message: string }> {
+  if (!Number.isInteger(extraGuests) || extraGuests < 0 || extraGuests > 5000 || (extraGuests === 0 && !includeBalance)) return { ok: false, message: "추가 인원을 확인해 주세요." };
   const v = await loadExtraGuest(reservationId);
   if (!v.eligible) return { ok: false, message: v.reason };
-  const due = actualGuests ? extraGuestDue({ actualGuests, guestLimit: v.guestLimit, billedExtraGuests: v.billedExtraGuests, paidClaim: v.paidClaim }) : { actualExtra: 0, amount: 0 };
+  const diff = extraGuests * EXTRA_GUEST_FEE;
   const balance = includeBalance ? v.balance : 0;
   if (includeBalance && balance <= 0) return { ok: false, message: "남은 잔금이 없습니다." };
-  if (due.amount + balance <= 0) return { ok: false, message: `청구할 차액이 없습니다 (실제 ${actualGuests}명, 기준 ${v.guestLimit}명${due.actualExtra ? `, 추가 ${due.actualExtra}명은 이미 결제됨` : ""}).` };
-  // 이번 링크에 담는 추가 하객 수 = 차액 금액 ÷ 1인 요금 (이전 방식 결제분은 금액으로 이미 빠져 있다)
-  const extraGuests = Math.floor(due.amount / EXTRA_GUEST_FEE);
+  if (diff + balance <= 0) return { ok: false, message: "청구할 금액이 없습니다." };
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } });
-  const res = await sendPaymentLinkFor(r, { amount: due.amount + balance, paymentType: "", days: 7, claim: { extraGuests, includesBalance: balance > 0 } });
+  const res = await sendPaymentLinkFor(r, { amount: diff + balance, paymentType: "", days: 7, claim: { extraGuests, includesBalance: balance > 0 } });
   if (res.ok) {
-    const parts = [balance > 0 ? `잔금 ${won(balance)}` : "", due.amount > 0 ? `추가 하객 ${extraGuests}명 차액 ${won(due.amount)}` : ""].filter(Boolean).join(" + ");
-    await prisma.note.create({ data: { reservationId, text: `추가 하객 차액 청구 · ${actualGuests ? `실제 접수 ${actualGuests}명(기준 ${v.guestLimit}명)` : "인원 입력 없음"} · ${parts} = ${won(due.amount + balance)}` } });
+    const parts = [balance > 0 ? `잔금 ${won(balance)}` : "", diff > 0 ? `추가 하객 ${extraGuests}명 차액 ${won(diff)}` : ""].filter(Boolean).join(" + ");
+    await prisma.note.create({ data: { reservationId, text: `추가 하객 차액 청구 · ${parts} = ${won(diff + balance)}` } });
   }
   return res;
 }
