@@ -7,7 +7,7 @@ import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { formatStamp } from "@/lib/format";
 import { recordMessage } from "@/lib/messageLog";
 import { cancelPayment, createPaymentLink, deactivatePaymentLink, getPayment, PortOneV1Error } from "@/lib/portoneV1";
-import { expireLabel, expiryAfterDays, paymentLinkText, paymentLinkVariables, type PaymentLinkFields } from "@/lib/paymentLinkText";
+import { claimLinkText, expireLabel, expiryAfterDays, paymentLinkText, paymentLinkVariables, type PaymentLinkFields } from "@/lib/paymentLinkText";
 
 import { logError } from "@/lib/errorLog";
 // 어드민 → 고객 결제 링크(포트원 V1 링크페이). 링크 생성·발송, 웹훅 반영, 환불을 여기서 한다.
@@ -26,7 +26,7 @@ export interface SendLinkOptions {
    * extraGuests: 이 링크에 담긴 추가 하객 수 — 결제되면 예약의 확정 추가 하객에 더해 총 금액에 반영한다.
    * includesBalance: 남은 잔금도 함께 담았는지 — 그렇다면 열려 있는 다른 결제 링크도 취소한다(잔금 이중 결제 방지).
    */
-  claim?: { extraGuests: number; includesBalance: boolean };
+  claim?: { extraGuests: number; includesBalance: boolean; balance: number; extraFee: number };
 }
 
 /** 추가 하객 차액 청구 링크인지 (-G: 현재, -X: 이전 방식) */
@@ -39,7 +39,8 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   if (r.status === "취소") return { ok: false, message: "취소된 예약에는 결제 링크를 보낼 수 없습니다." };
   const amount = Math.floor(opts.amount);
   if (!(amount >= PAYMENT_LINK_MIN_AMOUNT)) return { ok: false, message: `결제 금액은 ${won(PAYMENT_LINK_MIN_AMOUNT)} 이상이어야 합니다.` };
-  const days = Math.min(PAYMENT_LINK_MAX_DAYS, Math.max(1, Math.floor(opts.days) || 3));
+  // 잔금·차액 청구 링크는 보낸 날 23:59까지, 일반 링크는 정한 일수 뒤 23:59까지
+  const days = opts.claim ? 0 : Math.min(PAYMENT_LINK_MAX_DAYS, Math.max(1, Math.floor(opts.days) || 3));
   const expiresAt = expiryAfterDays(days);
 
   const seq = (await prisma.paymentLink.count({ where: { reservationId: r.id } })) + 1;
@@ -83,21 +84,23 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
     payUrl: url,
   };
   const tag = `payment link ${merchantUid}`;
+  // 잔금·차액 청구는 예약 결제 알림톡 문구가 맞지 않아 전용 문구를 문자(LMS)로 보낸다
+  const smsText = claim ? claimLinkText({ ...fields, balance: claim.balance, extraGuests: claim.extraGuests, extraFee: claim.extraFee }) : paymentLinkText(fields);
   let sentVia = "";
-  if (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag)) sentVia = "alimtalk";
-  else if (await sendSms(r.phone, paymentLinkText(fields), tag)) sentVia = "sms";
+  if (!claim && (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag))) sentVia = "alimtalk";
+  else if (await sendSms(r.phone, smsText, tag)) sentVia = "sms";
 
   // 예약 상세의 발송 내역에 남긴다 (알림톡이면 변수, 문자면 보낸 본문)
   await recordMessage({
     reservationId: r.id,
-    kind: "결제 링크",
-    channel: sentVia === "sms" ? "문자" : "알림톡",
+    kind: claim ? "잔금·차액 결제 링크" : "결제 링크",
+    channel: claim || sentVia === "sms" ? "문자" : "알림톡",
     recipient: r.phone,
     templateId: sentVia === "alimtalk" ? process.env.SOLAPI_TEMPLATE_PAYMENT_LINK : undefined,
     variables: sentVia === "alimtalk" ? paymentLinkVariables(fields) : undefined,
-    content: sentVia === "sms" ? paymentLinkText(fields) : "",
+    content: sentVia === "sms" ? smsText : "",
     status: sentVia ? "sent" : "failed",
-    detail: sentVia ? "" : "알림톡과 문자 모두 보내지 못했습니다.",
+    detail: sentVia ? "" : claim ? "문자를 보내지 못했습니다." : "알림톡과 문자 모두 보내지 못했습니다.",
   });
 
   await prisma.paymentLink.create({
@@ -171,7 +174,8 @@ export async function applyPaymentWebhook(impUid: string): Promise<WebhookOutcom
 
   const total = calcConfirm({ plan: updated.confirmPlan, butlers: updated.confirmButlers, extraGuests: updated.confirmExtraGuests, discount: updated.confirmDiscount, baseOverride: updated.requestedTotal, travelFee: updated.confirmTravelFee }).total;
   const onsite = onsiteAmount(total, updated.paidAmount);
-  await sendNewReservationAlimtalk({
+  // 잔금·차액 청구 결제는 예식 뒤라 "신규 예약 접수" 알림톡을 보내지 않는다 (운영팀 카카오워크 알림만)
+  if (!isClaimUid(link.merchantUid)) await sendNewReservationAlimtalk({
     reservationId: updated.id,
     customer: updated.customer,
     couple: updated.couple,
@@ -187,7 +191,7 @@ export async function applyPaymentWebhook(impUid: string): Promise<WebhookOutcom
   });
   await sendNewReservationKakaoWorkNotice(
     [
-      `결제 링크 결제 완료 (${updated.id})`,
+      `${isClaimUid(link.merchantUid) ? "잔금·차액 결제 완료" : "결제 링크 결제 완료"} (${updated.id})`,
       `고객: ${updated.customer} (${updated.couple}) · ${updated.phone}`,
       `예식: ${updated.wishDateLabel} · ${updated.venueLabel}`,
       `결제: ${isPaymentType(link.paymentType) ? PAYMENT_TYPES[link.paymentType].name : "유형 미지정"} · 이번 결제 ${won(pay.amount)} · 누적 ${won(updated.paidAmount)} · 현장(현금) ${won(onsite)}`,

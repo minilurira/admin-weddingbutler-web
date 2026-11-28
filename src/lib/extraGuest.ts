@@ -56,7 +56,7 @@ export async function sendExtraGuestClaim(reservationId: string, extraGuests: nu
   if (includeBalance && balance <= 0) return { ok: false, message: "남은 잔금이 없습니다." };
   if (diff + balance <= 0) return { ok: false, message: "청구할 금액이 없습니다." };
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } });
-  const res = await sendPaymentLinkFor(r, { amount: diff + balance, paymentType: "", days: 7, claim: { extraGuests, includesBalance: balance > 0 } });
+  const res = await sendPaymentLinkFor(r, { amount: diff + balance, paymentType: "", days: 0, claim: { extraGuests, includesBalance: balance > 0, balance, extraFee: diff } });
   if (res.ok) {
     const parts = [balance > 0 ? `잔금 ${won(balance)}` : "", diff > 0 ? `추가 하객 ${extraGuests}명 차액 ${won(diff)}` : ""].filter(Boolean).join(" + ");
     await prisma.note.create({ data: { reservationId, text: `추가 하객 차액 청구 · ${parts} = ${won(diff + balance)}` } });
