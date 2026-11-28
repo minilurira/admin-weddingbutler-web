@@ -98,7 +98,8 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
     recipient: r.phone,
     templateId: sentVia === "alimtalk" ? process.env.SOLAPI_TEMPLATE_PAYMENT_LINK : undefined,
     variables: sentVia === "alimtalk" ? paymentLinkVariables(fields) : undefined,
-    content: sentVia === "sms" ? smsText : "",
+    // 문자로 보냈거나 보내지 못한 건은 보내려던 본문을 남긴다 (실패해도 발송 내역에서 내용을 볼 수 있게)
+    content: sentVia === "alimtalk" ? "" : smsText,
     status: sentVia ? "sent" : "failed",
     detail: sentVia ? "" : claim ? "문자를 보내지 못했습니다." : "알림톡과 문자 모두 보내지 못했습니다.",
   });
