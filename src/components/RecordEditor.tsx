@@ -228,10 +228,10 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
     });
   }
 
-  function onSendLink() {
-    if (!window.confirm(`${reservation.customer} 고객님께 축의 기록 링크를 보낼까요?`)) return;
+  function onSendLink(channel: "alimtalk" | "sms") {
+    if (!window.confirm(`${reservation.customer} 고객님께 축의 기록 링크를 ${channel === "sms" ? "문자로" : "알림톡으로"} 보낼까요?`)) return;
     startTransition(async () => {
-      const res = await sendRecordLink(reservation.id);
+      const res = await sendRecordLink(reservation.id, channel);
       showToast(res.message);
       router.refresh();
     });
@@ -291,7 +291,8 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
               <code style={{ flex: "1 1 260px", minWidth: 0, padding: "11px 14px", borderRadius: 12, background: "#FFFFFF", fontSize: 13, color: shared ? "#1E1A1C" : "#A79BA1", overflowWrap: "anywhere" }}>{link.url}</code>
               {shared && <button type="button" onClick={copyUrl} style={ghostBtn}>주소 복사</button>}
-              {shared && <button type="button" onClick={onSendLink} disabled={isPending} style={{ ...ghostBtn, borderColor: "#B0567E", color: "#8A3F61" }}>알림톡 발송</button>}
+              {shared && <button type="button" onClick={() => onSendLink("alimtalk")} disabled={isPending} style={{ ...ghostBtn, borderColor: "#B0567E", color: "#8A3F61" }}>알림톡 발송</button>}
+              {shared && <button type="button" onClick={() => onSendLink("sms")} disabled={isPending} style={ghostBtn}>문자 발송</button>}
               {link.previewUrl && <a href={link.previewUrl} target="_blank" rel="noopener noreferrer" style={{ ...ghostBtn, display: "inline-flex", alignItems: "center" }}>고객 화면으로 보기</a>}
             </div>
             {shared && (

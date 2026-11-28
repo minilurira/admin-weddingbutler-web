@@ -6,6 +6,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { RETENTION_DAYS, addDays, customerUrl, fromKstInput, isExpired, newToken } from "@/lib/records";
 import { sendRecordLinkAlimtalk } from "@/lib/alimtalk";
+import { sendSms } from "@/lib/sms";
+import { recordMessage } from "@/lib/messageLog";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -165,7 +167,7 @@ export async function revokeRecord(reservationId: string): Promise<{ ok: boolean
 }
 
 /** 열려 있는(게시·실시간 공유) 축의 기록의 주소를 고객 예약 번호로 보낸다. */
-export async function sendRecordLink(reservationId: string): Promise<{ ok: boolean; message: string }> {
+export async function sendRecordLink(reservationId: string, channel: "alimtalk" | "sms" = "alimtalk"): Promise<{ ok: boolean; message: string }> {
   await requireSession();
   const link = await prisma.recordLink.findUnique({ where: { reservationId }, include: { reservation: true } });
   if (!link || (link.status !== "published" && link.status !== "live")) return { ok: false, message: "게시하거나 실시간 공유를 시작한 뒤에 보낼 수 있어요." };
@@ -186,7 +188,12 @@ export async function sendRecordLink(reservationId: string): Promise<{ ok: boole
     "아래 주소에서 예약하신 휴대폰 번호로 문자 인증을 하시면 확인하실 수 있습니다.",
     customerUrl(r.id),
   ].join("\n");
-  const res = await sendRecordLinkAlimtalk(r.id, r.phone, variables, text);
+  let res: { sent: boolean; detail: string };
+  if (channel === "sms") {
+    const sent = await sendSms(r.phone, text, `record link ${r.id}`);
+    await recordMessage({ reservationId: r.id, kind: "축의 기록 안내", channel: "문자", recipient: r.phone, content: text, status: sent ? "sent" : "failed", detail: sent ? "" : "문자를 보내지 못했습니다." });
+    res = { sent, detail: sent ? "문자" : "문자 발송 실패" };
+  } else res = await sendRecordLinkAlimtalk(r.id, r.phone, variables, text);
   if (res.sent) await prisma.note.create({ data: { reservationId: r.id, text: `축의 기록 링크 발송 (${res.detail})` } });
   revalidateRecord(reservationId);
   return res.sent ? { ok: true, message: `축의 기록 링크를 ${res.detail}으로 보냈어요.` } : { ok: false, message: `보내지 못했어요 (${res.detail}).` };
