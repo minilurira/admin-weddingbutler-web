@@ -21,9 +21,16 @@ export interface SendLinkOptions {
   days: number;
   /** 어드민이 정한 할인율(%) — 금액에는 이미 반영돼 있고 기록용으로만 쓴다 */
   discountRate?: number;
-  /** true면 예식 후 추가 하객 차액 청구 링크 (주문번호 끝이 -X, 결제창 이름에 "추가 하객 차액") */
-  extraGuests?: boolean;
+  /**
+   * 예식 후 추가 하객 차액 청구 링크면 넣는다 (주문번호 끝이 -G).
+   * extraGuests: 이 링크에 담긴 추가 하객 수 — 결제되면 예약의 확정 추가 하객에 더해 총 금액에 반영한다.
+   * includesBalance: 남은 잔금도 함께 담았는지 — 그렇다면 열려 있는 다른 결제 링크도 취소한다(잔금 이중 결제 방지).
+   */
+  claim?: { extraGuests: number; includesBalance: boolean };
 }
+
+/** 추가 하객 차액 청구 링크인지 (-G: 현재, -X: 이전 방식) */
+export const isClaimUid = (merchantUid: string) => /-[XG]\d+$/.test(merchantUid);
 
 export type SendLinkResult = { ok: true; message: string } | { ok: false; message: string };
 
@@ -36,14 +43,16 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   const expiresAt = expiryAfterDays(days);
 
   const seq = (await prisma.paymentLink.count({ where: { reservationId: r.id } })) + 1;
-  const merchantUid = `${r.id}-${opts.extraGuests ? "X" : "L"}${seq}`;
+  const claim = opts.claim;
+  const merchantUid = `${r.id}-${claim ? "G" : "L"}${seq}`;
   const plan = r.confirmPlan || r.requestedPlan;
+  const claimName = !claim ? "" : claim.includesBalance ? (claim.extraGuests > 0 ? " 잔금·추가 하객" : " 잔금") : " 추가 하객 차액";
 
   let url: string;
   try {
     url = await createPaymentLink({
       merchantUid,
-      name: opts.extraGuests ? `웨딩버틀러 ${plan} 추가 하객 차액` : `웨딩버틀러 ${plan}`,
+      name: `웨딩버틀러 ${plan}${claimName}`,
       amount,
       buyerName: r.customer,
       buyerTel: r.phone,
@@ -55,7 +64,10 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
     return { ok: false, message: "포트원에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요." };
   }
 
-  const previous = await prisma.paymentLink.findMany({ where: { reservationId: r.id, status: "sent" } });
+  // 이전에 보낸 미결제 링크 정리: 일반 링크는 일반 링크끼리, 차액 링크는 차액 링크끼리 대체한다.
+  // 잔금을 담은 차액 링크는 잔금이 두 번 결제되지 않게 열려 있는 링크를 모두 취소한다.
+  const open = await prisma.paymentLink.findMany({ where: { reservationId: r.id, status: "sent" } });
+  const previous = open.filter((p) => (claim?.includesBalance ? true : claim ? isClaimUid(p.merchantUid) : !isClaimUid(p.merchantUid)));
   for (const p of previous) {
     await deactivatePaymentLink(p.url);
     await prisma.paymentLink.updateMany({ where: { id: p.id, status: "sent" }, data: { status: "cancelled" } });
@@ -97,6 +109,7 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
       url,
       expiresAt,
       sentVia,
+      extraGuests: claim ? Math.max(0, Math.floor(claim.extraGuests)) : 0,
     },
   });
   const via = sentVia === "alimtalk" ? "알림톡" : sentVia === "sms" ? "문자" : "발송 실패";
@@ -149,6 +162,8 @@ export async function applyPaymentWebhook(impUid: string): Promise<WebhookOutcom
     where: { id: r.id },
     data: {
       paidAmount: { increment: pay.amount },
+      // 차액 청구 링크면 담긴 추가 하객을 확정 내역에 더해 총 금액에 반영한다 (현장결제 금액이 줄지 않게)
+      ...(link.extraGuests > 0 ? { confirmExtraGuests: { increment: link.extraGuests } } : {}),
       ...(isPaymentType(link.paymentType) ? { paymentType: link.paymentType } : {}),
     },
   });

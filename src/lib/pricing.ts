@@ -215,8 +215,9 @@ export function planBaseOf(r: { confirmPlan: string; requestedTotal: number }): 
 }
 
 /**
- * 예식 후 추가 하객 차액: 실제 접수 인원이 기준 하객을 넘은 만큼의 추가 요금에서, 예약 때 이미 청구한 추가 하객(확정 내역)과
- * 이미 결제된 차액을 뺀 금액. 음수면 청구할 차액이 없다(환불은 하지 않는다).
+ * 예식 후 추가 하객 차액: 실제 접수 인원이 기준 하객을 넘은 만큼의 추가 요금에서, 이미 청구한 추가 하객(확정 내역)과
+ * 이전 방식(-X 링크)으로 결제된 차액을 뺀 금액. 음수면 청구할 차액이 없다(환불은 하지 않는다).
+ * 현재 방식(-G 링크)으로 결제된 차액은 결제 때 확정 추가 하객에 더해지므로 billedExtraGuests에 이미 들어 있다.
  */
 export function extraGuestDue(input: { actualGuests: number; guestLimit: number; billedExtraGuests: number; paidClaim: number }): { actualExtra: number; amount: number } {
   const actualExtra = Math.max(0, Math.floor(input.actualGuests) - input.guestLimit);
