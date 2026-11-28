@@ -41,10 +41,14 @@ export interface RecordEditorProps {
     receiverLabel: string;
     staffCount: number;
     videoUrl: string;
+    videoUrl2: string;
     entries: { envelopeNo: number; side: Side; name: string; relation: string; amount: number | null; tickets: number; memo: string }[];
   };
   retentionDays: number;
 }
+
+const inputStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 12, padding: "12px 14px", fontSize: 13.5, color: "#1E1A1C", width: "100%", boxSizing: "border-box" };
+const labelStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#6E646A" };
 
 const RELATIONS = ["친척", "친구", "직장", "지인"];
 const STATUS_LABEL: Record<string, { text: string; bg: string; color: string }> = {
@@ -79,6 +83,7 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
     receiverLabel: initial.receiverLabel,
     staffCount: String(initial.staffCount),
     videoUrl: initial.videoUrl,
+    videoUrl2: initial.videoUrl2,
   });
   const [rows, setRows] = useState<Row[]>(() => initial.entries.map(toRow));
   const [dirty, setDirty] = useState(false);
@@ -86,6 +91,8 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
   const [pendingImport, setPendingImport] = useState<{ fileName: string; guests: ParsedGuest[] } | null>(null);
 
   const sealed = mode === "sealed";
+  // 양가 요금제는 신랑측·신부측 영상을 따로 받는다 (records.ts isBothSidesPlan과 같은 기준)
+  const bothSides = reservation.plan === "스몰양가" || reservation.plan === "프리미엄";
   const status = STATUS_LABEL[link?.status ?? "draft"] ?? STATUS_LABEL.draft;
   const isPublished = link?.status === "published";
   const isLive = link?.status === "live";
@@ -184,6 +191,7 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
         receiverLabel: meta.receiverLabel,
         staffCount: num(meta.staffCount),
         videoUrl: meta.videoUrl,
+        videoUrl2: meta.videoUrl2,
         entries: rows.map((r) => ({
           envelopeNo: num(r.envelopeNo),
           side: r.side,
@@ -247,9 +255,7 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
     }
   }
 
-  const inputStyle: React.CSSProperties = { border: 0, background: "#F6F3F5", borderRadius: 12, padding: "12px 14px", fontSize: 13.5, color: "#1E1A1C", width: "100%", boxSizing: "border-box" };
   const cellInput: React.CSSProperties = { ...inputStyle, padding: "9px 10px", borderRadius: 10, background: "#FFFFFF", border: "1px solid #ECE7E9" };
-  const labelStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#6E646A" };
   const ghostBtn: React.CSSProperties = { height: 40, padding: "0 16px", border: "1px solid #E4DCE1", borderRadius: 12, background: "#FFFFFF", color: "#413A3E", fontSize: 13, fontWeight: 700, cursor: "pointer" };
   const primaryBtn: React.CSSProperties = { height: 48, padding: "0 22px", border: 0, borderRadius: 14, background: "#B0567E", color: "#fff", fontSize: 14.5, fontWeight: 700, opacity: isPending ? 0.7 : 1, cursor: "pointer" };
   const th: React.CSSProperties = { textAlign: "left", fontSize: 12, fontWeight: 700, color: "#8C8188", padding: "0 6px 8px", whiteSpace: "nowrap" };
@@ -326,7 +332,14 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
           <label style={labelStyle}>인계확인서 봉투 매수<input inputMode="numeric" {...setMetaField("handoverEnvelopeCount")} placeholder="0" style={inputStyle} /></label>
           <label style={labelStyle}>축의금 인수자 (고객 화면 표시)<input {...setMetaField("receiverLabel")} placeholder="김○○ (신랑 부친)" style={inputStyle} /></label>
           <label style={labelStyle}>담당 버틀러 (명)<input inputMode="numeric" {...setMetaField("staffCount")} style={inputStyle} /></label>
-          <label style={{ ...labelStyle, gridColumn: "1 / -1" }}>운영 영상 링크 (선택)<input {...setMetaField("videoUrl")} placeholder="https://" style={inputStyle} /></label>
+          {bothSides ? (
+            <>
+              <VideoField label="신랑측 영상 (유튜브 링크, 선택)" input={setMetaField("videoUrl")} />
+              <VideoField label="신부측 영상 (유튜브 링크, 선택)" input={setMetaField("videoUrl2")} />
+            </>
+          ) : (
+            <VideoField label="운영 영상 (유튜브 링크, 선택)" input={setMetaField("videoUrl")} wide />
+          )}
         </div>
       </section>
 
@@ -429,5 +442,27 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
         {dirty && <span style={{ fontSize: 12.5, color: "#A79BA1" }}>저장하지 않은 변경이 있어요</span>}
       </div>
     </main>
+  );
+}
+
+/** 유튜브 주소에서 영상 ID를 뽑는다 (홈페이지 src/lib/youtube.ts와 같은 규칙) */
+function youtubeId(url: string): string | null {
+  const m = url.trim().match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function VideoField({ label, input, wide }: { label: string; input: { value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }; wide?: boolean }) {
+  const v = input.value.trim();
+  const id = v ? youtubeId(v) : null;
+  return (
+    <label style={{ ...labelStyle, ...(wide ? { gridColumn: "1 / -1" } : {}) }}>
+      {label}
+      <input {...input} placeholder="https://youtu.be/..." style={inputStyle} />
+      {v && (
+        <span style={{ fontSize: 12, fontWeight: 600, color: id ? "#2F6B4F" : "#8A5A00" }}>
+          {id ? "✓ 유튜브 영상 · 고객 화면에서 바로 재생돼요" : "유튜브 주소가 아니에요 · 고객 화면에는 링크 버튼으로만 보여요"}
+        </span>
+      )}
+    </label>
   );
 }
