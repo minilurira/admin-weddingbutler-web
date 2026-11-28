@@ -66,3 +66,26 @@ export function paymentLinkText(f: PaymentLinkFields) {
     "기한이 지나면 링크가 만료되니, 다시 받으시려면 채널로 문의해 주세요.",
   ].join("\n");
 }
+
+/** 잔금·추가 하객 차액 청구 문자(LMS). 알림톡 템플릿이 없어 문자로만 보낸다. 해당하는 금액 줄만 넣는다. */
+export function claimLinkText(f: PaymentLinkFields & { balance: number; extraGuests: number; extraFee: number }) {
+  const w = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+  const title = f.balance > 0 && f.extraFee > 0 ? "잔금·추가 하객 결제 안내" : f.balance > 0 ? "잔금 결제 안내" : "추가 하객 결제 안내";
+  return [
+    `[웨딩버틀러] ${title}`,
+    "",
+    `${f.name.trim() || "고객"}님, 웨딩버틀러를 이용해 주셔서 감사합니다.`,
+    "예식 당일 정산 내역을 안내드립니다.",
+    "",
+    `▶ 예식일: ${f.wishDate || "-"}`,
+    ...(f.balance > 0 ? [`▶ 잔금: ${w(f.balance)}`] : []),
+    ...(f.extraFee > 0 ? [`▶ 추가 하객 ${f.extraGuests}명 × 2,000원: ${w(f.extraFee)}`] : []),
+    `▶ 결제금액: ${w(f.amount)}`,
+    `▶ 결제기한: ${expireLabel(f.expiresAt)}`,
+    "",
+    "아래 링크에서 카드로 결제해 주세요.",
+    f.payUrl,
+    "",
+    "문의는 카카오톡 채널로 남겨 주세요.",
+  ].join("\n");
+}
