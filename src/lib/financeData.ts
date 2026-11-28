@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ensureFinanceTables, getFinanceSettings } from "@/lib/finance";
 import { reservationTotal } from "@/lib/view";
+import { cashReceivedBy } from "@/lib/cashReceipt";
 import { EXTRA_GUEST_FEE } from "@/lib/pricing";
 import type { FinanceLink } from "@/lib/financeCalc";
 import type { FinanceData } from "@/components/FinanceView";
@@ -27,6 +28,8 @@ export async function loadFinanceData(): Promise<FinanceData> {
     getFinanceSettings(),
   ]);
   const cashMap = new Map(cash.map((c) => [c.reservationId, c.amount]));
+  // "현금 수령"으로 기록한 돈은 예약의 결제 금액(paidAmount)에 더해져 있어서, 카드에서 빼고 현금으로 센다
+  const receivedBy = await cashReceivedBy(reservations.map((r) => r.id));
   return {
     today: kstToday(),
     settings,
@@ -36,9 +39,10 @@ export async function loadFinanceData(): Promise<FinanceData> {
       couple: r.customer,
       plan: r.confirmPlan,
       total: reservationTotal(r),
-      card: r.paidAmount,
+      card: Math.max(0, r.paidAmount - (receivedBy.get(r.id) ?? 0)),
+      received: receivedBy.get(r.id) ?? 0,
       paidDate: kstDay(r.requestedAt), // 접수(결제) 날짜, 한국시간
-      cash: cashMap.get(r.id) ?? null,
+      cash: cashMap.has(r.id) ? Math.max(cashMap.get(r.id)!, receivedBy.get(r.id) ?? 0) : null,
       links: r.paymentLinks.flatMap((l): FinanceLink[] => {
         if (l.status === "paid") return [{ paid: true, amount: l.paidAmount - l.refundedAmount, balance: 0, date: kstDay(l.paidAt ?? l.createdAt) }];
         if (l.expiresAt.getTime() <= Date.now()) return []; // 기한이 지난 미결제 링크는 다시 현장 현금으로 본다

@@ -78,11 +78,12 @@ export interface FinanceLink { paid: boolean; amount: number; balance: number; d
 
 /** 예약의 입금을 나눈다: 접수 때 카드(card − 링크로 결제된 금액), 링크 카드(결제됨·대기), 현장 현금.
  * 결제 대기 중인 링크가 담은 잔금은 현금에서 빼고 카드로 본다. 현금을 이미 입력했으면 그 값을 쓴다. */
-export function splitInflow(r: { total: number; card: number; cash: number | null; links?: readonly FinanceLink[] }) {
+export function splitInflow(r: { total: number; card: number; cash: number | null; received?: number; links?: readonly FinanceLink[] }) {
   const links = r.links ?? [];
   const paid = links.filter((l) => l.paid), pending = links.filter((l) => !l.paid);
   const baseCard = Math.max(0, r.card - paid.reduce((a, l) => a + l.amount, 0));
-  const cash = r.cash ?? Math.max(0, r.total - r.card - pending.reduce((a, l) => a + l.balance, 0));
+  // received: 예약 상세에서 "현금 수령"으로 기록한 돈(card에는 안 들어 있다). 남은 잔금 예상은 그보다 작아지지 않는다
+  const cash = r.cash ?? Math.max(r.received ?? 0, r.total - r.card - pending.reduce((a, l) => a + l.balance, 0));
   return { baseCard, linkCards: [...paid, ...pending], pending, cash };
 }
 
@@ -93,7 +94,7 @@ export function splitInflow(r: { total: number; card: number; cash: number | nul
  * 배정 전 예약(unassigned)은 버틀러 정산·오너 몫이 아직 빠지지 않는다.
  */
 export function companyProfitAll(
-  reservations: readonly { id: string; date: string; card: number; cash: number | null; total: number; links?: readonly FinanceLink[] }[],
+  reservations: readonly { id: string; date: string; card: number; cash: number | null; total: number; received?: number; links?: readonly FinanceLink[] }[],
   costs: readonly { kind: string; amount: number; date: string }[],
   shifts: readonly { rid: string; date: string; grade: string; pay: number; extra: number }[],
   feeRate: number,
@@ -106,7 +107,7 @@ export function companyProfitAll(
   for (const r of reservations) {
     const upcoming = r.date >= today;
     const split = splitInflow(r);
-    const expected = r.cash === null && upcoming ? split.cash : 0;
+    const expected = r.cash === null ? (upcoming ? split.cash : r.received ?? 0) : 0;
     const pendingCard = split.pending.reduce((a, l) => a + l.amount, 0); // 결제 대기 링크는 카드로 들어올 예정
     expectedCash += expected;
     income += r.card - cardFee(r.card, feeRate) + pendingCard - cardFee(pendingCard, feeRate) + (r.cash ?? expected);

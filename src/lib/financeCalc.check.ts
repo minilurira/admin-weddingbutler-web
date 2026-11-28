@@ -63,3 +63,9 @@ assert.equal(done.cash, 0); assert.equal(done.baseCard, 100000);
 // 추가 하객만 담은 링크(balance 0)는 현장 잔금 현금을 줄이지 않는다
 assert.equal(splitInflow({ total: 400000, card: 100000, cash: null, links: [{ paid: false, amount: 20000, balance: 0, date: "2026-11-28" }] }).cash, 300000);
 console.log("splitInflow ok");
+
+// 현금 수령: card에는 없고 현금으로 센다. 전액 수령이면 그 금액, 일부면 남은 잔금까지 예상
+assert.equal(splitInflow({ total: 750000, card: 100000, cash: null, received: 650000 }).cash, 650000);
+assert.equal(splitInflow({ total: 750000, card: 100000, cash: null, received: 100000 }).cash, 650000);
+assert.equal(companyProfitAll([{ id: "c", date: "2026-11-01", card: 100000, cash: null, total: 750000, received: 650000 }], [], [], 0, "2026-11-28").profit, 750000);
+console.log("현금 수령 ok");

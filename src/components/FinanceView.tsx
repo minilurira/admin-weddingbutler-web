@@ -13,7 +13,7 @@ import { BUTLER_GRADES, CARD_SETTLE_BUSINESS_DAYS, OWNER_HEADCOUNT, OWNER_SPLIT,
 export interface FinanceData {
   today: string;
   settings: { feeRate: number; bankDate: string; bankBalance: number };
-  reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null; links: FinanceLink[] }[];
+  reservations: { id: string; date: string; couple: string; plan: string; total: number; card: number; paidDate: string; cash: number | null; received: number; links: FinanceLink[] }[];
   costs: { id: string; name: string; amount: number; kind: "once" | "monthly"; date: string; memo: string; payments: Record<string, string> }[];
   butlers: { id: string; name: string; grade: string; bankName: string; accountNumber: string; accountHolder: string; phone: string }[];
   shifts: { id: string; butlerId: string; date: string; rid: string; grade: string; pay: number; extra: number; paid: boolean; paidDate: string }[];
@@ -92,7 +92,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
   // 수입 리스트는 결제일(예약 접수일) 기준으로 모으고 정렬한다. 예식일은 옆에 함께 보여 준다.
   const rs = reservations.filter((r) => inMonth(r.paidDate)).sort((a, b) => a.paidDate.localeCompare(b.paidDate) || a.date.localeCompare(b.date));
   const card = rs.reduce((s, r) => s + r.card, 0);
-  const cash = rs.reduce((s, r) => s + (r.cash ?? 0), 0);
+  const cash = rs.reduce((s, r) => s + (r.cash ?? r.received), 0);
   const fee = rs.reduce((s, r) => s + feeOf(r.card), 0);
   const gross = card + cash, income = gross - fee;
   const monthly = costs.filter((c) => c.kind === "monthly" && c.date.slice(0, 7) <= month).reduce((s, c) => s + c.amount, 0);
@@ -125,7 +125,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
         if (settle > base && keys.includes(settle.slice(0, 7)) && c.amount > 0) ev.push({ date: settle, type: "card", amount: c.amount - feeOf(c.amount), label: r.couple, note: `카드 ${won(c.amount)} − 수수료 ${won(feeOf(c.amount))} (${c.note} ${md(c.date)})` });
       }
       const cash = split.cash; // 현금: 예식 당일
-      if (r.date > base && keys.includes(r.date.slice(0, 7)) && cash > 0) ev.push({ date: r.date, type: "cash", amount: cash, label: r.couple, note: r.cash === null ? "잔금 예상(총액−카드)" : "현금" });
+      if (r.date > base && keys.includes(r.date.slice(0, 7)) && cash > 0) ev.push({ date: r.date, type: "cash", amount: cash, label: r.couple, note: r.cash !== null ? "현금" : r.received >= cash ? "현금 수령" : "잔금 예상(총액−카드)" });
     }
     for (const e of costOutflowEvents(costs, keys, base)) ev.push({ date: e.when, type: e.kind === "once" ? "one" : "mon", amount: e.amount, label: e.name });
     for (const x of shifts) {
@@ -175,7 +175,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
       const key = `${y}-${String(m).padStart(2, "0")}`;
       if (key > endMonth) break;
       const rm = reservations.filter((r) => r.paidDate.startsWith(key));
-      const g = rm.reduce((a, r) => a + r.card + (r.cash ?? 0), 0), f = rm.reduce((a, r) => a + feeOf(r.card), 0);
+      const g = rm.reduce((a, r) => a + r.card + (r.cash ?? r.received), 0), f = rm.reduce((a, r) => a + feeOf(r.card), 0);
       const mon = costs.filter((c) => c.kind === "monthly" && c.date.slice(0, 7) <= key).reduce((a, c) => a + c.amount, 0);
       const one = costs.filter((c) => c.kind === "once" && c.date.startsWith(key)).reduce((a, c) => a + c.amount, 0);
       const sm = shifts.filter((x) => x.date.startsWith(key));
@@ -295,7 +295,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               <tbody>
                 {rs.length === 0 && <tr><td colSpan={9} className="empty">이 달에 결제된 확정 예약이 없습니다.</td></tr>}
                 {rs.map((r) => {
-                  const f = feeOf(r.card), unentered = r.cash === null;
+                  const f = feeOf(r.card), unentered = r.cash === null && (r.received === 0 || r.received < r.total - r.card);
                   return (
                     <tr key={r.id}>
                       <td className="num">{md(r.paidDate)}</td>
@@ -303,9 +303,9 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
                       <td>{r.couple}<br /><small className="sub">{r.id} · {r.plan}</small></td>
                       <td className="r num">{won(r.card)}</td>
                       <td className="r num neg">{f ? `−${won(f)}` : "-"}</td>
-                      <td className="r"><input className="cell num" key={`${r.id}:${r.cash}`} inputMode="numeric" defaultValue={r.cash ?? ""} placeholder={`예상 ${Math.max(0, r.total - r.card).toLocaleString("ko-KR")}`} aria-label={`${r.couple} 현금결제 금액`}
+                      <td className="r"><input className="cell num" key={`${r.id}:${r.cash}`} inputMode="numeric" defaultValue={r.cash ?? ""} placeholder={r.received ? `수령 ${r.received.toLocaleString("ko-KR")}` : `예상 ${Math.max(0, r.total - r.card).toLocaleString("ko-KR")}`} aria-label={`${r.couple} 현금결제 금액`}
                         onBlur={(e) => { const t = e.target.value.trim(); const next = t === "" ? null : toInt(t); if (next !== r.cash) run(() => setCash(r.id, next)); }} /></td>
-                      <td className="r num"><b>{won(r.card - f + (r.cash ?? 0))}</b></td>
+                      <td className="r num"><b>{won(r.card - f + (r.cash ?? r.received))}</b></td>
                       <td className="num">{(() => { const d = addBusinessDays(r.paidDate, CARD_SETTLE_BUSINESS_DAYS); return <>{md(d)}<br /><small className="sub">{won(r.card - f)}{d <= data.today ? " · 입금일 경과" : ""}</small></>; })()}</td>
                       <td>{unentered ? (r.date > data.today ? <span className="pill mute">예식 전</span> : <span className="pill warn">잔금 확인 필요</span>) : <span className="pill good">수금 완료</span>}</td>
                     </tr>
@@ -314,7 +314,7 @@ export default function FinanceView({ data, view = "finance" }: { data: FinanceD
               </tbody>
               <tfoot><tr><td colSpan={3}>합계</td><td className="r num">{won(card)}</td><td className="r num neg">−{won(fee)}</td><td className="r num">{won(cash)}</td><td className="r num">{won(income)}</td><td colSpan={2} /></tr></tfoot>
             </table></div>
-            <p className="note">월은 결제일(예약 접수일) 기준입니다. 카드결제는 예약에 기록된 결제 금액(홈페이지 KG이니시스)을 그대로 가져옵니다. 현금결제는 예식 당일 받은 잔금을 입력하세요(칸을 벗어나면 저장). 예식일이 아직 안 지난 예약은 잔금이 비어 있어도 "예식 전"으로 표시합니다. 실수입 = 카드결제 − 카드수수료 + 현금결제. 취소된 예약은 포함하지 않습니다. "카드 입금 예정"은 결제 후 7영업일에 수수료를 뗀 금액이 들어온다고 가정한 예상입니다. 실제 입금일과 입금액은 이니시스 정산 내역을 연동하면 보여 드릴 수 있습니다.</p>
+            <p className="note">월은 결제일(예약 접수일) 기준입니다. 카드결제는 예약에 기록된 결제 금액(홈페이지 결제·결제 링크)에서 "현금 수령" 기록을 뺀 값입니다. "현금 수령"으로 기록한 돈은 현금으로 셉니다. 현금결제는 예식 당일 받은 잔금을 입력하세요(칸을 벗어나면 저장). 예식일이 아직 안 지난 예약은 잔금이 비어 있어도 "예식 전"으로 표시합니다. 실수입 = 카드결제 − 카드수수료 + 현금결제. 취소된 예약은 포함하지 않습니다. "카드 입금 예정"은 결제 후 7영업일에 수수료를 뗀 금액이 들어온다고 가정한 예상입니다. 실제 입금일과 입금액은 이니시스 정산 내역을 연동하면 보여 드릴 수 있습니다.</p>
           </div>
         </section>
       )}
