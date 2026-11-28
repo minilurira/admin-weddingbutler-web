@@ -1,5 +1,6 @@
 "use server";
 
+import { cashReceivedBy } from "@/lib/cashReceipt";
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
@@ -248,20 +249,23 @@ export async function runReconciliation(month: string): Promise<ReconcileResult>
     select: { id: true, status: true, paidAmount: true, paymentLinks: { where: { status: "paid" }, select: { paidAmount: true } } },
   });
   const admin = new Map(adminRows.map((a) => [a.id, a]));
+  const cashBy = await cashReceivedBy(adminRows.map((a) => a.id));
   let adminPaidTotal = 0;
 
   const rows = data.rows.map((raw) => {
     const a = admin.get(raw.bookingNo);
-    // 홈페이지(포트원 V2) 결제와 맞춰 보는 것이라, 어드민 결제금액에서 결제 링크(V1)로 따로 받은 금액은 뺀다
+    // 홈페이지(포트원 V2) 결제와 맞춰 보는 것이라, 어드민 결제금액에서 결제 링크(V1)와 "현금 수령"으로 따로 받은 금액은 뺀다
     const linkPaid = a ? a.paymentLinks.reduce((sum, l) => sum + l.paidAmount, 0) : 0;
-    const homePaid = a ? a.paidAmount - linkPaid : 0;
+    const cashPaid = a ? cashBy.get(a.id) ?? 0 : 0;
+    const homePaid = a ? a.paidAmount - linkPaid - cashPaid : 0;
+    const apart = [linkPaid ? `결제 링크 ${linkPaid.toLocaleString("ko-KR")}원` : "", cashPaid ? `현금 수령 ${cashPaid.toLocaleString("ko-KR")}원` : ""].filter(Boolean).join(", ");
     const r = { ...raw, adminPaid: a ? homePaid : null };
     if (a && r.dbStatus === "paid") adminPaidTotal += homePaid;
     // 홈페이지 쪽은 맞는데 어드민과 어긋나는 경우
     if (r.verdict === "ok" && r.dbStatus === "paid") {
       if (!a) return { ...r, verdict: "mismatch" as const, reason: "결제는 확인되는데 어드민에 예약이 없습니다 (연동 누락)" };
       if (a.status !== "취소" && homePaid !== r.pgAmount)
-        return { ...r, verdict: "mismatch" as const, reason: `어드민 결제금액(${a.paidAmount.toLocaleString("ko-KR")}원${linkPaid ? `, 결제 링크 ${linkPaid.toLocaleString("ko-KR")}원 제외 ${homePaid.toLocaleString("ko-KR")}원` : ""})이 포트원 결제금액(${r.pgAmount.toLocaleString("ko-KR")}원)과 다릅니다` };
+        return { ...r, verdict: "mismatch" as const, reason: `어드민 결제금액(${a.paidAmount.toLocaleString("ko-KR")}원${apart ? `, ${apart} 제외 ${homePaid.toLocaleString("ko-KR")}원` : ""})이 포트원 결제금액(${r.pgAmount.toLocaleString("ko-KR")}원)과 다릅니다` };
     }
     return r;
   });

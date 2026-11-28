@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/errorLog";
@@ -75,6 +76,14 @@ export async function listCashReceipts(reservationId: string): Promise<CashRecei
     logError(`[cashReceipt] list failed for ${reservationId}`, err);
     return [];
   }
+}
+
+/** 예약별로 "현금 수령"으로 결제 금액에 더한 합계 (receiveCash). */
+export async function cashReceivedBy(reservationIds: string[]): Promise<Map<string, number>> {
+  if (!reservationIds.length) return new Map();
+  await ensureTable();
+  const rows = await prisma.$queryRaw<{ reservationId: string; total: bigint }[]>`SELECT "reservationId", SUM("amount") AS total FROM "CashReceipt" WHERE "reservationId" IN (${Prisma.join(reservationIds)}) GROUP BY "reservationId"`;
+  return new Map(rows.map((r) => [r.reservationId, Number(r.total)]));
 }
 
 export interface ReceiveInput {
