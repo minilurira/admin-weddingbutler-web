@@ -47,7 +47,7 @@ export async function loadExtraGuest(reservationId: string): Promise<ExtraGuestV
 }
 
 /** 청구할 추가 인원(extraGuests) × 1인 요금을 결제 링크로 보낸다. 0명이면 잔금만 청구한다(includeBalance일 때만). */
-export async function sendExtraGuestClaim(reservationId: string, extraGuests: number, includeBalance: boolean): Promise<{ ok: boolean; message: string }> {
+export async function sendExtraGuestClaim(reservationId: string, extraGuests: number, includeBalance: boolean, smsOnly = false): Promise<{ ok: boolean; message: string }> {
   if (!Number.isInteger(extraGuests) || extraGuests < 0 || extraGuests > 5000 || (extraGuests === 0 && !includeBalance)) return { ok: false, message: "추가 인원을 확인해 주세요." };
   const v = await loadExtraGuest(reservationId);
   if (!v.eligible) return { ok: false, message: v.reason };
@@ -56,7 +56,7 @@ export async function sendExtraGuestClaim(reservationId: string, extraGuests: nu
   if (includeBalance && balance <= 0) return { ok: false, message: "남은 잔금이 없습니다." };
   if (diff + balance <= 0) return { ok: false, message: "청구할 금액이 없습니다." };
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id: reservationId } });
-  const res = await sendPaymentLinkFor(r, { amount: diff + balance, paymentType: "", days: 0, claim: { extraGuests, includesBalance: balance > 0, balance, extraFee: diff } });
+  const res = await sendPaymentLinkFor(r, { amount: diff + balance, paymentType: "", days: 0, claim: { extraGuests, includesBalance: balance > 0, balance, extraFee: diff }, smsOnly });
   if (res.ok) {
     const parts = [balance > 0 ? `잔금 ${won(balance)}` : "", diff > 0 ? `추가 하객 ${extraGuests}명 차액 ${won(diff)}` : ""].filter(Boolean).join(" + ");
     await prisma.note.create({ data: { reservationId, text: `추가 하객 차액 청구 · ${parts} = ${won(diff + balance)}` } });

@@ -35,12 +35,12 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
     try { await navigator.clipboard.writeText(url); toast("결제 링크를 복사했습니다."); } catch { window.prompt("결제 링크", url); }
   }
 
-  async function send() {
+  async function send(smsOnly = false) {
     if (!data || total <= 0) return;
     const what = [balance ? `잔금 ${won(balance)}` : "", diff ? `추가 하객 차액 ${won(diff)}` : ""].filter(Boolean).join(" + ");
-    if (!window.confirm(`${n ? `추가 인원 ${n}명 ` : ""}${what}${balance && diff ? ` = ${won(total)}` : ""} 결제 링크를 고객에게 보낼까요?`)) return;
+    if (!window.confirm(`${n ? `추가 인원 ${n}명 ` : ""}${what}${balance && diff ? ` = ${won(total)}` : ""} 결제 링크를 고객에게 ${smsOnly ? "문자로" : "알림톡으로"} 보낼까요?`)) return;
     setBusy(true);
-    try { const res = await claimExtraGuests(reservationId, n, balance > 0); toast(res.message); load(); } catch (e) { toast(e instanceof Error ? e.message : "처리하지 못했습니다."); } finally { setBusy(false); }
+    try { const res = await claimExtraGuests(reservationId, n, balance > 0, smsOnly); toast(res.message); load(); } catch (e) { toast(e instanceof Error ? e.message : "처리하지 못했습니다."); } finally { setBusy(false); }
   }
 
   return (
@@ -70,9 +70,13 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
                 ? `잔금 ${won(balance)}${diff > 0 ? ` + 차액 ${won(diff)} = ${won(total)}` : ""}`
                 : diff > 0 ? `청구 차액 ${won(diff)}` : ""}
             </span>
-            <button disabled={busy || total <= 0} onClick={send}
+            <button disabled={busy || total <= 0} onClick={() => send()}
               style={{ marginLeft: "auto", height: 40, padding: "0 16px", border: 0, borderRadius: 12, background: "#B0567E", color: "#FFFFFF", fontSize: 13, fontWeight: 800, cursor: "pointer", opacity: busy || total <= 0 ? 0.5 : 1 }}>
               {balance > 0 ? (diff > 0 ? "잔금 + 차액 결제 링크 보내기" : "잔금 결제 링크 보내기") : "차액 청구 링크 보내기"}
+            </button>
+            <button disabled={busy || total <= 0} onClick={() => send(true)}
+              style={{ height: 40, padding: "0 14px", borderRadius: 12, border: "1px solid #E4DCE1", background: "#FFFFFF", color: "#413A3E", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: busy || total <= 0 ? 0.5 : 1 }}>
+              문자로 보내기
             </button>
           </div>
           {data.claims.length > 0 && (

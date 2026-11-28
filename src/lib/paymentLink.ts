@@ -27,6 +27,8 @@ export interface SendLinkOptions {
    * includesBalance: 남은 잔금도 함께 담았는지 — 그렇다면 열려 있는 다른 결제 링크도 취소한다(잔금 이중 결제 방지).
    */
   claim?: { extraGuests: number; includesBalance: boolean; balance: number; extraFee: number };
+  /** 알림톡을 건너뛰고 문자로만 보낸다 (잔금·차액 청구의 "문자로 보내기") */
+  smsOnly?: boolean;
 }
 
 /** 추가 하객 차액 청구 링크인지 (-G: 현재, -X: 이전 방식) */
@@ -89,7 +91,7 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   const smsText = claimFields ? claimLinkText(claimFields) : paymentLinkText(fields);
   let sentVia = "";
   const claimVars = claimFields ? claimLinkVariables(claimFields) : null;
-  const claimSent = claimVars ? await sendClaimLinkAlimtalk(r.phone, claimVars, tag, smsText) : null;
+  const claimSent = claimVars && !opts.smsOnly ? await sendClaimLinkAlimtalk(r.phone, claimVars, tag, smsText) : null;
   if (claimSent || (!claim && (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag)))) sentVia = "alimtalk";
   let smsGroupId = "";
   if (!sentVia) {
