@@ -96,7 +96,8 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
     const nos = filled.map((r) => num(r.envelopeNo));
     const dupes = nos.filter((n, i) => n && nos.indexOf(n) !== i);
     return {
-      envelopes: filled.length,
+      // 금액 0원인 줄(식권만 받은 하객 등)은 봉투로 세지 않는다 (고객 화면과 같은 기준)
+      envelopes: filled.filter((r) => !(r.amount.trim() && num(r.amount) === 0)).length,
       tickets: filled.reduce((a, r) => a + num(r.tickets), 0),
       amount: filled.reduce((a, r) => a + num(r.amount), 0),
       missingNo: filled.filter((r) => !num(r.envelopeNo)).length,
@@ -389,7 +390,7 @@ export default function RecordEditor({ reservation, link, codeUrl, initial, rete
         </div>
         {(countMismatch || summary.missingNo > 0 || summary.dupes.length > 0) && (
           <ul style={{ margin: "10px 0 0", padding: "12px 14px 12px 30px", borderRadius: 12, background: "#FBF0DC", color: "#8A5A00", fontSize: 13, lineHeight: 1.7 }}>
-            {countMismatch && <li>인계확인서 매수({handoverCount}장)와 명단 봉투 수({summary.envelopes}장)가 달라요. 고객 화면에 문의 안내가 표시돼요.</li>}
+            {countMismatch && <li>인계확인서 매수({handoverCount}장)와 명단 봉투 수({summary.envelopes}장, 0원 제외)가 달라요.</li>}
             {summary.missingNo > 0 && <li>봉투번호가 비어 있는 줄이 {summary.missingNo}개 있어요.</li>}
             {summary.dupes.length > 0 && <li>봉투번호 {summary.dupes.join(", ")}번이 겹쳐요.</li>}
           </ul>
