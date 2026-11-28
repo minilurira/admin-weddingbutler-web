@@ -14,9 +14,9 @@ export async function getExtraGuest(reservationId: string): Promise<ExtraGuestVi
   return loadExtraGuest(reservationId);
 }
 
-export async function claimExtraGuests(reservationId: string, actualGuests: number, includeBalance: boolean) {
+export async function claimExtraGuests(reservationId: string, extraGuests: number, includeBalance: boolean) {
   await guard();
-  const res = await sendExtraGuestClaim(reservationId, actualGuests, includeBalance);
+  const res = await sendExtraGuestClaim(reservationId, extraGuests, includeBalance);
   revalidatePath("/reservations");
   revalidatePath(`/reservations/${reservationId}`);
   return res;
