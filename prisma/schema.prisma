@@ -100,6 +100,8 @@ model PaymentLink {
   paidAmount     Int         @default(0)
   paidAt         DateTime?
   refundedAmount Int         @default(0)
+  // 추가 하객 차액 청구 링크(-G)에 담긴 추가 하객 수. 결제되면 예약의 confirmExtraGuests에 더한다. 일반 링크는 0
+  extraGuests    Int         @default(0)
   createdAt      DateTime    @default(now())
 
   @@index([reservationId])

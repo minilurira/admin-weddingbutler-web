@@ -322,7 +322,8 @@ export async function sendPaymentLink(id: string, opts: SendLinkOptions) {
   await requireSession();
   const r = await prisma.reservation.findUniqueOrThrow({ where: { id } });
   if (isPast(r)) return { ok: false, message: "예식 일시가 지난 예약에는 결제 링크를 보낼 수 없습니다." };
-  const res = await sendPaymentLinkFor(r, opts);
+  // 차액 청구 옵션은 차액 청구 카드(extraGuest.ts)만 쓴다
+  const res = await sendPaymentLinkFor(r, { amount: opts.amount, paymentType: opts.paymentType, days: opts.days, discountRate: opts.discountRate });
   revalidateAll();
   return res;
 }
