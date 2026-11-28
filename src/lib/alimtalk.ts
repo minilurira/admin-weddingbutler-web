@@ -363,6 +363,24 @@ export async function sendPaymentLinkAlimtalk(phone: string, variables: Record<s
   }
 }
 
+/** 잔금·차액 청구 알림톡. 템플릿 ID는 SOLAPI_TEMPLATE_CLAIM_LINK(없으면 null — 호출부가 문자로 보낸다).
+ * 보냈으면 솔라피 그룹 ID(수신 결과 확인용)를 돌려준다. 카카오가 나중에 거절하면 솔라피가 fallbackText를 문자로 대신 보낸다. */
+export async function sendClaimLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string, fallbackText: string): Promise<{ templateId: string; groupId: string } | null> {
+  const svc = client();
+  const from = process.env.SOLAPI_SENDER_PHONE;
+  const pfId = process.env.SOLAPI_PF_ID;
+  const templateId = process.env.SOLAPI_TEMPLATE_CLAIM_LINK || "";
+  if (!svc || !from || !pfId || !templateId) return null;
+  try {
+    const result = await svc.send({ to: digitsOnly(phone), from, text: fallbackText, kakaoOptions: { pfId, templateId, variables: await onlyTemplateVariables(templateId, variables), disableSms: false } });
+    logSendResult(tag, result);
+    return result.failedMessageList.length === 0 ? { templateId, groupId: result.groupInfo.groupId } : null;
+  } catch (err) {
+    logError(`[alimtalk] Solapi claim link send failed for ${tag}`, err);
+    return null;
+  }
+}
+
 /** 버틀러(스태프) 업무 배정 알림톡 — 배정된 버틀러 본인에게. 언제 보낼지와 중복 방지는 src/lib/butlerNotice.ts가 맡는다.
  * 템플릿 ID는 비밀이 아니라 기본값을 두었다(환경변수 SOLAPI_TEMPLATE_BUTLER_STAFF로 바꿀 수 있다).
  * 발송 내역에는 번호를 가려서 남기고, 같은 버틀러에게 다시 보내지 않도록 변수에 "_butlerId"를 함께 기록한다(솔라피로는 보내지 않음). */

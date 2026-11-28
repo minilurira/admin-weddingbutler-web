@@ -1,13 +1,13 @@
 import type { Reservation } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { calcConfirm, isPaymentType, onsiteAmount, PAYMENT_TYPES, won } from "@/lib/pricing";
-import { sendNewReservationAlimtalk, sendPaymentLinkAlimtalk } from "@/lib/alimtalk";
+import { sendClaimLinkAlimtalk, sendNewReservationAlimtalk, sendPaymentLinkAlimtalk } from "@/lib/alimtalk";
 import { sendSmsWithGroup } from "@/lib/sms";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { formatStamp } from "@/lib/format";
 import { recordMessage } from "@/lib/messageLog";
 import { cancelPayment, createPaymentLink, deactivatePaymentLink, getPayment, PortOneV1Error } from "@/lib/portoneV1";
-import { claimLinkText, expireLabel, expiryAfterDays, paymentLinkText, paymentLinkVariables, type PaymentLinkFields } from "@/lib/paymentLinkText";
+import { claimLinkText, claimLinkVariables, expireLabel, expiryAfterDays, paymentLinkText, paymentLinkVariables, type PaymentLinkFields } from "@/lib/paymentLinkText";
 
 import { logError } from "@/lib/errorLog";
 // 어드민 → 고객 결제 링크(포트원 V1 링크페이). 링크 생성·발송, 웹훅 반영, 환불을 여기서 한다.
@@ -84,10 +84,13 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
     payUrl: url,
   };
   const tag = `payment link ${merchantUid}`;
-  // 잔금·차액 청구는 예약 결제 알림톡 문구가 맞지 않아 전용 문구를 문자(LMS)로 보낸다
-  const smsText = claim ? claimLinkText({ ...fields, balance: claim.balance, extraGuests: claim.extraGuests, extraFee: claim.extraFee }) : paymentLinkText(fields);
+  // 잔금·차액 청구는 예약 결제 알림톡과 문구가 달라 전용 템플릿·전용 문자 문구를 쓴다. 알림톡이 안 되면 문자(LMS)
+  const claimFields = claim ? { ...fields, balance: claim.balance, extraGuests: claim.extraGuests, extraFee: claim.extraFee } : null;
+  const smsText = claimFields ? claimLinkText(claimFields) : paymentLinkText(fields);
   let sentVia = "";
-  if (!claim && (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag))) sentVia = "alimtalk";
+  const claimVars = claimFields ? claimLinkVariables(claimFields) : null;
+  const claimSent = claimVars ? await sendClaimLinkAlimtalk(r.phone, claimVars, tag, smsText) : null;
+  if (claimSent || (!claim && (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag)))) sentVia = "alimtalk";
   let smsGroupId = "";
   if (!sentVia) {
     const sms = await sendSmsWithGroup(r.phone, smsText, tag);
@@ -98,11 +101,11 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   await recordMessage({
     reservationId: r.id,
     kind: claim ? "잔금·차액 결제 링크" : "결제 링크",
-    channel: claim || sentVia === "sms" ? "문자" : "알림톡",
+    channel: sentVia === "alimtalk" ? "알림톡" : claim || sentVia === "sms" ? "문자" : "알림톡",
     recipient: r.phone,
-    templateId: sentVia === "alimtalk" ? process.env.SOLAPI_TEMPLATE_PAYMENT_LINK : undefined,
+    templateId: claimSent ? claimSent.templateId : sentVia === "alimtalk" ? process.env.SOLAPI_TEMPLATE_PAYMENT_LINK : undefined,
     // 문자는 솔라피 그룹 ID를 남겨 나중에 수신 결과(수신 완료/실패 사유)를 확인한다
-    variables: sentVia === "alimtalk" ? paymentLinkVariables(fields) : smsGroupId ? { _solapiGroupId: smsGroupId } : undefined,
+    variables: claimSent && claimVars ? { ...claimVars, _solapiGroupId: claimSent.groupId } : sentVia === "alimtalk" ? paymentLinkVariables(fields) : smsGroupId ? { _solapiGroupId: smsGroupId } : undefined,
     // 문자로 보냈거나 보내지 못한 건은 보내려던 본문을 남긴다 (실패해도 발송 내역에서 내용을 볼 수 있게)
     content: sentVia === "alimtalk" ? "" : smsText,
     status: sentVia ? "sent" : "failed",

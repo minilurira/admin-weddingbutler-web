@@ -67,7 +67,22 @@ export function paymentLinkText(f: PaymentLinkFields) {
   ].join("\n");
 }
 
-/** 잔금·추가 하객 차액 청구 문자(LMS). 알림톡 템플릿이 없어 문자로만 보낸다. 해당하는 금액 줄만 넣는다. */
+/** 잔금·차액 청구 알림톡 변수. 템플릿 버튼 링크가 "https://#{url}" 이라 주소에서 스킴을 뺀다. 해당하는 금액만 내역에 넣는다. */
+export function claimLinkVariables(f: PaymentLinkFields & { balance: number; extraGuests: number; extraFee: number }): Record<string, string> {
+  const w = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+  const detail = [f.balance > 0 ? `잔금 ${w(f.balance)}` : "", f.extraFee > 0 ? `추가 하객 ${f.extraGuests}명 ${w(f.extraFee)}` : ""].filter(Boolean).join(" + ");
+  return {
+    "#{name}": f.name.trim() || "고객",
+    "#{bookingNo}": f.bookingNo,
+    "#{wishDate}": f.wishDate || "-",
+    "#{detail}": detail || w(f.amount),
+    "#{amount}": w(f.amount),
+    "#{expireAt}": expireLabel(f.expiresAt),
+    "#{url}": f.payUrl.replace(/^https?:\/\//, ""),
+  };
+}
+
+/** 잔금·추가 하객 차액 청구 문자(LMS). 알림톡 템플릿이 없거나 실패할 때 보낸다. 해당하는 금액 줄만 넣는다. */
 export function claimLinkText(f: PaymentLinkFields & { balance: number; extraGuests: number; extraFee: number }) {
   const w = (n: number) => `${n.toLocaleString("ko-KR")}원`;
   const title = f.balance > 0 && f.extraFee > 0 ? "잔금·추가 하객 결제 안내" : f.balance > 0 ? "잔금 결제 안내" : "추가 하객 결제 안내";
