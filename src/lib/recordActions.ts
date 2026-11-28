@@ -4,7 +4,8 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { RETENTION_DAYS, addDays, fromKstInput, newToken } from "@/lib/records";
+import { RETENTION_DAYS, addDays, customerUrl, fromKstInput, isExpired, newToken } from "@/lib/records";
+import { sendRecordLinkAlimtalk } from "@/lib/alimtalk";
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -161,4 +162,32 @@ export async function revokeRecord(reservationId: string): Promise<{ ok: boolean
   await prisma.recordLink.update({ where: { id: link.id }, data: { status: "revoked" } });
   revalidateRecord(reservationId);
   return { ok: true, message: "링크를 회수했어요. 다시 게시하거나 실시간 공유를 시작하기 전까지 주소가 열리지 않아요." };
+}
+
+/** 열려 있는(게시·실시간 공유) 축의 기록의 주소를 고객 예약 번호로 보낸다. */
+export async function sendRecordLink(reservationId: string): Promise<{ ok: boolean; message: string }> {
+  await requireSession();
+  const link = await prisma.recordLink.findUnique({ where: { reservationId }, include: { reservation: true } });
+  if (!link || (link.status !== "published" && link.status !== "live")) return { ok: false, message: "게시하거나 실시간 공유를 시작한 뒤에 보낼 수 있어요." };
+  if (isExpired(link)) return { ok: false, message: "열람 기한이 지난 기록이에요." };
+  const r = link.reservation;
+  if (r.status === "취소") return { ok: false, message: "취소된 예약이에요." };
+  if (!r.phone) return { ok: false, message: "예약에 휴대폰 번호가 없어요." };
+  const until = link.expiresAt ? new Date(link.expiresAt.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, ".") : "추후 안내";
+  const variables = { "#{customer}": r.customer, "#{bookingNo}": r.id, "#{expiresAt}": until, "#{recordCode}": r.id };
+  const text = [
+    "[웨딩버틀러] 축의 기록 안내",
+    "",
+    `${r.customer} 고객님, 예식의 축의 기록이 준비되었습니다.`,
+    "",
+    `예약번호: ${r.id}`,
+    `열람 기한: ${until}까지`,
+    "",
+    "아래 주소에서 예약하신 휴대폰 번호로 문자 인증을 하시면 확인하실 수 있습니다.",
+    customerUrl(r.id),
+  ].join("\n");
+  const res = await sendRecordLinkAlimtalk(r.id, r.phone, variables, text);
+  if (res.sent) await prisma.note.create({ data: { reservationId: r.id, text: `축의 기록 링크 발송 (${res.detail})` } });
+  revalidateRecord(reservationId);
+  return res.sent ? { ok: true, message: `축의 기록 링크를 ${res.detail}으로 보냈어요.` } : { ok: false, message: `보내지 못했어요 (${res.detail}).` };
 }

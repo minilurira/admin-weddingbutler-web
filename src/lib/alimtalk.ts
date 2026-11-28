@@ -447,6 +447,34 @@ export const sendButlerCancelAlimtalk = (reservationId: string, butlerId: string
 export const sendButlerDayBeforeAlimtalk = (reservationId: string, butlerId: string, phone: string, variables: Record<string, string>, fallbackText: string) =>
   sendToButler("버틀러 1일 전 안내", process.env.SOLAPI_TEMPLATE_BUTLER_DAY1 || "KA01TP261127005500580HIYrxpvMOVx", reservationId, butlerId, phone, variables, fallbackText);
 
+/** 축의 기록 링크 안내 — 고객에게. 언제 보낼지는 src/lib/recordActions.ts(sendRecordLink).
+ * 템플릿 ID는 SOLAPI_TEMPLATE_RECORD_LINK (없으면 문자). 버튼 링크는 https://report.weddingbutler.co.kr/#{recordCode}. 카카오가 거절해도 text가 문자로 대신 간다. */
+export async function sendRecordLinkAlimtalk(reservationId: string, phone: string, variables: Record<string, string>, fallbackText: string): Promise<{ sent: boolean; detail: string }> {
+  const svc = client();
+  const from = process.env.SOLAPI_SENDER_PHONE;
+  const pfId = process.env.SOLAPI_PF_ID;
+  const templateId = process.env.SOLAPI_TEMPLATE_RECORD_LINK || "";
+  const useTemplate = Boolean(templateId && pfId);
+  const log = (outcome: { status: "sent" | "failed" | "skipped"; detail?: string }, groupId?: string) =>
+    useTemplate ? logKakao(reservationId, "축의 기록 안내", phone, templateId, variables, outcome, false, groupId)
+      : recordMessage({ reservationId, kind: "축의 기록 안내", channel: "문자", recipient: phone, content: fallbackText, status: outcome.status, detail: outcome.detail });
+  if (!svc || !from) {
+    await log({ status: "skipped", detail: "솔라피 설정이 없어 보내지 않았습니다." });
+    return { sent: false, detail: "미설정" };
+  }
+  try {
+    const result = await svc.send({ to: digitsOnly(phone), from, text: fallbackText, ...(useTemplate ? { kakaoOptions: { pfId: pfId!, templateId, variables: await onlyTemplateVariables(templateId, variables), disableSms: false } } : {}) });
+    logSendResult(reservationId, result);
+    const reason = failureFor(result, phone);
+    await log(reason ? { status: "failed", detail: reason } : { status: "sent" }, result.groupInfo.groupId);
+    return reason ? { sent: false, detail: reason } : { sent: true, detail: useTemplate ? "알림톡" : "문자" };
+  } catch (err) {
+    logError(`[alimtalk] Solapi record-link send failed for ${reservationId}`, err);
+    await log({ status: "failed", detail: err instanceof Error ? err.message : "전송 실패" });
+    return { sent: false, detail: "전송 실패" };
+  }
+}
+
 /** 스페셜 예약 링크 알림톡(SOLAPI_TEMPLATE_SPECIAL_LINK). 변수와 본문은 src/lib/specialLinkText.ts.
  * 템플릿 ID가 없거나 바로 거절되면 false — 호출부가 문자(LMS)로 대신 보낸다. */
 export async function sendSpecialLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string, fallbackText?: string): Promise<boolean> {
