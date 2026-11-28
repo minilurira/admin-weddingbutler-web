@@ -30,6 +30,11 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
   const balance = hasBalance && withBalance ? data!.balance : 0;
   const total = diff + balance;
 
+  // 문자가 안 갔을 때 카톡 등으로 직접 보낼 수 있게 (예식일이 지나도 쓸 수 있다)
+  async function copy(url: string) {
+    try { await navigator.clipboard.writeText(url); toast("결제 링크를 복사했습니다."); } catch { window.prompt("결제 링크", url); }
+  }
+
   async function send() {
     if (!data || total <= 0) return;
     const what = [balance ? `잔금 ${won(balance)}` : "", diff ? `추가 하객 차액 ${won(diff)}` : ""].filter(Boolean).join(" + ");
@@ -73,8 +78,11 @@ export default function ExtraGuestClaim({ reservationId, card }: { reservationId
           {data.claims.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
               {data.claims.map((c) => (
-                <div key={c.id} style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", padding: "10px 12px", borderRadius: 12, border: "1px solid #EFEBED", fontSize: 13 }}>
+                <div key={c.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px", padding: "10px 12px", borderRadius: 12, border: "1px solid #EFEBED", fontSize: 13 }}>
                   <b>{won(c.amount)}</b>{c.extraGuests > 0 && <span style={{ color: "#6E646A" }}>추가 하객 {c.extraGuests}명</span>}<span style={{ color: "#8C8188" }}>{c.expired ? "만료" : STATUS[c.status] ?? c.status} · 발송 {c.createdLabel}{c.paidLabel ? ` · 결제 ${c.paidLabel}` : ""}</span>
+                  {c.status === "sent" && !c.expired && c.url && (
+                    <button type="button" onClick={() => copy(c.url)} style={{ marginLeft: "auto", height: 28, padding: "0 12px", borderRadius: 10, border: "1px solid #E5DDE1", background: "#FFFFFF", color: "#8A3F61", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>링크 복사</button>
+                  )}
                 </div>
               ))}
             </div>

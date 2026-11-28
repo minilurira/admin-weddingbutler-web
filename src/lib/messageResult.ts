@@ -31,7 +31,7 @@ const isPending = (m: Stored) => m.statusCode === "2000" || m.statusCode === "30
 type Verdict = { kind: "pending" } | { kind: "delivered" } | { kind: "failed"; detail: string };
 
 /** 그룹 안에서 이 기록의 받는 사람(직원은 번호가 가려져 있어 끝 4자리)에게 간 메시지를 골라 판정한다. */
-function judge(list: Stored[], recipient: string): Verdict {
+function judge(list: Stored[], recipient: string, channel = "알림톡"): Verdict {
   const last4 = digits(recipient).slice(-4);
   const mine = list.filter((m) => last4 && toOf(m).endsWith(last4));
   const pool = mine.length ? mine : list.length === 1 ? list : [];
@@ -40,6 +40,7 @@ function judge(list: Stored[], recipient: string): Verdict {
   if (!target || isPending(target)) return { kind: "pending" };
   if (target.statusCode === "4000") return { kind: "delivered" };
   const reason = [target.statusCode, target.reason].filter(Boolean).join(" ") || "전송 실패";
+  if (channel === "문자") return { kind: "failed", detail: `문자 최종 실패: ${reason}` };
   // 알림톡이 실패하면 솔라피가 문자로 대신 보내기도 한다 (같은 그룹에 문자가 따로 생긴다)
   const sms = pool.find((m) => m.type !== "ATA" && m.statusCode === "4000");
   return { kind: "failed", detail: `카카오 최종 실패: ${reason}${sms ? " · 문자로 대체 발송됨" : target.replacement ? " · 문자 대체 발송 시도" : ""}` };
@@ -54,7 +55,7 @@ export async function refreshMessageResults(reservationId?: string): Promise<voi
     const rows = await prisma.messageLog.findMany({
       where: {
         ...(reservationId ? { reservationId } : {}),
-        channel: "알림톡",
+        channel: { in: ["알림톡", "문자"] },
         status: "sent",
         variables: { contains: '"_solapiGroupId"' },
         NOT: { variables: { contains: '"_result"' } },
@@ -73,7 +74,7 @@ export async function refreshMessageResults(reservationId?: string): Promise<voi
         const res = await svc.getMessages({ groupId });
         groups.set(groupId, Object.values(res.messageList) as Stored[]);
       }
-      const verdict = judge(groups.get(groupId)!, row.recipient);
+      const verdict = judge(groups.get(groupId)!, row.recipient, row.channel);
       if (verdict.kind === "pending") continue;
       if (verdict.kind === "delivered") {
         await prisma.messageLog.update({ where: { id: row.id }, data: { variables: JSON.stringify({ ...vars, _result: "delivered" }) } });
@@ -83,7 +84,7 @@ export async function refreshMessageResults(reservationId?: string): Promise<voi
         where: { id: row.id },
         data: { status: "failed", detail: verdict.detail.slice(0, 300), variables: JSON.stringify({ ...vars, _result: "failed" }) },
       });
-      await sendNewReservationKakaoWorkNotice(`알림톡 발송 실패 (${row.kind})\n${row.reservationId} · ${verdict.detail}\n어드민 예약 상세의 발송 내역에서 확인하세요.`);
+      await sendNewReservationKakaoWorkNotice(`${row.channel} 발송 실패 (${row.kind})\n${row.reservationId} · ${verdict.detail}\n어드민 예약 상세의 발송 내역에서 확인하세요.`);
     }
   } catch (err) {
     logError("[messageResult] could not refresh Solapi results", err);

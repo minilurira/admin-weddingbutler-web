@@ -2,7 +2,7 @@ import type { Reservation } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { calcConfirm, isPaymentType, onsiteAmount, PAYMENT_TYPES, won } from "@/lib/pricing";
 import { sendNewReservationAlimtalk, sendPaymentLinkAlimtalk } from "@/lib/alimtalk";
-import { sendSms } from "@/lib/sms";
+import { sendSmsWithGroup } from "@/lib/sms";
 import { sendNewReservationKakaoWorkNotice } from "@/lib/kakaowork";
 import { formatStamp } from "@/lib/format";
 import { recordMessage } from "@/lib/messageLog";
@@ -88,7 +88,11 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
   const smsText = claim ? claimLinkText({ ...fields, balance: claim.balance, extraGuests: claim.extraGuests, extraFee: claim.extraFee }) : paymentLinkText(fields);
   let sentVia = "";
   if (!claim && (await sendPaymentLinkAlimtalk(r.phone, paymentLinkVariables(fields), tag))) sentVia = "alimtalk";
-  else if (await sendSms(r.phone, smsText, tag)) sentVia = "sms";
+  let smsGroupId = "";
+  if (!sentVia) {
+    const sms = await sendSmsWithGroup(r.phone, smsText, tag);
+    if (sms.ok) { sentVia = "sms"; smsGroupId = sms.groupId ?? ""; }
+  }
 
   // 예약 상세의 발송 내역에 남긴다 (알림톡이면 변수, 문자면 보낸 본문)
   await recordMessage({
@@ -97,7 +101,8 @@ export async function sendPaymentLinkFor(r: Reservation, opts: SendLinkOptions):
     channel: claim || sentVia === "sms" ? "문자" : "알림톡",
     recipient: r.phone,
     templateId: sentVia === "alimtalk" ? process.env.SOLAPI_TEMPLATE_PAYMENT_LINK : undefined,
-    variables: sentVia === "alimtalk" ? paymentLinkVariables(fields) : undefined,
+    // 문자는 솔라피 그룹 ID를 남겨 나중에 수신 결과(수신 완료/실패 사유)를 확인한다
+    variables: sentVia === "alimtalk" ? paymentLinkVariables(fields) : smsGroupId ? { _solapiGroupId: smsGroupId } : undefined,
     // 문자로 보냈거나 보내지 못한 건은 보내려던 본문을 남긴다 (실패해도 발송 내역에서 내용을 볼 수 있게)
     content: sentVia === "alimtalk" ? "" : smsText,
     status: sentVia ? "sent" : "failed",
