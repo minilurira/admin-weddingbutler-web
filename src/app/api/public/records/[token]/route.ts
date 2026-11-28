@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRecordApiKey } from "@/lib/publicApi";
 import { loadOpenRecord, viewerOf } from "@/lib/publicRecord";
-import { maskPhone, planCode } from "@/lib/records";
+import { maskPhone, planCode, recordVideos } from "@/lib/records";
 
 export const dynamic = "force-dynamic";
 
@@ -22,5 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     coupleName: byReservation ? "" : link.reservation.couple,
     phoneMasked: byReservation ? "" : maskPhone(link.reservation.phone),
     expiresAt: link.expiresAt?.toISOString() ?? null,
+    // 스몰 화면(엑셀 전용)에도 영상을 보여 준다. 홈페이지는 문자 인증을 통과한 뒤에만 그린다.
+    videos: recordVideos(link, link.reservation.confirmPlan),
   });
 }

@@ -37,6 +37,7 @@ export interface RecordSaveInput {
   receiverLabel: string;
   staffCount: number;
   videoUrl: string;
+  videoUrl2: string;
   entries: RecordEntryInput[];
 }
 
@@ -88,6 +89,7 @@ export async function saveRecord(reservationId: string, input: RecordSaveInput):
     receiverLabel: input.receiverLabel.trim(),
     staffCount: int(input.staffCount),
     videoUrl: input.videoUrl.trim(),
+    videoUrl2: (input.videoUrl2 ?? "").trim(),
   };
 
   await prisma.$transaction(async (tx) => {

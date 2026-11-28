@@ -60,6 +60,7 @@ export default async function RecordPage({ params }: { params: { id: string } })
       receiverLabel: link?.receiverLabel ?? "",
       staffCount: link?.staffCount || r.confirmButlers,
       videoUrl: link?.videoUrl ?? "",
+      videoUrl2: link?.videoUrl2 ?? "",
       entries: (link?.entries ?? []).map((e) => ({
         envelopeNo: e.envelopeNo,
         side: e.side === "신부측" ? ("신부측" as const) : ("신랑측" as const),

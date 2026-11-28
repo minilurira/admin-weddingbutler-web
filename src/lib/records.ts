@@ -26,6 +26,20 @@ export function planCode(planKey: string) {
   return PLAN_CODE[planKey] ?? "standard";
 }
 
+/** 양가 요금제(스몰양가·프리미엄)는 신랑측·신부측 영상을 하나씩 받는다 */
+export function isBothSidesPlan(planKey: string) {
+  return planKey === "스몰양가" || planKey === "프리미엄";
+}
+
+/** 고객 화면에 보여 줄 영상 목록. 빈 칸은 뺀다. */
+export function recordVideos(link: Pick<RecordLink, "videoUrl" | "videoUrl2">, planKey: string) {
+  const both = isBothSidesPlan(planKey);
+  return [
+    { label: both ? "신랑측 영상" : "운영 영상", url: link.videoUrl.trim() },
+    ...(both ? [{ label: "신부측 영상", url: link.videoUrl2.trim() }] : []),
+  ].filter((v) => v.url);
+}
+
 /** 추측할 수 없는 24자 URL 토큰 */
 export function newToken() {
   return crypto.randomBytes(18).toString("base64url");
@@ -122,6 +136,7 @@ export function buildRecordPayload(link: RecordLink & { reservation: Reservation
       baseGuests: guestLimitAt(meta, r.createdAt),
       extraGuestFee: EXTRA_GUEST_FEE,
       ...(link.videoUrl ? { videoUrl: link.videoUrl } : {}),
+      videos: recordVideos(link, r.confirmPlan),
     },
     entries: link.entries
       .slice()

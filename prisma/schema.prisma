@@ -121,6 +121,8 @@ model RecordLink {
   receiverLabel         String         @default("")
   staffCount            Int            @default(0)
   videoUrl              String         @default("")
+  // 양가 요금제(스몰양가·프리미엄)의 신부측 영상. videoUrl은 신랑측(한측 요금제는 유일한 영상)
+  videoUrl2             String         @default("")
   version               Int            @default(0)
   publishedAt           DateTime?
   expiresAt             DateTime?
