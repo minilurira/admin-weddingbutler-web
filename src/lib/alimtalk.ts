@@ -363,13 +363,13 @@ export async function sendPaymentLinkAlimtalk(phone: string, variables: Record<s
   }
 }
 
-/** 잔금·차액 청구 알림톡. 템플릿 ID는 SOLAPI_TEMPLATE_CLAIM_LINK(없으면 null — 호출부가 문자로 보낸다).
+/** 잔금·차액 청구 알림톡. 템플릿 ID는 환경변수 SOLAPI_TEMPLATE_CLAIM_LINK로 바꿀 수 있다. 보내지 못하면 null — 호출부가 문자로 보낸다.
  * 보냈으면 솔라피 그룹 ID(수신 결과 확인용)를 돌려준다. 카카오가 나중에 거절하면 솔라피가 fallbackText를 문자로 대신 보낸다. */
 export async function sendClaimLinkAlimtalk(phone: string, variables: Record<string, string>, tag: string, fallbackText: string): Promise<{ templateId: string; groupId: string } | null> {
   const svc = client();
   const from = process.env.SOLAPI_SENDER_PHONE;
   const pfId = process.env.SOLAPI_PF_ID;
-  const templateId = process.env.SOLAPI_TEMPLATE_CLAIM_LINK || "";
+  const templateId = process.env.SOLAPI_TEMPLATE_CLAIM_LINK || "KA01TP261128082147752TrAcOAinDUB";
   if (!svc || !from || !pfId || !templateId) return null;
   try {
     const result = await svc.send({ to: digitsOnly(phone), from, text: fallbackText, kakaoOptions: { pfId, templateId, variables: await onlyTemplateVariables(templateId, variables), disableSms: false } });
